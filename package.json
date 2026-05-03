@@ -1,23 +1,33 @@
 {
-  "name": "rhythm-plus-game",
-  "version": "1.1.6",
-  "private": true,
-  "description": "Community based vertical scrolling rhythm game",
-  "author": {
-    "name": "henryz00"
-  },
+  "name": "rhythm-plus-exe",
+  "version": "1.0.0",
+  "description": "My DJMAX style rhythm game",
+  "author": "YourName",
+  "main": "background.js",
   "scripts": {
     "format": "prettier --write \"src/**/*.{js,vue}\" && eslint --fix \"src/**/*.{js,vue}\"",
     "lint": "eslint --fix \"src/**/*.js\"",
-    "start": "cross-env NODE_ENV=development webpack serve --mode development --progress --history-api-fallback",
+    "start": "cross-env NODE_ENV=development webnp serve --mode development --progress --history-api-fallback",
     "build:dev": "cross-env NODE_ENV=development webpack --mode development",
     "build": "cross-env NODE_ENV=production webpack --mode production",
+    "electron:build": "npm run build && electron-builder",
     "clean": "rm -rf ./dist",
     "serve": "yarn run build && serve .",
     "update": "npm version patch -m 'Upgrade to %s' && git push && git push --tags",
     "deploy": "git push && yarn build && firebase deploy",
     "test": "echo \"no test specified yet\" && exit 0",
     "prepare": "husky install"
+  },
+  "build": {
+    "productName": "RhythmPlus",
+    "directories": {
+      "output": "build_exe"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ]
+    }
   },
   "dependencies": {
     "@sentry/tracing": "^6.15.0",
@@ -64,6 +74,8 @@
     "copy-webpack-plugin": "^5.1.1",
     "cross-env": "^7.0.3",
     "css-loader": "^3.5.3",
+    "electron": "^25.9.8",
+    "electron-builder": "^24.13.3",
     "eslint": "^7.3.1",
     "eslint-config-prettier": "^8.1.0",
     "eslint-plugin-prettier": "^3.1.4",
