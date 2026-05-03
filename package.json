@@ -7,7 +7,7 @@
   "scripts": {
     "format": "prettier --write \"src/**/*.{js,vue}\" && eslint --fix \"src/**/*.{js,vue}\"",
     "lint": "eslint --fix \"src/**/*.js\"",
-    "start": "cross-env NODE_ENV=development webnp serve --mode development --progress --history-api-fallback",
+    "start": "cross-env NODE_ENV=development webpack serve --mode development --progress --history-api-fallback",
     "build:dev": "cross-env NODE_ENV=development webpack --mode development",
     "build": "cross-env NODE_ENV=production webpack --mode production",
     "electron:build": "npm run build && electron-builder",
@@ -15,8 +15,7 @@
     "serve": "yarn run build && serve .",
     "update": "npm version patch -m 'Upgrade to %s' && git push && git push --tags",
     "deploy": "git push && yarn build && firebase deploy",
-    "test": "echo \"no test specified yet\" && exit 0",
-    "prepare": "husky install"
+    "test": "echo \"no test specified yet\" && exit 0"
   },
   "build": {
     "productName": "RhythmPlus",
@@ -95,15 +94,6 @@
     "webpack": "^5.24.2",
     "webpack-cli": "^4.5.0",
     "webpack-dev-server": "^3.11.2"
-  },
-  "lint-staged": {
-    "*.{js,vue}": [
-      "prettier --write",
-      "eslint --fix"
-    ],
-    "*.{html,css,json}": [
-      "prettier --write"
-    ]
   },
   "license": "ISC"
 }

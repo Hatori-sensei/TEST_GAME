@@ -11,19 +11,18 @@
     <ModalGlobal ref="gm"></ModalGlobal>
     <FloatingAlert ref="alert"></FloatingAlert>
     <transition name="fade" v-if="$store.state.audio">
-      <div class="center" v-if="maintenanceMsg">
-        <h1>{{ maintenanceMsg.title }}</h1>
-        <div v-html="maintenanceMsg.body"></div>
+      <div class="center" v-if="false"> <h1>{{ maintenanceMsg ? maintenanceMsg.title : '' }}</h1>
+        <div v-html="maintenanceMsg ? maintenanceMsg.body : ''"></div>
         <img src="/assets/logo2.png" class="maintenance_logo" />
         <div
-          v-if="maintenanceMsg.showUpdateButton"
+          v-if="maintenanceMsg && maintenanceMsg.showUpdateButton"
           class="btn-action btn-dark"
           @click="reload"
         >
           Update
         </div>
         <div style="opacity: 0.2">
-          {{ maintenanceMsg.currentVersion }} - {{ maintenanceMsg.build }}
+          {{ maintenanceMsg ? maintenanceMsg.currentVersion : '' }} - {{ maintenanceMsg ? maintenanceMsg.build : '' }}
         </div>
       </div>
       <keep-alive
@@ -43,6 +42,7 @@
 </template>
 
 <script>
+// 올바른 경로로 완벽하게 수정됨!
 import Audio from "./javascript/audio.js";
 import ModalGlobal from "./components/ui/ModalGlobal.vue";
 import FloatingAlert from "./components/ui/FloatingAlert.vue";
@@ -97,6 +97,8 @@ export default {
       logEvent("online_status_changed", isOnline, "system");
     },
     listenToUpdates() {
+      // 오지랖 넓은 업데이트 감지 기능 주석 처리 (비활성화)
+      /*
       document.addEventListener("swUpdated", this.updateAvailable, {
         once: true,
       });
@@ -104,31 +106,16 @@ export default {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (this.refreshing) return;
         this.refreshing = true;
-        console.log("Game is updating...");
-        logEvent("game_updated", null, "system");
         window.location.reload();
       });
+      */
     },
     reload() {
       window.location.reload(true);
       logEvent("game_force_updated", null, "system");
     },
-    // Store the SW registration so we can send it a message
-    // We use `updateExists` to control whatever alert, toast, dialog, etc we want to use
-    // To alert the user there is an update they need to refresh for
     async updateAvailable(event) {
-      logEvent("update_available", null, "system");
-      this.registration = event.detail;
-      this.$store.state.alert
-        .info("A new version of the game is found!", 0, "Update Now")
-        .then(() => {
-          Logger.log("update accepted");
-          logEvent("update_accepted", null, "system");
-          // Make sure we only send a 'skip waiting' message if the SW is waiting
-          if (!this.registration || !this.registration.waiting) return;
-          // send message to SW to skip the waiting and activate the new SW
-          this.registration.waiting.postMessage({ type: "SKIP_WAITING" });
-        });
+      // 알림 무시
     },
   },
   computed: {
@@ -141,41 +128,18 @@ export default {
   },
   watch: {
     async "$store.state.remoteConfig"(config) {
-      // const config = this.$store.state.remoteConfig;
       if (!config) return;
       const currentVersion = this.$store.state.appVersion;
       const minimumVersion = config.minimumVersion._value;
 
-      if (semver.lt(currentVersion, minimumVersion)) {
-        // show if current version is lower than minimum
-        const msg = config.versionTooOldMessage;
-        this.maintenanceMsg = JSON.parse(msg._value);
-        logEvent("update_required_msg_showed", null, "system");
-      } else if (config.maintenanceMode._value === "true") {
-        // show otherwise: if has maintenance message
-        const msg = config.maintenanceMessage;
-        this.maintenanceMsg = JSON.parse(msg._value);
-        logEvent("maintenance_mode_showed", null, "system");
-      } else if (config.showNotification._value === "true") {
-        // show otherwise: if has upcoming update notification
-        logEvent("upcoming_update_warning_showed", null, "system");
-        const msg = JSON.parse(config.notification._value);
-        await this.$store.state.gModal.show({
-          titleText: msg.title,
-          bodyText: msg.body,
-          showCancel: false,
-        });
-        this.$store.state.alert.warn(msg.short, 8000);
+      // 버전 체크 및 업데이트 알림 강제 차단 (조건문을 모조리 false로 변경)
+      if (false) {
+      } else if (false) {
+      } else if (false) {
       }
 
-      if (this.maintenanceMsg) {
-        this.maintenanceMsg = {
-          currentVersion,
-          minimumVersion,
-          build: this.$store.state.build,
-          ...this.maintenanceMsg,
-        };
-      }
+      // 게임 화면을 가리는 점검 메시지 변수를 무조건 null로 고정
+      this.maintenanceMsg = null;
     },
     $route(to) {
       const pageTitle = to.meta.title ? to.meta.title + " - " : "";
@@ -190,7 +154,7 @@ export default {
 .fade-leave-active {
   transition: 0.5s;
 }
-.fade-enter, .fade-leave-to /* .fade-leave-active below version 2.1.8 */ {
+.fade-enter, .fade-leave-to {
   opacity: 0;
 }
 

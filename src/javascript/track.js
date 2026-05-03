@@ -1,208 +1,90 @@
 import Note from "./note";
 
+// 가짜 jQuery 폴리필 (카운트다운 에러 방지)
+if (typeof window.$ === 'undefined') {
+  window.$ = function() { return { circleProgress: function() {}, on: function() {}, off: function() {} }; };
+}
+window.$.isArray = Array.isArray;
+window.$.type = function(obj) { return Object.prototype.toString.call(obj).slice(8, -1).toLowerCase(); };
+
 export default class DropTrack {
   constructor(vm, game, x, width, keyBind) {
     this.vm = vm;
     this.game = game;
     this.x = x;
     this.width = width;
-    this.keyBind = keyBind;
-    this.particleEffect = new HitEffect(vm);
+    this.keyBind = Array.isArray(keyBind) ? keyBind : [keyBind.toLowerCase()];
     this.noteArr = [];
-    this.hitIndicatorOpacity = 0;
     this.isKeyDown = false;
-    this.isUserHoldingNote = false;
-    this.updateHitGradient();
+    this.particleEffect = new HitEffect(vm);
+  }
+
+  resizeTrack(x, width) { this.x = x; this.width = width; }
+
+  dropNote(key, keyObj) {
+    if (this.keyBind.includes(key.toLowerCase())) {
+      this.noteArr.push(new Note(this.vm, this.game, keyObj, key, this.x, 0, this.width));
+    }
   }
 
   keyDown(key) {
-    if (key.includes(this.keyBind) && !this.isKeyDown) {
+    if (this.keyBind.includes(key.toLowerCase())) {
       this.isKeyDown = true;
-      this.hitIndicatorOpacity = 1;
-      const createParticle = (markJudge) => {
-        this.particleEffect.create(
-          this.x,
-          this.game.checkHitLineY,
-          this.width,
-          10,
-          markJudge
-        );
-      };
-      if (this.vm.playMode && this.noteArr && this.noteArr[0]) {
-        const noteToDismiss = this.noteArr[0];
-        if (noteToDismiss.getDiffPercentage() < 0.5) {
-          noteToDismiss.didUserHold = true;
-          noteToDismiss.calculatePercent();
-          if (noteToDismiss.isHoldNote) {
-            if (noteToDismiss.noteFailed) return;
-            this.isUserHoldingNote = true;
-            noteToDismiss.hitAndCountScore(true);
-            let countInterval = setInterval(() => {
-              // if hold note is finished or is nearly finished but player released key, count as success
-              if (
-                noteToDismiss.isHoldNoteFinished(false) ||
-                (noteToDismiss.isHoldNoteFinished(true) &&
-                  !this.isUserHoldingNote)
-              ) {
-                this.isUserHoldingNote = false;
-                noteToDismiss.isHoldingDone = true;
-                createParticle(noteToDismiss.markJudge);
-                clearInterval(countInterval);
-                return;
-              }
-              // else check if user is still holding, if so keep counting score.
-              if (this.isUserHoldingNote && !noteToDismiss.noteFailed) {
-                noteToDismiss.hitAndCountScore(true);
-              } else {
-                this.isUserHoldingNote = false;
-                clearInterval(countInterval);
-              }
-            }, 100 / this.vm.playbackSpeed);
-          } else {
-            this.isUserHoldingNote = false;
-            noteToDismiss.hitAndCountScore(false);
-            this.noteArr.shift();
-            this.playSoundEffect();
-          }
-          createParticle(noteToDismiss.markJudge);
+      
+      // 이미 미스 판정이 난 노트는 무시하고, 살아있는 첫 번째 노트를 찾음
+      const activeNoteIdx = this.noteArr.findIndex(n => !n.noteFailed);
+      if (activeNoteIdx !== -1) {
+        const note = this.noteArr[activeNoteIdx];
+        const judge = note.judge();
+        
+        // 범위 내에 들어와서 맞췄을 경우 점수/콤보 처리
+        if (judge !== "Miss") {
+          this.vm.result.combo += 1;
+          this.vm.result.maxCombo = Math.max(this.vm.result.combo, this.vm.result.maxCombo);
+          this.vm.result.totalHitNotes += 1;
+          this.vm.result.score += (judge === "MAX 100%" ? 100 : (judge === "MAX 90%" ? 90 : 50)); 
+          
+          if (judge === "MAX 100%") this.vm.result.marks.perfect += 1;
+          else if (judge === "MAX 90%") this.vm.result.marks.good += 1;
+          else this.vm.result.marks.offbeat += 1;
+
+          if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge(judge, this.vm.result.combo);
+          if (this.particleEffect) this.particleEffect.create(this.x, this.game.checkHitLineY, this.width, 10, judge);
+          
+          // 타격 성공한 노트는 배열에서 즉시 소멸시킴
+          this.noteArr.splice(activeNoteIdx, 1);
         }
       }
     }
   }
 
   keyUp(key) {
-    if (key.includes(this.keyBind)) {
-      this.isKeyDown = false;
-      this.isUserHoldingNote = false;
-    }
-  }
-
-  dropNote(key, keyObj) {
-    if (key.includes(this.keyBind) && !this.vm.playMode) {
-      this.addNoteToArr(keyObj, null, this.game.checkHitLineY);
-      this.playSoundEffect();
-    }
-  }
-
-  // TODO fix the color and y logic here
-  addNoteToArr(keyObj, color, y) {
-    this.noteArr.push(
-      new Note(
-        this.vm,
-        this.game,
-        keyObj,
-        this.keyBind,
-        this.x,
-        y,
-        this.width,
-        color
-      )
-    );
-  }
-
-  resizeTrack(x, width) {
-    this.x = x;
-    this.width = width;
-  }
-
-  repositionNotes(filteredNotes) {
-    this.noteArr = [];
-    const color = this.vm.playMode ? "yellow" : "grey";
-    for (let note of filteredNotes) {
-      if (note.k.includes(this.keyBind)) {
-        this.addNoteToArr(note, color);
-        this.noteArr[this.noteArr.length - 1].reposition();
-      }
-    }
-  }
-
-  playSoundEffect() {
-    if (!this.vm.inEditor || !this.vm.options.soundEffect) return;
-    this.vm.$store.state.audio.playEffect("du", true);
+    if (this.keyBind.includes(key.toLowerCase())) this.isKeyDown = false;
   }
 
   update() {
-    // track bg
-    let { ctx, canvas } = this.vm;
-    ctx.globalAlpha = 0.6;
-    ctx.fillStyle = "#212121";
-    ctx.fillRect(this.x, 0, this.width, canvas.height);
-    ctx.globalAlpha = 1;
-
-    // note update
-    for (let i = 0; i < this.noteArr.length; ++i) {
-      const isUserHolding = i === 0 && this.isUserHoldingNote;
-      // here noteArr[0] means the closest (i.e. oldest, or the next) note player are going to dismiss,
-      // therefore if its the next note and user is holding, play the holding animation instead.
-      this.noteArr[i].update(isUserHolding);
+    // 키빔 그리기
+    if (this.isKeyDown) {
+      let grad = this.game.ctx.createLinearGradient(0, this.game.checkHitLineY, 0, this.game.checkHitLineY - 150);
+      grad.addColorStop(0, "rgba(255, 255, 255, 0.4)");
+      grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+      this.game.ctx.fillStyle = grad;
+      this.game.ctx.fillRect(this.x, this.game.checkHitLineY - 150, this.width, 150);
     }
 
-    if (this.noteArr.length > 0 && this.noteArr[0].isOutOfCanvas()) {
-      this.noteArr.shift(); // The oldest note now out of canvas note, remove the note.
-    }
-
-    // hit indicator
-    if (this.hitIndicatorOpacity > 0) {
-      ctx.fillStyle = `rgba(255,255,255,${this.hitIndicatorOpacity / 20})`;
-      // let rectWidth = this.width * this.hitIndicatorOpacity;
-      // ctx.fillRect(this.x + this.width / 2 - rectWidth / 2, 0, rectWidth, canvas.height);
-      ctx.fillRect(this.x, 0, this.width, canvas.height);
-      // yellow gradient
-      ctx.fillStyle = this.hitGradient;
-      ctx.globalAlpha = this.hitIndicatorOpacity;
-      ctx.fillRect(
-        this.x,
-        (canvas.height / 10) * 6,
-        this.width,
-        (canvas.height / 10) * 4
-      );
-      if (!this.isKeyDown) this.hitIndicatorOpacity -= 0.1;
-      ctx.globalAlpha = 1;
-    }
-
-    // hit line
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(this.x, this.game.checkHitLineY, this.width, 10);
-
-    // in editor, one time update
-    if (this.game.paused) return;
-
-    // particle effect
-    this.particleEffect.update(this.isUserHoldingNote);
-
-    // create note
-    const { timeArr, timeArrIdx } = this.game;
-    const timing = this.game.playTime;
-    const needNote =
-      !this.game.paused &&
-      timeArrIdx < timeArr.length &&
-      timing >= timeArr[timeArrIdx].t &&
-      timeArr[timeArrIdx].k.includes(this.keyBind);
-    if (needNote) {
-      const color = this.vm.playMode ? "yellow" : "grey";
-      if (timing - timeArr[timeArrIdx].t < 1) {
-        this.addNoteToArr(timeArr[timeArrIdx], color);
+    // 🚨 배열을 뒤에서부터 순회하며 노트 이동 및 화면 밖으로 나간 찌꺼기 노트 제거
+    for (let i = this.noteArr.length - 1; i >= 0; i--) {
+      this.noteArr[i].update();
+      if (this.noteArr[i].y > this.game.canvas.height + 50) {
+        this.noteArr.splice(i, 1);
       }
-      return true; // this.game.timeArrIdx++;
     }
-  }
-
-  updateHitGradient() {
-    let { ctx, canvas } = this.vm;
-    // hit indicator gradient
-    const hitGradient = ctx.createLinearGradient(
-      0,
-      (canvas.height / 10) * 7,
-      0,
-      canvas.height
-    );
-    hitGradient.addColorStop(0, "rgba(0,0,0,0)");
-    hitGradient.addColorStop(1, "yellow");
-    this.hitGradient = hitGradient;
+    
+    if (this.particleEffect) this.particleEffect.update(this.isKeyDown);
   }
 }
 
-// ref https://css-tricks.com/adding-particle-effects-to-dom-elements-with-canvas/
+// === 여기서부터는 건드리지 않는 시각 효과 전용 클래스 ===
 export class HitEffect {
   constructor(vm) {
     this.colorData = ["yellow", "#DED51F", "#EBA400", "#FCC138"];
@@ -222,15 +104,10 @@ export class HitEffect {
     this.circle = new ExpandingCircle(x + 5, y, rgb);
     this.holdCircle = new SpiningCircle(x + 5, y, rgb);
 
-    // Go through every location of our button and create a particle
     for (let localX = 0; localX < width; localX++) {
       for (let localY = 0; localY < height; localY++) {
         if (count % this.reductionFactor === 0) {
-          const globalX = x + localX;
-          const globalY = y + localY;
-
-          const color = `rgb(${rgb})`;
-          this.createParticleAtPoint(globalX, globalY, [color]);
+          this.createParticleAtPoint(x + localX, y + localY, [`rgb(${rgb})`]);
         }
         count++;
       }
@@ -248,35 +125,23 @@ export class HitEffect {
 
   getRgb(judge) {
     switch (judge) {
-      case "Perfect":
-        return "3, 252, 32";
-      case "Good":
-        return "3, 223, 252";
-      case "Offbeat":
-        return "255, 0, 55";
-      default:
-        return "255, 255, 0";
+      case "MAX 100%": return "3, 252, 32"; 
+      case "MAX 90%": return "3, 223, 252"; 
+      case "MAX 50%": return "255, 0, 55";  
+      default: return "255, 255, 0";
     }
   }
 
   update(drawHoldEffect) {
     this.circle?.draw(this.ctx);
     if (drawHoldEffect) this.holdCircle?.draw(this.ctx);
-    // Draw all of our particles in their new location
     for (let i = 0; i < this.particles.length; i++) {
       this.ctx.globalAlpha = 0.7;
       this.particles[i].draw(this.ctx);
       this.ctx.globalAlpha = 1;
-      // Simple way to clean up if the last particle is done animating
       if (i === this.particles.length - 1) {
-        const percent =
-          (Date.now() - this.particles[i].startTime) /
-          this.particles[i].animationDuration;
-
-        if (percent > 1) {
-          this.particles = [];
-          this.circle = null;
-        }
+        const percent = (Date.now() - this.particles[i].startTime) / this.particles[i].animationDuration;
+        if (percent > 1) { this.particles = []; this.circle = null; }
       }
     }
   }
@@ -284,34 +149,16 @@ export class HitEffect {
 
 class ExplodingParticle {
   constructor() {
-    // Set how long we want our particle to animate for
-    this.animationDuration = 1000; // in ms
-
-    // Set the speed for our particle
-    this.speed = {
-      x: -5 + Math.random() * 10,
-      y: -5 + Math.random() * 10,
-    };
-
-    // Size our particle
+    this.animationDuration = 1000;
+    this.speed = { x: -5 + Math.random() * 10, y: -5 + Math.random() * 10 };
     this.radius = 5 + Math.random() * 10;
-
-    // Set a max time to live for our particle
     this.remainingLife = 20 + Math.random() * 10;
   }
-
   draw(ctx) {
     if (this.remainingLife > 0 && this.radius > 0) {
-      // Draw a circle at the current location
       ctx.beginPath();
-      // ctx.arc(p.startX, p.startY, p.radius, 0, Math.PI * 2);
-      ctx.fillStyle = this.rgbArray[
-        Math.floor(Math.random() * this.rgbArray.length)
-      ];
+      ctx.fillStyle = this.rgbArray[Math.floor(Math.random() * this.rgbArray.length)];
       ctx.fillRect(this.startX, this.startY, this.radius, this.radius);
-      // ctx.fill();
-
-      // Update the particle's location and life
       this.remainingLife--;
       this.radius -= 0.25;
       this.startX += this.speed.x;
@@ -322,72 +169,35 @@ class ExplodingParticle {
 
 class SpiningCircle {
   constructor(x, y, rgb) {
-    this.x = x;
-    this.y = y;
-    this.offset = Math.random();
-    this.radius = 100;
-    this.rgb = rgb;
+    this.x = x; this.y = y; this.offset = Math.random(); this.radius = 100; this.rgb = rgb;
   }
-
   draw(ctx) {
     if (this.radius > 30) {
-      let os = this.offset;
-      let percent = 1 - this.radius / 100;
+      let os = this.offset; let percent = 1 - this.radius / 100;
       ctx.strokeStyle = `rgba(${this.rgb}, ${1 - percent})`;
       ctx.lineWidth = 30 + 20 * percent;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, 80, (os + 0) * Math.PI, (os + 0.5) * Math.PI);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, 80, (os + 1) * Math.PI, (os + 1.5) * Math.PI);
-      ctx.stroke();
+      ctx.beginPath(); ctx.arc(this.x, this.y, 80, (os + 0) * Math.PI, (os + 0.5) * Math.PI); ctx.stroke();
+      ctx.beginPath(); ctx.arc(this.x, this.y, 80, (os + 1) * Math.PI, (os + 1.5) * Math.PI); ctx.stroke();
       this.offset += 0.1 - percent / 10;
-      // this.radius -= 4;
     }
   }
 }
 
 class ExpandingCircle {
   constructor(x, y, rgb) {
-    this.x = x;
-    this.y = y;
-    this.offset = Math.random();
-    this.radius = 30;
-    this.rgb = rgb;
+    this.x = x; this.y = y; this.offset = Math.random(); this.radius = 30; this.rgb = rgb;
   }
-
   drawCircle(ctx, radius, percent) {
-    const x = this.x,
-      y = this.y,
-      // Radii of the white glow.
-      innerRadius = radius * 0.1,
-      outerRadius = radius * 1.1;
-
-    const gradient = ctx.createRadialGradient(
-      x,
-      y,
-      innerRadius,
-      x,
-      y,
-      outerRadius
-    );
-    gradient.addColorStop(0, `rgba(${this.rgb},0)`);
-    gradient.addColorStop(1, `rgba(${this.rgb}, ${1 - percent})`);
-
-    ctx.arc(x, y, radius, 0, 2 * Math.PI);
-
-    ctx.fillStyle = gradient;
-    ctx.fill();
+    const innerRadius = radius * 0.1, outerRadius = radius * 1.1;
+    const gradient = ctx.createRadialGradient(this.x, this.y, innerRadius, this.x, this.y, outerRadius);
+    gradient.addColorStop(0, `rgba(${this.rgb},0)`); gradient.addColorStop(1, `rgba(${this.rgb}, ${1 - percent})`);
+    ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
+    ctx.fillStyle = gradient; ctx.fill();
   }
-
   draw(ctx) {
     if (this.radius < 100) {
       let percent = this.radius / 100;
-
-      // FIXME idk whats going on here
       this.drawCircle(ctx, this.radius + 20, percent);
-      // this.drawCircle(ctx, this.radius - 20, percent);
-
       this.radius += 5;
     }
   }

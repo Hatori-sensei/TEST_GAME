@@ -118,4 +118,10 @@ dist
 yarn.lock
 package-lock.json
 
+node_modules/
+dist/
+build_exe/
+.husky/
+.DS_Store
+
 .firebase/

@@ -2,21 +2,8 @@
   <transition name="modal-fade">
     <div class="modal-backdrop" v-if="show">
       <div class="center">
-        <div class="scoreCircle" ref="resultDiv">
-          <VueCircle
-            ref="circle"
-            :progress="percentage"
-            :size="150"
-            :animation="false"
-            :fill="{ gradient: ['darkorange', '#ffab2d'] }"
-            empty-fill="rgba(100, 100, 100, .5)"
-            :thickness="10"
-            :start-angle="(-1 / 2) * Math.PI"
-            insert-mode="append"
-            :show-percent="false"
-          >
-            <div class="num">{{ num }}</div>
-          </VueCircle>
+        <div class="scoreCircle">
+          <div class="num">{{ num }}</div>
         </div>
       </div>
     </div>
@@ -24,17 +11,10 @@
 </template>
 
 <script>
-import VueCircle from "vue2-circle-progress/src/index.vue";
-
 export default {
   name: "Countdown",
-  components: {
-    VueCircle,
-  },
-  props: [],
   data() {
     return {
-      percentage: 100,
       show: false,
       interval: null,
       num: 3,
@@ -45,16 +25,12 @@ export default {
       clearInterval(this.interval);
       this.num = 3;
       this.show = true;
-      this.percentage = 100;
       this.interval = setInterval(() => {
-        this.percentage -= 1;
-        this.$refs.circle.updateProgress(this.percentage);
-        if (this.percentage < 66) this.num = 2;
-        if (this.percentage < 33) this.num = 1;
-        if (this.percentage <= 0) {
+        this.num -= 1;
+        if (this.num <= 0) {
           this.clear();
         }
-      }, 20);
+      }, 800); // 0.8초 간격 카운트다운
     },
     clear() {
       this.show = false;
@@ -63,15 +39,31 @@ export default {
     },
   },
   watch: {
-    num() {
-      this.$store.state.audio.playEffect("ui/event");
+    num(val) {
+      if (val > 0) this.$store.state.audio.playEffect("ui/event");
     },
   },
 };
 </script>
 
 <style scoped>
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; justify-content: center; align-items: center;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+}
+.scoreCircle {
+  width: 150px; height: 150px;
+  border-radius: 50%;
+  border: 10px solid #ffab2d;
+  display: flex; justify-content: center; align-items: center;
+  background: rgba(0,0,0,0.7);
+}
 .num {
-  font-size: 2em;
+  font-size: 4em;
+  font-weight: bold;
+  color: white;
 }
 </style>
