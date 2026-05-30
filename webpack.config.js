@@ -15,8 +15,8 @@ const isProduction = () => process.env.NODE_ENV === "production";
 
 module.exports = {
   entry: ["babel-polyfill", path.resolve(__dirname, "src", "main.js")],
-  mode: "development",
-  devtool: "source-map",
+  mode: isProduction() ? "production" : "development",
+  devtool: isProduction() ? false : "source-map",
   resolve: { extensions: ["*", ".js"] },
   output: {
     path: path.resolve(__dirname, "dist"),
@@ -24,12 +24,16 @@ module.exports = {
     publicPath: "/",
   },
   devServer: {
-    contentBase: path.resolve(__dirname, "public"),
+    static: {
+      directory: path.resolve(__dirname, "public"),
+    },
     host: "0.0.0.0",
     port: 3000,
-    hotOnly: true,
+    hot: true,
     historyApiFallback: true,
-    clientLogLevel: "warn",
+    client: {
+      logging: "warn",
+    },
   },
   optimization: isProduction()
     ? {
