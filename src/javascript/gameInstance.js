@@ -54,7 +54,10 @@ export default class GameInstance {
     this.effectCanvas.width = this.canvas.width;
     this.effectCanvas.height = this.canvas.height;
 
-    const trackWidth = Math.min(this.canvas.width / this.trackNum, 140);
+    // 🚨 1. 기어 넓이 충돌 완벽 해결!
+    // 캔버스 기어 넓이가 화면마다 변하던 것을 CSS(500px)와 똑같이 맞춥니다.
+    // 4키 기준, 1개당 125px로 고정하면 총 500px로 양옆 기어가 딱 맞아떨어집니다.
+    const trackWidth = 125; 
     const startX = (this.canvas.width / 2) - (this.trackNum * trackWidth / 2);
 
     this.dropTrackArr.forEach((track, i) => {
@@ -63,7 +66,10 @@ export default class GameInstance {
 
     this.startX = startX;
     this.endX = startX + (trackWidth * this.trackNum);
-    this.checkHitLineY = this.canvas.height * 0.82; 
+    
+    // 🚨 2. 판정선 위치 충돌 완벽 해결!
+    // 캔버스가 자기 멋대로 곱하기(* 0.82) 하던 것을 CSS와 똑같이 바닥에서 140px로 고정합니다.
+    this.checkHitLineY = this.canvas.height - 320; 
     
     this.noteSpeedPxPerSec = 400 * (this.vm.noteSpeed || 1.0) * (this.vm.playbackSpeed || 1);
     this.noteDelay = this.checkHitLineY / this.noteSpeedPxPerSec;
@@ -137,21 +143,17 @@ export default class GameInstance {
   }
 
   drawDecoration() {
-    this.ctx.fillStyle = "black";
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    this.ctx.fillStyle = "rgba(10, 10, 10, 1)"; 
+    // 배경 (블랙)
+  
+    // 🚨 노트보다 먼저 도화지에 그려지는 반투명 기어 배경
+    this.ctx.fillStyle = "rgba(0, 0, 0, 0.4)"; // 투명도는 여기서 0.3~0.5 등 입맛대로 조절!
     this.ctx.fillRect(this.startX, 0, this.endX - this.startX, this.canvas.height);
+  
     
-    this.ctx.fillStyle = "rgba(30, 30, 30, 1)";
-    this.ctx.fillRect(this.startX, this.checkHitLineY, this.endX - this.startX, this.canvas.height - this.checkHitLineY);
-
-    this.ctx.fillStyle = "rgba(255, 200, 200, 0.6)"; 
-    this.ctx.fillRect(this.startX - 5, 0, 5, this.canvas.height);
-    this.ctx.fillRect(this.endX, 0, 5, this.canvas.height);
-
-    this.ctx.fillStyle = "rgba(255, 50, 50, 1)"; 
-    this.ctx.fillRect(this.startX - 5, this.checkHitLineY, (this.endX - this.startX) + 10, 4);
+    // 🚨 여기서부터 캔버스가 그리던 '과거의 쓰레기 UI' 코드를 전부 지워버렸습니다! 🚨
+    // (예전 회색 하단 박스 삭제)
+    // (예전 분홍색 양옆 테두리 삭제)
+    // (예전 겹쳐 보이던 빨간색 가로 판정선 삭제)
   }
 
   // 🚨 딱 이 부분만 this.ytPlayer.getPlayerTime() 으로 원상복구 했습니다!

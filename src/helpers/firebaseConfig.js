@@ -1,64 +1,60 @@
-import firebase from "firebase/app";
-import "firebase/firestore";
-import "firebase/analytics";
-import "firebase/functions";
-import "firebase/auth";
-import "firebase/performance";
-import "firebase/remote-config";
+// firebaseConfig.js (축제 오프라인용 완벽 차단 + 에러 방어 버전)
 
-// firebase init goes here
-const config = {
-  apiKey: "AIzaSyAdeWHYbSj2iErECQTncQLrz9WdfbuiCsQ",
-  authDomain: "auth.rhythm-plus.com",
-  databaseURL: "https://rhythm-plus.firebaseio.com",
-  projectId: "rhythm-plus",
-  storageBucket: "rhythm-plus.appspot.com",
-  messagingSenderId: "327500964227",
-  appId: "1:327500964227:web:cc9ce6980b9f9232b356b6",
-  measurementId: "G-PNF64CVYX2",
+console.log("Firebase 연결 차단됨 (오프라인 시연 모드)");
+
+// 🚨 1. usersCollection 에러 방어: doc().get(), doc().set() 체이닝 대응
+const dummyCollection = {
+  doc: () => ({
+    get: () => Promise.resolve({ exists: false, data: () => ({}) }),
+    set: () => Promise.resolve(),
+    update: () => Promise.resolve(),
+    collection: () => dummyCollection // 혹시 모를 하위 컬렉션 방어
+  }),
+  where: () => dummyCollection,
+  get: () => Promise.resolve({ docs: [], empty: true })
 };
-firebase.initializeApp(config);
 
-// Init analytics
-firebase.analytics();
-
-// firebase utils
-const db = firebase.firestore();
-const firestore = firebase.firestore; //db instance
-const auth = firebase.auth();
-const functions = firebase.functions();
-const analytics = firebase.analytics;
-const currentUser = auth.currentUser;
-const remoteConfig = firebase.remoteConfig();
-
-remoteConfig.settings.minimumFetchIntervalMillis = 10000;
-
-// Initialize Performance Monitoring and get a reference to the service
-const perf = firebase.performance();
-
-// firebase collections
-const usersCollection = db.collection("users");
-const songsCollection = db.collection("songs");
-const sheetsCollection = db.collection("sheets");
-const resultsCollection = db.collection("results");
-const tagsCollection = db.collection("tags");
-const playsCollection = db.collection("plays");
-const playlistsCollection = db.collection("playlists");
-
-export {
-  db,
-  firestore,
-  analytics,
-  auth,
-  currentUser,
-  perf,
-  functions,
-  usersCollection,
-  songsCollection,
-  sheetsCollection,
-  resultsCollection,
-  tagsCollection,
-  playsCollection,
-  playlistsCollection,
-  remoteConfig,
+// 🚨 2. remoteConfig 에러 방어: fetchAndActivate() 대응
+const dummyRemoteConfig = {
+  fetchAndActivate: () => Promise.resolve(true),
+  getValue: () => ({ asString: () => "" })
 };
+
+// 🚨 3. analytics 에러 방어: analytics() 함수 호출 대응
+const dummyAnalytics = () => ({
+  logEvent: () => {},
+  setUserId: () => {}
+});
+
+// 가짜 유저 및 인증 로직 (이전과 동일)
+const fakeUser = { uid: "festival-admin", displayName: "Player 1" };
+const dummyAuth = {
+  currentUser: fakeUser,
+  onAuthStateChanged: (callback) => {
+    setTimeout(() => { callback(fakeUser); }, 100);
+    return () => {};
+  },
+  signInAnonymously: () => Promise.resolve({ user: fakeUser }),
+  signInWithEmailAndPassword: () => Promise.resolve({ user: fakeUser }),
+  getRedirectResult: () => Promise.resolve({ user: fakeUser }),
+  signOut: () => Promise.resolve()
+};
+
+const dummyFunc = () => ({});
+
+// export 
+export const db = dummyCollection;
+export const firestore = dummyCollection;
+export const analytics = dummyAnalytics; // 수정됨
+export const auth = dummyAuth;
+export const currentUser = fakeUser;
+export const perf = dummyFunc;
+export const functions = dummyFunc;
+export const usersCollection = dummyCollection; // 수정됨
+export const songsCollection = dummyCollection;
+export const sheetsCollection = dummyCollection;
+export const resultsCollection = dummyCollection;
+export const tagsCollection = dummyCollection;
+export const playsCollection = dummyCollection;
+export const playlistsCollection = dummyCollection;
+export const remoteConfig = dummyRemoteConfig; // 수정됨

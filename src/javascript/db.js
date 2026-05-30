@@ -67,10 +67,18 @@ const MOCK_SHEET = {
   dateUpdated: mockDate,
   createdBy: "local-admin",
   // 🚨 10개짜리 고정 노트를 지우고 0.4초마다 150초 동안 생성하는 코드로 변경!
+  // db.js 내부 MOCK_SHEET의 sheet 배열 생성 부분 수정
   sheet: JSON.stringify((() => {
     let notes = [];
     for(let i = 1.0; i <= 150.0; i += 0.4) { 
-      notes.push({ t: i, key: Math.floor(Math.random() * 4) });
+      // 3번에 1번 꼴로 길이가 0.3초인 롱노트 생성, 나머지는 단노트
+      let isLongNote = (Math.random() > 0.6); 
+      notes.push({ 
+        t: i, 
+        key: Math.floor(Math.random() * 4),
+        // 노트 객체에 'l' (길이) 속성 추가 (note.js가 사용하는 변수명에 따라 length나 duration일 수 있음)
+        l: isLongNote ? 0.3 : 0 
+      });
     }
     return notes;
   })())

@@ -16,8 +16,16 @@ export default class DropTrack {
     this.keyBind = Array.isArray(keyBind) ? keyBind : [keyBind.toLowerCase()];
     this.noteArr = [];
     this.isKeyDown = false;
-    this.particleEffect = new HitEffect(vm);
+
+    // 🚨 실제 엔진의 판정 높이를 밑에서 140px 위로 정확히 고정
+    this.game.checkHitLineY = this.game.canvas.height - 320;
+
+    this.particleEffect = new HitEffect(vm, game); 
+  
+  // ... 나머지 코드 유지
   }
+  // ... 나머지 코드 동일
+  // ... 나머지 코드 동일
 
   resizeTrack(x, width) { this.x = x; this.width = width; }
 
@@ -27,178 +35,326 @@ export default class DropTrack {
     }
   }
 
-  keyDown(key) {
+keyDown(key) {
     if (this.keyBind.includes(key.toLowerCase())) {
       this.isKeyDown = true;
-      
-      // 이미 미스 판정이 난 노트는 무시하고, 살아있는 첫 번째 노트를 찾음
       const activeNoteIdx = this.noteArr.findIndex(n => !n.noteFailed);
+      
+      // 1. 유효 판정 범위 (MAX 100% ~ 1%)
+      const HIT_WINDOW = 175; 
+      
+      // 🚨 2. 미리 치기(Early Miss) 함정 구역 (175ms ~ 300ms)
+      // 노트가 이 구역에 들어왔을 때 너무 일찍 치면 Miss가 뜹니다!
+      const EARLY_MISS_WINDOW = 300; 
+
       if (activeNoteIdx !== -1) {
         const note = this.noteArr[activeNoteIdx];
-        const judge = note.judge();
         
-        // 범위 내에 들어와서 맞췄을 경우 점수/콤보 처리
-        if (judge !== "Miss") {
-          this.vm.result.combo += 1;
-          this.vm.result.maxCombo = Math.max(this.vm.result.combo, this.vm.result.maxCombo);
-          this.vm.result.totalHitNotes += 1;
-          this.vm.result.score += (judge === "MAX 100%" ? 100 : (judge === "MAX 90%" ? 90 : 50)); 
-          
-          if (judge === "MAX 100%") this.vm.result.marks.perfect += 1;
-          else if (judge === "MAX 90%") this.vm.result.marks.good += 1;
-          else this.vm.result.marks.offbeat += 1;
+        // 판정 기준: 노트의 밑바닥
+        const noteBottomY = note.y + (note.height || 15);
+        const diffPx = Math.abs(this.game.checkHitLineY - noteBottomY);
+        const diffMs = (diffPx / this.game.noteSpeedPxPerSec) * 1000;
+        
+        // 노트가 판정선보다 '위에' 있는지(일찍 쳤는지) 확인
+        const isEarly = noteBottomY < this.game.checkHitLineY;
 
-          if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge(judge, this.vm.result.combo);
-          if (this.particleEffect) this.particleEffect.create(this.x, this.game.checkHitLineY, this.width, 10, judge);
+        // ==========================================
+        // 🎯 [정상 판정] 175ms 범위 안쪽
+        // ==========================================
+        if (diffMs <= HIT_WINDOW) {
           
-          // 타격 성공한 노트는 배열에서 즉시 소멸시킴
+          let rawPercent = 0;
+          if (diffMs <= 41.67) rawPercent = 100;
+          else if (diffMs <= 75.0) rawPercent = 99 - ((diffMs - 41.67) / 33.33) * 9;
+          else if (diffMs <= 108.33) rawPercent = 89 - ((diffMs - 75.0) / 33.33) * 19;
+          else if (diffMs <= 141.67) rawPercent = 69 - ((diffMs - 108.33) / 33.33) * 59;
+          else rawPercent = 9 - ((diffMs - 141.67) / 33.33) * 8;
+
+          let judgePercent = 100;
+          if (rawPercent >= 100) judgePercent = 100;
+          else if (rawPercent >= 10) judgePercent = Math.floor(rawPercent / 10) * 10;
+          else judgePercent = 1;
+
+          const judgeString = judgePercent === 100 ? "MAX 100%" : `MAX ${judgePercent}%`;
+
+          this.vm.result.combo += (this.vm.result.feverMultiplier || 1); 
+          this.vm.result.maxCombo = Math.max(this.vm.result.combo, this.vm.result.maxCombo || 0);
+          this.vm.result.totalHitNotes += 1;
+
+          let gaugeCharge = judgePercent === 100 ? 5 : (judgePercent >= 90 ? 3 : 1);
+          this.vm.result.feverGauge = (this.vm.result.feverGauge || 0) + gaugeCharge;
+
+          if (this.vm.result.feverGauge >= 100) {
+            if ((this.vm.result.feverMultiplier || 1) < 5) this.vm.result.feverMultiplier++;
+            this.vm.result.feverGauge -= 100;
+          }
+
+          const totalNotes = this.vm.sheet ? this.vm.sheet.length : 500;
+          const maxScorePerNote = 1000000 / totalNotes;
+          this.vm.result.score += maxScorePerNote * (judgePercent / 100);
+
+          if (judgePercent === 100) this.vm.result.marks.perfect += 1;
+          else this.vm.result.marks.good += 1;
+
+          if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge(judgeString, this.vm.result.combo);
+          if (this.particleEffect) this.particleEffect.create(this.x, this.game.checkHitLineY, this.width, judgeString);
+          
           this.noteArr.splice(activeNoteIdx, 1);
         }
+        // ==========================================
+        // 🚨 [Early Miss 함정] 175ms ~ 300ms 사이에서 너무 일찍 친 경우
+        // ==========================================
+        else if (isEarly && diffMs <= EARLY_MISS_WINDOW) {
+          this.vm.result.combo = 0;
+          this.vm.result.feverMultiplier = 1;
+          this.vm.result.feverGauge = 0;
+          this.vm.result.marks.miss += 1;
+          if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge("Miss", 0);
+          
+          // Miss 처리 후 노트를 파괴하여 이중 타격을 방지
+          this.noteArr.splice(activeNoteIdx, 1);
+        }
+        // ==========================================
+        // 🛡️ [완전 무시] 300ms 밖에서 허공을 친 경우 (그냥 무시)
+        // ==========================================
+        else {
+          return; 
+        }
       }
+      // 🛡️ 트랙에 노트가 아예 없을 때도 무시 (return)
     }
   }
 
+  // 🚨 키 빔 꺼짐을 담당하는 핵심 함수
   keyUp(key) {
-    if (this.keyBind.includes(key.toLowerCase())) this.isKeyDown = false;
+    if (this.keyBind.includes(key.toLowerCase())) {
+      this.isKeyDown = false;
+    }
   }
 
-  update() {
-    // 키빔 그리기
+ update() {
     if (this.isKeyDown) {
-      let grad = this.game.ctx.createLinearGradient(0, this.game.checkHitLineY, 0, this.game.checkHitLineY - 150);
-      grad.addColorStop(0, "rgba(255, 255, 255, 0.4)");
-      grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+      let grad = this.game.ctx.createLinearGradient(0, this.game.checkHitLineY, 0, 0);
+      grad.addColorStop(0, "rgba(150, 220, 255, 0.7)");
+      grad.addColorStop(1, "rgba(150, 220, 255, 0)");
       this.game.ctx.fillStyle = grad;
-      this.game.ctx.fillRect(this.x, this.game.checkHitLineY - 150, this.width, 150);
+      this.game.ctx.fillRect(this.x, 0, this.width, this.game.checkHitLineY);
     }
 
-    // 🚨 배열을 뒤에서부터 순회하며 노트 이동 및 화면 밖으로 나간 찌꺼기 노트 제거
     for (let i = this.noteArr.length - 1; i >= 0; i--) {
       this.noteArr[i].update();
-      if (this.noteArr[i].y > this.game.canvas.height + 50) {
+      if (this.noteArr[i].noteFailed) {
+        this.noteArr.splice(i, 1);
+        continue;
+      }
+      
+      // 🚨 여기도 똑같이 노트의 밑바닥(Bottom)을 기준으로 계산!
+      const noteBottomY = this.noteArr[i].y + (this.noteArr[i].height || 15);
+      const passedPx = noteBottomY - this.game.checkHitLineY;
+      const passedMs = (passedPx / this.game.noteSpeedPxPerSec) * 1000;
+
+      // 판정 범위를 지나쳐서 떨어지면 완벽하게 놓친 것으로 처리 (Miss)
+      if (passedMs > 175) {
+        if (typeof this.noteArr[i].missNote === 'function') this.noteArr[i].missNote();
+        this.vm.result.combo = 0;
+        this.vm.result.feverMultiplier = 1;
+        this.vm.result.feverGauge = 0;
+        this.vm.result.marks.miss += 1;
+        this.vm.result.totalHitNotes += 1;
+        
+        if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge("Miss", 0);
         this.noteArr.splice(i, 1);
       }
     }
-    
-    if (this.particleEffect) this.particleEffect.update(this.isKeyDown);
+
+    if (this.particleEffect) this.particleEffect.update();
   }
 }
 
-// === 여기서부터는 건드리지 않는 시각 효과 전용 클래스 ===
+// =================================================================
+// 🚨 디맥 하드코어 "퐝!!!!" 폭발 이펙트 엔진 🚨
+// =================================================================
+
 export class HitEffect {
-  constructor(vm) {
-    this.colorData = ["yellow", "#DED51F", "#EBA400", "#FCC138"];
-    this.reductionFactor = 5;
+  constructor(vm, game) {
     this.particles = [];
-    this.ctx = vm.effectCtx;
-    this.vm = vm;
+    this.rings = [];
+    this.flares = []; 
+    this.cores = []; 
+    this.shards = [];
+    this.game = game;
   }
 
-  create(mX, mY, mWidth, height, judge) {
-    let x = mX + mWidth / 2 - 5;
-    let y = mY;
-    if (this.vm.perspective) y -= 35;
-    let width = 10;
-    let count = 0;
-    const rgb = this.getRgb(judge);
-    this.circle = new ExpandingCircle(x + 5, y, rgb);
-    this.holdCircle = new SpiningCircle(x + 5, y, rgb);
+  create(mX, mY, mWidth, judge) {
+    const x = mX + mWidth / 2;
+    const y = mY;
+    const color = this.getColor(judge);
+    const accent = judge === "MAX 100%" ? "#7af4ff" : "#ffffff";
 
-    for (let localX = 0; localX < width; localX++) {
-      for (let localY = 0; localY < height; localY++) {
-        if (count % this.reductionFactor === 0) {
-          this.createParticleAtPoint(x + localX, y + localY, [`rgb(${rgb})`]);
-        }
-        count++;
+    this.cores.push({ x, y, radius: 8, alpha: 1, color: accent });
+    this.flares.push({ x: mX - 5, y: mY, width: mWidth + 6, color, alpha: 0.9, type: 'vertical' });
+    this.flares.push({ x: x, y: y, color, alpha: 1, scale: 0.28, type: 'horizontal' });
+    this.rings.push({ x, y, radius: 10, thickness: 22, color, alpha: 1, speed: 10 });
+    this.rings.push({ x, y, radius: 18, thickness: 8, color: accent, alpha: 0.9, speed: 14 });
+
+    for (let i = 0; i < 24; i++) {
+      const angle = (Math.PI * 2 / 24) * i + (Math.random() * 0.1);
+      const speed = Math.random() * 10 + 8;
+      this.particles.push(new ExplodingParticle(x, y, color, angle, speed));
+    }
+
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI * 2 / 6) * i + Math.PI / 12;
+      this.shards.push({ x, y, angle, speed: 2.5 + i * 0.35, alpha: 1, length: 14 + i * 1.5, color });
+    }
+  }
+
+  // HitEffect 클래스 내부
+  getColor(judge) {
+    if (judge === "MAX 100%") return "#00f0ff"; // 100%: 시안색 (Perfect)
+    
+    if (judge.startsWith("MAX")) {
+      const percent = parseInt(judge.replace(/[^0-9]/g, ''));
+      if (percent >= 80) return "#55ff00"; // 90%, 80%: 초록색
+      if (percent >= 50) return "#ffff00"; // 70%, 60%, 50%: 노란색
+      return "#ff003c";                    // 40% 이하 (40~1): 빨간색
+    }
+    
+    return "#ff003c";
+  }
+
+  update() {
+    const ctx = this.game.ctx;
+    ctx.save();
+    
+    ctx.globalCompositeOperation = "lighter";
+    
+    for (let i = this.cores.length - 1; i >= 0; i--) {
+      let c = this.cores[i];
+      ctx.globalAlpha = c.alpha;
+      ctx.beginPath();
+      ctx.fillStyle = c.color;
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = c.color;
+      ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      c.radius += 4;
+      c.alpha -= 0.1;
+      if (c.alpha <= 0) this.cores.splice(i, 1);
+    }
+
+    for (let i = this.flares.length - 1; i >= 0; i--) {
+      let f = this.flares[i];
+      ctx.globalAlpha = f.alpha;
+      
+      if (f.type === 'vertical') {
+        const grad = ctx.createLinearGradient(0, f.y, 0, 0);
+        grad.addColorStop(0, f.color);
+        grad.addColorStop(0.4, "rgba(0,0,0,0.08)");
+        grad.addColorStop(1, "transparent");
+        ctx.fillStyle = grad;
+        ctx.fillRect(f.x, 0, f.width, f.y);
+        f.alpha -= 0.14;
+      } else if (f.type === 'horizontal') {
+        const width = Math.max(120, f.scale * 170);
+        const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, width);
+        grad.addColorStop(0, "rgba(255,255,255,0.85)");
+        grad.addColorStop(0.24, f.color);
+        grad.addColorStop(0.6, "rgba(255,255,255,0.06)");
+        grad.addColorStop(1, "transparent");
+        ctx.fillStyle = grad;
+        
+        ctx.save();
+        ctx.translate(f.x, f.y);
+        ctx.scale(1, 0.12); 
+        ctx.beginPath();
+        ctx.arc(0, 0, width, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        
+        f.scale += 1.2;
+        f.alpha -= 0.15;
       }
+      if (f.alpha <= 0) this.flares.splice(i, 1);
     }
-  }
 
-  createParticleAtPoint(x, y, colorData) {
-    const particle = new ExplodingParticle(this.ctx);
-    particle.rgbArray = colorData;
-    particle.startX = x;
-    particle.startY = y;
-    particle.startTime = Date.now();
-    this.particles.push(particle);
-  }
-
-  getRgb(judge) {
-    switch (judge) {
-      case "MAX 100%": return "3, 252, 32"; 
-      case "MAX 90%": return "3, 223, 252"; 
-      case "MAX 50%": return "255, 0, 55";  
-      default: return "255, 255, 0";
+    for (let i = this.rings.length - 1; i >= 0; i--) {
+      let r = this.rings[i];
+      ctx.globalAlpha = r.alpha;
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = r.thickness;
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = r.color;
+      
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      r.radius += r.speed;
+      r.thickness *= 0.9;
+      r.alpha -= 0.08;
+      if (r.alpha <= 0) this.rings.splice(i, 1);
     }
-  }
 
-  update(drawHoldEffect) {
-    this.circle?.draw(this.ctx);
-    if (drawHoldEffect) this.holdCircle?.draw(this.ctx);
-    for (let i = 0; i < this.particles.length; i++) {
-      this.ctx.globalAlpha = 0.7;
-      this.particles[i].draw(this.ctx);
-      this.ctx.globalAlpha = 1;
-      if (i === this.particles.length - 1) {
-        const percent = (Date.now() - this.particles[i].startTime) / this.particles[i].animationDuration;
-        if (percent > 1) { this.particles = []; this.circle = null; }
-      }
+    for (let i = this.shards.length - 1; i >= 0; i--) {
+      const s = this.shards[i];
+      ctx.globalAlpha = s.alpha;
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = s.color;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x + Math.cos(s.angle) * s.length, s.y + Math.sin(s.angle) * s.length);
+      ctx.stroke();
+
+      s.x += Math.cos(s.angle) * s.speed;
+      s.y += Math.sin(s.angle) * s.speed;
+      s.alpha -= 0.04;
+      s.length *= 0.96;
+      if (s.alpha <= 0) this.shards.splice(i, 1);
     }
+
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      this.particles[i].draw(ctx);
+      if (this.particles[i].alpha <= 0) this.particles.splice(i, 1);
+    }
+    
+    ctx.restore();
   }
 }
 
 class ExplodingParticle {
-  constructor() {
-    this.animationDuration = 1000;
-    this.speed = { x: -5 + Math.random() * 10, y: -5 + Math.random() * 10 };
-    this.radius = 5 + Math.random() * 10;
-    this.remainingLife = 20 + Math.random() * 10;
+  constructor(x, y, color, angle, speed) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    this.speedX = Math.cos(angle) * speed; 
+    this.speedY = Math.sin(angle) * speed; 
+    this.alpha = 1;
+    this.decay = Math.random() * 0.05 + 0.03;
   }
-  draw(ctx) {
-    if (this.remainingLife > 0 && this.radius > 0) {
-      ctx.beginPath();
-      ctx.fillStyle = this.rgbArray[Math.floor(Math.random() * this.rgbArray.length)];
-      ctx.fillRect(this.startX, this.startY, this.radius, this.radius);
-      this.remainingLife--;
-      this.radius -= 0.25;
-      this.startX += this.speed.x;
-      this.startY += this.speed.y;
-    }
-  }
-}
 
-class SpiningCircle {
-  constructor(x, y, rgb) {
-    this.x = x; this.y = y; this.offset = Math.random(); this.radius = 100; this.rgb = rgb;
-  }
   draw(ctx) {
-    if (this.radius > 30) {
-      let os = this.offset; let percent = 1 - this.radius / 100;
-      ctx.strokeStyle = `rgba(${this.rgb}, ${1 - percent})`;
-      ctx.lineWidth = 30 + 20 * percent;
-      ctx.beginPath(); ctx.arc(this.x, this.y, 80, (os + 0) * Math.PI, (os + 0.5) * Math.PI); ctx.stroke();
-      ctx.beginPath(); ctx.arc(this.x, this.y, 80, (os + 1) * Math.PI, (os + 1.5) * Math.PI); ctx.stroke();
-      this.offset += 0.1 - percent / 10;
-    }
-  }
-}
-
-class ExpandingCircle {
-  constructor(x, y, rgb) {
-    this.x = x; this.y = y; this.offset = Math.random(); this.radius = 30; this.rgb = rgb;
-  }
-  drawCircle(ctx, radius, percent) {
-    const innerRadius = radius * 0.1, outerRadius = radius * 1.1;
-    const gradient = ctx.createRadialGradient(this.x, this.y, innerRadius, this.x, this.y, outerRadius);
-    gradient.addColorStop(0, `rgba(${this.rgb},0)`); gradient.addColorStop(1, `rgba(${this.rgb}, ${1 - percent})`);
-    ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
-    ctx.fillStyle = gradient; ctx.fill();
-  }
-  draw(ctx) {
-    if (this.radius < 100) {
-      let percent = this.radius / 100;
-      this.drawCircle(ctx, this.radius + 20, percent);
-      this.radius += 5;
-    }
+    ctx.globalAlpha = this.alpha;
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = this.color;
+    
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(this.x - this.speedX * 2.5, this.y - this.speedY * 2.5); 
+    ctx.stroke();
+    
+    this.x += this.speedX;
+    this.y += this.speedY;
+    
+    this.speedX *= 0.88;
+    this.speedY *= 0.88;
+    
+    this.alpha -= this.decay;
   }
 }
