@@ -17,7 +17,12 @@ const router = new VueRouter({
       name: "home",
       path: "/",
       component: Home,
-      meta: { requireBg: true, requireSignin: true },
+      meta: {
+        requireBg: false,
+        requireSignin: true,
+        showNav: false,
+        backgroundOnly: false,
+      },
     },
     {
       name: "menu",

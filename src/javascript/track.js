@@ -93,8 +93,15 @@ keyDown(key) {
           const maxScorePerNote = 1000000 / totalNotes;
           this.vm.result.score += maxScorePerNote * (judgePercent / 100);
 
-          if (judgePercent === 100) this.vm.result.marks.perfect += 1;
-          else this.vm.result.marks.good += 1;
+          if (judgePercent === 100) {
+            this.vm.result.marks.perfect += 1;
+            // Perfect 판정: 체력 10% 회복
+            this.vm.health = Math.min(100, this.vm.health + 10);
+          } else {
+            this.vm.result.marks.good += 1;
+            // Good 판정: 체력 5% 회복
+            this.vm.health = Math.min(100, this.vm.health + 5);
+          }
 
           if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge(judgeString, this.vm.result.combo);
           if (this.particleEffect) this.particleEffect.create(this.x, this.game.checkHitLineY, this.width, judgeString);
@@ -109,7 +116,19 @@ keyDown(key) {
           this.vm.result.feverMultiplier = 1;
           this.vm.result.feverGauge = 0;
           this.vm.result.marks.miss += 1;
+          // Miss 판정: 체력 20% 감소
+          this.vm.health = Math.max(0, this.vm.health - 20);
           if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge("Miss", 0);
+          
+          // 체력이 0 이하가 되면 게임오버
+          if (this.vm.health <= 0) {
+            if (typeof this.vm.triggerGameOverImmediate === 'function') {
+              this.vm.triggerGameOverImmediate();
+            } else {
+              this.vm.isGameEnded = true;
+              this.game.pauseGame();
+            }
+          }
           
           // Miss 처리 후 노트를 파괴하여 이중 타격을 방지
           this.noteArr.splice(activeNoteIdx, 1);
@@ -161,8 +180,21 @@ keyDown(key) {
         this.vm.result.feverGauge = 0;
         this.vm.result.marks.miss += 1;
         this.vm.result.totalHitNotes += 1;
+        // 노트를 놓친 경우: 체력 20% 감소
+        this.vm.health = Math.max(0, this.vm.health - 20);
         
         if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge("Miss", 0);
+        
+        // 체력이 0 이하가 되면 게임오버
+        if (this.vm.health <= 0) {
+          if (typeof this.vm.triggerGameOverImmediate === 'function') {
+            this.vm.triggerGameOverImmediate();
+          } else {
+            this.vm.isGameEnded = true;
+            this.game.pauseGame();
+          }
+        }
+        
         this.noteArr.splice(i, 1);
       }
     }

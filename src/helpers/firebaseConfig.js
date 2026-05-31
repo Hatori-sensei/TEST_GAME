@@ -23,11 +23,17 @@ const dummyRemoteConfig = {
 // 🚨 3. analytics 에러 방어: analytics() 함수 호출 대응
 const dummyAnalytics = () => ({
   logEvent: () => {},
-  setUserId: () => {}
+  setUserId: () => {},
+  setCurrentScreen: () => {},
+  setUserProperties: () => {}
 });
 
 // 가짜 유저 및 인증 로직 (이전과 동일)
-const fakeUser = { uid: "festival-admin", displayName: "Player 1" };
+const fakeUser = { 
+  uid: "festival-admin", 
+  displayName: "Player 1",
+  getIdToken: () => Promise.resolve("festival-token-dummy")
+};
 const dummyAuth = {
   currentUser: fakeUser,
   onAuthStateChanged: (callback) => {

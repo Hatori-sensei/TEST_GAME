@@ -71,17 +71,17 @@ export default {
 .comboNum {
   font-family: "Anton", Impact, "Raleway", "Arial Narrow Bold", sans-serif;
   margin-top: -10px;
-  font-size: 3.5em;
+  font-size: 4em;
 }
 
 .center_judge {
   font-family: "Raleway";
   position: absolute;
-  font-size: 3em;
+  font-size: 5em;
   line-height: 80px;
   width: 400px;
   height: 80px;
-  top: 65%;
+  top: 59%;
   left: 50%;
   margin-left: -200px;
   z-index: 100;

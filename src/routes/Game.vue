@@ -1,5 +1,10 @@
 <template>
-  <div class="game">
+  <div class="game" :class="{ 'tv-off-active': tvOff }">
+    <div class="tv-off-screen" v-if="tvOff">
+      <div class="tv-off-line top"></div>
+      <div class="tv-off-line bottom"></div>
+      <div class="tv-off-flash"></div>
+    </div>
     <ProgressBar
       v-if="currentSong && currentSong.length"
       :progress="progress"
@@ -52,23 +57,14 @@
 
       <div class="gear-overlay">
         <div class="judgment-line"></div>
-        <div class="gear-ring"></div>
-        <div class="gear-plate"></div>
-        <div class="neon-grain"></div>
       </div>
       
       <div class="arcade-buttons">
-        <div class="arcade-btn d-key" :class="{ 'is-pressed': keyState.key1 }">
-          <span class="btn-label">D</span>
-        </div>
-        <div class="arcade-btn f-key" :class="{ 'is-pressed': keyState.key2 }">
-          <span class="btn-label">F</span>
-        </div>
-        <div class="arcade-btn j-key" :class="{ 'is-pressed': keyState.key3 }">
-          <span class="btn-label">J</span>
-        </div>
-        <div class="arcade-btn k-key" :class="{ 'is-pressed': keyState.key4 }">
-          <span class="btn-label">K</span>
+        <div class="buttons-container">
+          <div class="arcade-btn d-key" :class="{ 'is-pressed': keyState.key1 }"></div>
+          <div class="arcade-btn f-key" :class="{ 'is-pressed': keyState.key2 }"></div>
+          <div class="arcade-btn j-key" :class="{ 'is-pressed': keyState.key3 }"></div>
+          <div class="arcade-btn k-key" :class="{ 'is-pressed': keyState.key4 }"></div>
         </div>
       </div>
     </div>
@@ -81,7 +77,7 @@
 
     <ScorePanel></ScorePanel>
 
-    <div></div>
+    <HealthBar v-show="!isGameEnded" :health="health"></HealthBar>
     <div v-if="srcMode === 'youtube' && !isGameEnded" v-show="initialized">
       <Youtube
         :class="{ 'allow-events': srcMode === 'youtube' }"
@@ -251,6 +247,7 @@ import Countdown from "../components/game/Countdown.vue";
 import MarkComboJudge from "../components/game/MarkComboJudge.vue";
 import Tutorial from "../components/game/Tutorial.vue";
 import ScorePanel from "../components/game/ScorePanel.vue";
+import HealthBar from "../components/game/HealthBar.vue";
 import GameMixin from "../mixins/gameMixin";
 import { Youtube } from "vue-youtube";
 import {
@@ -283,6 +280,7 @@ export default {
     MarkComboJudge,
     Tutorial,
     ScorePanel,
+    HealthBar,
   },
   mixins: [GameMixin],
   data() {
@@ -292,7 +290,9 @@ export default {
       tutorial: false,
       youtubeBuffering: false,
       // 🚨 UI 애니메이션을 위한 버튼 눌림 상태 추가
-      keyState: { key1: false, key2: false, key3: false, key4: false }
+      keyState: { key1: false, key2: false, key3: false, key4: false },
+      // TV off animation flag
+      tvOff: false,
     };
   },
   computed: {
@@ -381,6 +381,8 @@ export default {
       if (!this.showStartButton) return;
       logEvent("start_game", { songId: this.currentSong.songId });
       this.showStartButton = false;
+      // 체력 초기화
+      this.health = 100;
       if (this.srcMode === "youtube") {
         this.instance.loading = true;
         this.youtubeBuffering = true;
@@ -395,6 +397,18 @@ export default {
         this.currentSong.sheetId,
         this.currentSong.songId
       );
+    },
+    triggerGameOverImmediate() {
+      if (this.tvOff) return;
+      this.tvOff = true;
+      setTimeout(() => {
+        try {
+          this.gameEnded(true);
+        } catch (e) {
+          this.isGameEnded = true;
+          if (this.instance && typeof this.instance.pauseGame === 'function') this.instance.pauseGame();
+        }
+      }, 300);
     },
     pauseGame() {
       if (!this.started || this.isGameEnded) return;
@@ -421,6 +435,7 @@ export default {
     restartGame() {
       this.hideMenu();
       this.clearResult();
+      this.health = 100; // 체력 초기화
       this.instance.paused = false;
       this.instance.resetPlaying();
       this.instance.startSong();
@@ -540,6 +555,46 @@ export default {
 .perspective {
   transform: rotateX(30deg) scaleY(1.5);
   transform-origin: 50% 100%;
+}
+
+/* TV off overlay animation */
+/* =======================================================
+   🚨 리얼 브라운관 TV 꺼짐 (플레이 화면 초고속 0.35초 압축)
+   ======================================================= */
+/* 불필요한 기존 오버레이 요소들 숨김 */
+.tv-off-screen {
+  display: none; 
+}
+
+/* 게임 화면 전체가 중심을 기준으로 0.35초 만에 확 찌그러짐 */
+.game.tv-off-active {
+  transform-origin: center center;
+  animation: crt_off_game 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards !important;
+  pointer-events: none;
+  background: black;
+}
+
+/* 진짜 티비 꺼지듯 슉! -> 점 -> 쾅! 소멸하는 애니메이션 */
+@keyframes crt_off_game {
+  0% { 
+    transform: scale(1, 1); 
+    filter: brightness(1) contrast(1); 
+  }
+  40% { 
+    /* 순식간에 높이를 쳐내서 극단적으로 얇고 눈부신 가로선으로 압축 */
+    transform: scale(1, 0.005); 
+    filter: brightness(5) contrast(3); 
+  }
+  70% { 
+    /* 가로선이 중앙의 점으로 빨려 들어감 */
+    transform: scale(0, 0.005); 
+    filter: brightness(5); 
+  }
+  100% { 
+    /* 완전 소멸 */
+    transform: scale(0, 0); 
+    filter: brightness(0); 
+  }
 }
 
 .start_button_text {
@@ -695,6 +750,10 @@ export default {
    🚨 하단 노트 비침 완벽 차단 + DJMAX 아케이드 UI 🚨
    ======================================================= */
 
+/* 1. 기어(트랙) 배경 및 양옆 구분선 */
+/* =======================================================
+   1. 기어(트랙) 배경
+   ======================================================= */
 .gear-overlay {
   position: absolute;
   top: 0;
@@ -702,206 +761,79 @@ export default {
   transform: translateX(-50%);
   width: 500px;
   height: 100%;
+  background: transparent;
+  /* 양옆 구분선을 조금 더 날카롭게 */
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  border-right: 2px solid rgba(255, 255, 255, 0.15);
   pointer-events: none;
   z-index: 10;
-
-  background: radial-gradient(circle at 50% 10%, rgba(0, 240, 255, 0.08), transparent 28%),
-    radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.05), transparent 18%),
-    linear-gradient(180deg,
-      rgba(0, 10, 24, 0.88) 0%,
-      rgba(0, 10, 24, 0.42) 45%,
-      rgba(0, 10, 24, 0.08) 100%);
-
-  border-left: 2px solid rgba(0, 240, 255, 0.14);
-  border-right: 2px solid rgba(0, 240, 255, 0.14);
-
-  box-shadow: 0 0 22px rgba(0, 240, 255, 0.08), inset 0 0 40px rgba(0, 240, 255, 0.04);
-  mix-blend-mode: screen;
-  backdrop-filter: blur(1.8px);
-  overflow: visible;
-}
-
-.gear-overlay::before,
-.gear-overlay::after {
-  content: "";
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(0,240,255,0.75), transparent);
-  filter: blur(6px);
-  pointer-events: none;
-  opacity: 0.9;
-  animation: neonPulse 3.5s ease-in-out infinite;
-}
-
-.gear-overlay::before { top: 10px; }
-.gear-overlay::after { bottom: 10px; }
-
-.gear-overlay .gear-ring {
-  position: absolute;
-  inset: 10% 12%;
-  border-radius: 50%;
-  border: 1.5px solid rgba(0, 240, 255, 0.16);
-  box-shadow: inset 0 0 22px rgba(0, 240, 255, 0.1);
-  background: radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.08), transparent 55%);
-}
-
-.gear-overlay .gear-plate {
-  position: absolute;
-  left: 50%;
-  top: 46%;
-  width: 70%;
-  height: 14px;
-  transform: translateX(-50%);
-  border-radius: 999px;
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.12),
-    rgba(255, 255, 255, 0.12) 2px,
-    transparent 2px,
-    transparent 6px
-  );
-  opacity: 0.78;
-}
-
-.gear-overlay .neon-grain {
-  position: absolute;
-  inset: 0;
-  background-image: repeating-linear-gradient(
-    45deg,
-    rgba(255,255,255,0.006),
-    rgba(255,255,255,0.006) 1px,
-    transparent 1px,
-    transparent 6px
-  );
-  mix-blend-mode: overlay;
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-@keyframes neonPulse {
-  0% { transform: scale(1); opacity: 0.85; }
-  50% { transform: scale(1.01); opacity: 1; }
-  100% { transform: scale(1); opacity: 0.85; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gear-overlay::before,
-  .gear-overlay::after {
-    animation: none;
-    filter: blur(4px);
-  }
-}
-
-/* 2. 하단 버튼 영역: 바닥(0)에 붙이고 높이를 키워 가림막 역할 수행 */
-.arcade-buttons {
-  position: absolute;
-  bottom: 0; /* 🚨 바닥에 완전히 붙여서 밑으로 노트가 새어나가는 걸 물리적으로 차단합니다 */
-  left: 50%;
-  transform: translateX(-50%);
-  width: 500px;
-  height: 260px; /* 🚨 버튼 높이(100px) + 밑에 띄울 공백(140px) = 총 240px */
-  background: radial-gradient(circle at 50% 15%, rgba(0, 255, 255, 0.08), transparent 30%),
-    linear-gradient(180deg, #111111 0%, #070707 100%);
-  border-top: 1px solid rgba(255,255,255,0.08);
-  display: flex;
-  align-items: flex-start; /* 🚨 버튼들을 상단에 정렬시켜서 밑에 정확히 140px 공백을 남깁니다 */
-  gap: 1px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 -2px 12px rgba(0,0,0,0.45);
-  z-index: 20;
-}
-
-/* 3. 판정선 (관문) 위치: 바닥에서 320px */
-.judgment-line {
-  position: absolute;
-  bottom: 320px; 
-  left: -2px; 
-  width: calc(100% + 4px); 
-  height: 18px; 
-  background-color: #ffffff; 
-  z-index: 50; 
-  box-shadow: 0px 0px 10px #00f0ff, 0px 0px 20px #00f0ff;
 }
 
 /* =======================================================
-   버튼 디자인 및 키 입력 발광 효과 (높이 100px 고정)
+   2. 하단 버튼 컨테이너 (기어와 버튼의 분리)
+   ======================================================= */
+.arcade-buttons {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 260px; /* 기존 높이 유지 */
+  background-color: #161616; /* 버튼 밑 공간을 채우는 베젤 */
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+}
+
+/* 버튼들을 감싸는 영역 */
+.buttons-container {
+  display: flex;
+  height: 100px; /* 버튼 높이만 차지 */
+  width: 100%;
+  gap: 1px;
+}
+
+/* =======================================================
+   3. 판정선 
+   ======================================================= */
+.judgment-line {
+  position: absolute;
+  bottom: 320px; 
+  left: 0; 
+  width: 100%; 
+  height: 18px; 
+  background-color: #ffffff; 
+  z-index: 50; 
+  box-shadow: 0px 0px 15px #ffffff, 0px 0px 30px #00f0ff;
+}
+
+/* =======================================================
+   4. 버튼 디자인 및 타격감
    ======================================================= */
 .arcade-btn {
   flex: 1;
-  height: 100px; /* 🚨 부모 박스가 240px로 커졌으므로, 버튼 순수 높이는 100px로 고정합니다 */
-  background: linear-gradient(180deg, #161616 0%, #090909 55%, #050505 100%);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-top: 2px solid rgba(255, 255, 255, 0.12);
+  height: 100%; 
+  background: linear-gradient(180deg, #222 0%, #000 100%);
+  border-top: 3px solid #444; /* 기어와 확실히 구분되는 경계선 */
   position: relative;
-  overflow: hidden;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,0.05), inset 0 -6px 16px rgba(0,0,0,0.25);
+  transition: all 0.05s ease;
 }
 
-.arcade-btn::before {
-  content: "";
-  position: absolute;
-  top: 10px;
-  left: 0;
-  right: 0;
-  height: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.12), transparent 90%);
-  pointer-events: none;
-}
-
-.arcade-btn::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  width: 55%;
-  height: 4px;
-  transform: translateX(-50%);
-  background: rgba(255,255,255,0.08);
-  border-radius: 999px;
-  pointer-events: none;
-}
-
+/* 물리적으로 눌리는 느낌 (4px 하강) */
 .arcade-btn.is-pressed {
-  border-top: 2px solid transparent;
   transform: translateY(4px);
-  background: linear-gradient(180deg, #101010 0%, #060606 50%, #020202 100%);
-  box-shadow: inset 0 2px 4px rgba(255,255,255,0.04), inset 0 -8px 18px rgba(0,0,0,0.35);
+  border-top: none;
 }
 
-/* D, K 키 (시안색 발광) */
+/* D, K 키 (시안색 계열) */
 .arcade-btn.d-key.is-pressed, .arcade-btn.k-key.is-pressed {
-  background: linear-gradient(180deg, rgba(0, 240, 255, 0.2) 0%, #050505 100%);
-  box-shadow: 0px -20px 50px rgba(0, 240, 255, 0.3), inset 0px 0px 20px rgba(0, 240, 255, 0.8);
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.4) 0%, #000 100%);
+  box-shadow: inset 0px 0px 20px rgba(0, 240, 255, 0.6);
 }
 
-/* F, J 키 (마젠타색 발광) */
+/* F, J 키 (마젠타색 계열) */
 .arcade-btn.f-key.is-pressed, .arcade-btn.j-key.is-pressed {
-  background: linear-gradient(180deg, rgba(255, 0, 160, 0.2) 0%, #050505 100%);
-  box-shadow: 0px -20px 50px rgba(255, 0, 160, 0.3), inset 0px 0px 20px rgba(255, 0, 160, 0.8);
+  background: linear-gradient(180deg, rgba(255, 0, 160, 0.4) 0%, #000 100%);
+  box-shadow: inset 0px 0px 20px rgba(255, 0, 160, 0.6);
 }
-
-.btn-label {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-family: Arial, sans-serif;
-  font-weight: 900;
-  font-size: 24px;
-  color: rgba(255, 255, 255, 0.78);
-  letter-spacing: 0.16em;
-  text-shadow: 0 0 4px rgba(255,255,255,0.14);
-}
-
-.arcade-btn:hover {
-  transform: translateY(-1px);
-}
-
-.arcade-btn.d-key.is-pressed .btn-label, .arcade-btn.k-key.is-pressed .btn-label { color: #00f0ff; text-shadow: 0px 0px 14px #00f0ff; }
-.arcade-btn.f-key.is-pressed .btn-label, .arcade-btn.j-key.is-pressed .btn-label { color: #ff00a0; text-shadow: 0px 0px 14px #ff00a0; }
-
-
-
 </style>

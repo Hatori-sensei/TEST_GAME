@@ -96,9 +96,33 @@ export default class GameInstance {
       }
     };
     this.keyupEvent = (event) => this.onKeyUp(this.getKeyName(event));
-    window.addEventListener("resize", () => this.reposition());
+    this.resizeHandler = () => this.reposition();
+    window.addEventListener("resize", this.resizeHandler);
     document.addEventListener("keydown", this.keydownEvent);
     document.addEventListener("keyup", this.keyupEvent);
+  }
+
+  destroyInstance() {
+    // stop the main loop
+    this.destoryed = true;
+    // remove DOM event listeners
+    try {
+      if (this.keydownEvent) document.removeEventListener("keydown", this.keydownEvent);
+      if (this.keyupEvent) document.removeEventListener("keyup", this.keyupEvent);
+      if (this.resizeHandler) window.removeEventListener("resize", this.resizeHandler);
+    } catch (e) {
+      // ignore
+    }
+    // clear timers/intervals
+    try { clearInterval(this.intervalPlay); } catch (e) {}
+    try { clearInterval(this.speedPopupTimer); } catch (e) {}
+    // pause audio and youtube player
+    try {
+      if (this.vm.srcMode === "youtube" && this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') this.ytPlayer.pauseVideo();
+      if (this.audio && typeof this.audio.pause === 'function') this.audio.pause();
+    } catch (e) {}
+    // clear track arrays
+    try { this.dropTrackArr.forEach(track => { if (track.particleEffect && typeof track.particleEffect.clear === 'function') track.particleEffect.clear(); track.noteArr = []; }); } catch (e) {}
   }
 
   async onKeyDown(key) {

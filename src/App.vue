@@ -3,10 +3,13 @@
     <PageBackground
       v-if="
         $store.state.audio &&
+        $route.name !== 'home' &&
         $route.meta.requireBg &&
         showOnPageRequireSignin &&
         !maintenanceMsg
       "
+      :showNav="$route.meta.showNav !== false"
+      :backgroundOnly="$route.meta.backgroundOnly === true"
     ></PageBackground>
     <ModalGlobal ref="gm"></ModalGlobal>
     <FloatingAlert ref="alert"></FloatingAlert>
