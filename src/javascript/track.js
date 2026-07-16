@@ -175,26 +175,6 @@ keyDown(key) {
       // 판정 범위를 지나쳐서 떨어지면 완벽하게 놓친 것으로 처리 (Miss)
       if (passedMs > 175) {
         if (typeof this.noteArr[i].missNote === 'function') this.noteArr[i].missNote();
-        this.vm.result.combo = 0;
-        this.vm.result.feverMultiplier = 1;
-        this.vm.result.feverGauge = 0;
-        this.vm.result.marks.miss += 1;
-        this.vm.result.totalHitNotes += 1;
-        // 노트를 놓친 경우: 체력 20% 감소
-        this.vm.health = Math.max(0, this.vm.health - 20);
-        
-        if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge("Miss", 0);
-        
-        // 체력이 0 이하가 되면 게임오버
-        if (this.vm.health <= 0) {
-          if (typeof this.vm.triggerGameOverImmediate === 'function') {
-            this.vm.triggerGameOverImmediate();
-          } else {
-            this.vm.isGameEnded = true;
-            this.game.pauseGame();
-          }
-        }
-        
         this.noteArr.splice(i, 1);
       }
     }

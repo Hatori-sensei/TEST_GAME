@@ -28,6 +28,10 @@
                 <span class="label">Length</span>
                 <strong>{{ selectedSong.duration || '3:24' }}</strong>
               </div>
+              <div class="detail-card">
+                <span class="label">Speed</span>
+                <strong>{{ noteSpeed.toFixed(1) }}x</strong>
+              </div>
             </div>
 
             <div class="play-panel" v-if="sheetList && sheetList.length > 0">
@@ -99,6 +103,7 @@ export default {
       selectedSong: null,
       selectedIndex: 0,
       tab: "recom",
+      noteSpeed: 1.0,
     };
   },
   computed: {
@@ -162,6 +167,19 @@ export default {
     handleKeydown(e) {
       if (!this.songList || this.songList.length === 0) return;
 
+      // 1,2 번 키로 배속 조정 (1.0x ~ 8.0x)
+      if (e.keyCode === 49) { // 1 key
+        e.preventDefault();
+        this.noteSpeed = Math.max(1.0, this.noteSpeed - 0.1);
+        this.$store.state.audio.playHoverEffect("ui/ta");
+        return;
+      } else if (e.keyCode === 50) { // 2 key
+        e.preventDefault();
+        this.noteSpeed = Math.min(8.0, this.noteSpeed + 0.1);
+        this.$store.state.audio.playHoverEffect("ui/ta");
+        return;
+      }
+
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         let next = this.selectedIndex + 1;
@@ -192,6 +210,9 @@ export default {
       });
     },
     playGame(sheetId) {
+      // 배속을 $store에 저장해서 게임에서 사용
+      this.$store.state.userProfile = this.$store.state.userProfile || {};
+      this.$store.state.userProfile.noteSpeed = this.noteSpeed;
       this.$store.state.audio.playEffect("ui/slide2");
       this.$router.push(`/game/${sheetId}`);
     },

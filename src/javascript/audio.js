@@ -128,6 +128,12 @@ export default class Audio {
     this.mute(this.muteBg);
   }
 
+  fadeOut(duration = 300) {
+    if (!this.player || typeof this.player.fade !== "function") return;
+    const currentVolume = this.player.volume ? this.player.volume() : this.maxVolume;
+    this.player.fade(currentVolume, 0, duration);
+  }
+
   getCurrentTime() {
     return this.player ? this.player.seek() : 0;
   }

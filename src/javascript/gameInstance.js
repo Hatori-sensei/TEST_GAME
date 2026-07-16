@@ -82,11 +82,11 @@ export default class GameInstance {
     this.keydownEvent = (event) => {
       const key = this.getKeyName(event);
       if (event.keyCode === 49) { 
-        this.vm.noteSpeed = Math.max(1.0, (this.vm.noteSpeed || 1.0) - 0.1);
+        this.vm.noteSpeed = Math.max(1.0, (this.vm.noteSpeed || 1.0) - 0.5);
         this.speedPopupTimer = 80;
         this.reposition();
       } else if (event.keyCode === 50) { 
-        this.vm.noteSpeed = Math.min(10.0, (this.vm.noteSpeed || 1.0) + 0.1);
+        this.vm.noteSpeed = Math.min(8.0, (this.vm.noteSpeed || 1.0) + 0.5);
         this.speedPopupTimer = 80;
         this.reposition();
       }
@@ -191,12 +191,20 @@ export default class GameInstance {
     this.resetPlaying();
     this.vm.started = true;
     this.reposition();
-    this.resumeGame(true); 
+    this.resumeGame(true);
+    // 노트 스폰 딜레이 (음악 시작 후 1초 뒤에 노트 등장)
+    this.noteStartDelay = 1.0;
     this.intervalPlay = setInterval(this.gameTimingLoop.bind(this), 20);
   }
 
   async gameTimingLoop() {
     if (this.paused) return;
+    
+    // 노트 딜레이 적용: 음악 시작 후 1초 동안은 노트를 스폰하지 않음
+    // (배속 변경 영향을 받지 않도록 절대 시간 기준으로 확인)
+    if (this.noteStartDelay && this.currentTime < this.noteStartDelay) {
+      return;
+    }
     
     while (this.timeArr && this.timeArrIdx < this.timeArr.length) {
       const noteObj = this.timeArr[this.timeArrIdx];

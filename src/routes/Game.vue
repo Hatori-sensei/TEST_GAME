@@ -56,6 +56,17 @@
       ></canvas>
 
       <div class="gear-overlay">
+        <div class="gear-display">
+          <div class="display-item speed-display">
+            <span class="label">SPEED</span>
+            <span class="value">{{ (noteSpeed || 1.0).toFixed(1) }}x</span>
+          </div>
+          <div class="display-item stats-display">
+            <span class="stat perfect">P: {{ result.marks.perfect }}</span>
+            <span class="stat good">G: {{ result.marks.good }}</span>
+            <span class="stat miss">M: {{ result.marks.miss }}</span>
+          </div>
+        </div>
         <div class="judgment-line"></div>
       </div>
       
@@ -353,9 +364,20 @@ export default {
       this.instance.loading = false;
       this.youtubeBuffering = false;
       if (!this.started) {
+        // 배속 설정 적용 (선곡 화면에서 설정된 값)
+        if (this.$store.state.userProfile?.noteSpeed) {
+          this.noteSpeed = this.$store.state.userProfile.noteSpeed;
+          this.instance.reposition();
+        }
         // first loaded
+        if (this.srcMode !== "youtube") {
+          // 비YouTube 모드: 바로 시작
+          this.showStartButton = false;
+          this.startGameDirect();
+          return;
+        }
+        // YouTube 모드
         this.showStartButton = true;
-        if (this.srcMode !== "youtube") return;
         this.ytPlayer?.setVolume(0);
         this.instance?.startSong();
         this.showStartButton = false;
@@ -370,6 +392,12 @@ export default {
       this.instance.loading = false;
       this.showStartButton = true;
       logEvent("youtube_cued");
+      // 자동으로 게임 시작
+      setTimeout(() => {
+        if (this.showStartButton) {
+          this.startGame();
+        }
+      }, 500);
     },
     ytBuffering() {
       Logger.log("buffering");
@@ -388,8 +416,14 @@ export default {
         this.youtubeBuffering = true;
         this.ytPlayer?.playVideo();
         this.ytPlayer?.setVolume(0);
+        this.$refs.zoom.show("Get Ready...");
+        // Get Ready 표시 후 2초 뒤에 게임 시작
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        this.instance.startSong();
       } else {
         if (!this.tutorial) this.$refs.zoom.show("Get Ready...");
+        // Get Ready 표시 후 2초 뒤에 게임 시작
+        await new Promise(resolve => setTimeout(resolve, 2000));
         this.instance.startSong();
       }
       if (isDev) return;
@@ -398,8 +432,22 @@ export default {
         this.currentSong.songId
       );
     },
+    async startGameDirect() {
+      logEvent("start_game", { songId: this.currentSong.songId });
+      this.health = 100;
+      this.$refs.zoom.show("Get Ready...");
+      // Get Ready 표시 후 2초 뒤에 게임 시작
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      this.instance.startSong();
+      if (isDev) return;
+      this.playId = await createPlay(
+        this.currentSong.sheetId,
+        this.currentSong.songId
+      );
+    },
     triggerGameOverImmediate() {
       if (this.tvOff) return;
+      this.fadeOutMusic();
       this.tvOff = true;
       setTimeout(() => {
         try {
@@ -409,6 +457,30 @@ export default {
           if (this.instance && typeof this.instance.pauseGame === 'function') this.instance.pauseGame();
         }
       }, 300);
+    },
+    fadeOutMusic() {
+      if (this.srcMode === "youtube") {
+        this.fadeOutYoutube(300);
+      }
+      if (this.$store.state.audio && typeof this.$store.state.audio.fadeOut === "function") {
+        this.$store.state.audio.fadeOut(300);
+      }
+    },
+    fadeOutYoutube(duration = 300) {
+      if (!this.ytPlayer || typeof this.ytPlayer.getVolume !== "function" || typeof this.ytPlayer.setVolume !== "function") return;
+      const stepTime = 50;
+      const steps = Math.max(1, Math.ceil(duration / stepTime));
+      let currentVolume = this.ytPlayer.getVolume();
+      const delta = currentVolume / steps;
+      const fadeInterval = setInterval(() => {
+        currentVolume -= delta;
+        if (currentVolume <= 0) {
+          this.ytPlayer.setVolume(0);
+          clearInterval(fadeInterval);
+          return;
+        }
+        this.ytPlayer.setVolume(Math.max(0, Math.round(currentVolume)));
+      }, stepTime);
     },
     pauseGame() {
       if (!this.started || this.isGameEnded) return;
@@ -761,12 +833,88 @@ export default {
   transform: translateX(-50%);
   width: 500px;
   height: 100%;
-  background: transparent;
-  /* 양옆 구분선을 조금 더 날카롭게 */
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 20px,
+    rgba(0, 240, 255, 0.03) 20px,
+    rgba(0, 240, 255, 0.03) 21px
+  ),
+  repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 40px,
+    rgba(0, 240, 255, 0.02) 40px,
+    rgba(0, 240, 255, 0.02) 41px
+  );
   border-left: 2px solid rgba(255, 255, 255, 0.15);
   border-right: 2px solid rgba(255, 255, 255, 0.15);
   pointer-events: none;
   z-index: 10;
+}
+
+/* 기어 상단 미니 디스플레이 */
+.gear-display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.1) 0%, transparent 100%);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 20px;
+  box-sizing: border-box;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.display-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+}
+
+.display-item .label {
+  color: rgba(0, 240, 255, 0.6);
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.display-item .value {
+  color: #00ffff;
+  font-weight: 900;
+  font-size: 1rem;
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  font-family: "Anton", monospace;
+}
+
+.stats-display {
+  display: flex;
+  gap: 12px;
+}
+
+.stat {
+  font-weight: bold;
+  font-size: 0.8rem;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.stat.perfect {
+  color: #15ff00;
+}
+
+.stat.good {
+  color: #00ffea;
+}
+
+.stat.miss {
+  color: #ff3232;
 }
 
 /* =======================================================
