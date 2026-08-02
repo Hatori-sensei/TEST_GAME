@@ -71,7 +71,18 @@ export default class GameInstance {
     this.checkHitLineY = this.canvas.height - 320; 
     
     // noteSpeedPxPerSec is derived from a session-locked multiplier to avoid runtime changes
-    const sessionMultiplier = this.sessionSpeedMultiplier !== undefined ? this.sessionSpeedMultiplier : (this.vm.noteSpeed || 1.0);
+    let sessionMultiplier;
+    if (this.sessionSpeedMultiplier !== undefined) {
+      sessionMultiplier = this.sessionSpeedMultiplier;
+    } else if (this.vm && this.vm.started) {
+      // Game already started but sessionSpeedMultiplier not set (race); lock from store and prevent reading live vm.noteSpeed thereafter
+      const storeSpeed = (this.vm.$store && this.vm.$store.state && this.vm.$store.state.speedMultiplier) ? this.vm.$store.state.speedMultiplier : undefined;
+      sessionMultiplier = storeSpeed !== undefined ? storeSpeed : (this.vm.noteSpeed || 1.0);
+      this.sessionSpeedMultiplier = sessionMultiplier;
+    } else {
+      // Pre-start: use configured vm.noteSpeed but do NOT treat as mutable during a running session
+      sessionMultiplier = (this.vm.noteSpeed || 1.0);
+    }
     this.noteSpeedPxPerSec = 400 * sessionMultiplier * (this.vm.playbackSpeed || 1);
     this.noteDelay = this.checkHitLineY / this.noteSpeedPxPerSec;
     
@@ -175,7 +186,8 @@ export default class GameInstance {
     this.vm.started = true;
 
     // Lock the session speed at song start to prevent runtime changes
-    this.sessionSpeedMultiplier = this.vm.noteSpeed || 1.0;
+    const storeSpeed = (this.vm.$store && this.vm.$store.state && this.vm.$store.state.speedMultiplier) ? this.vm.$store.state.speedMultiplier : undefined;
+    this.sessionSpeedMultiplier = storeSpeed !== undefined ? storeSpeed : (this.vm.noteSpeed || 1.0);
 
     this.reposition();
     this.resumeGame(true);

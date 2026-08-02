@@ -27,6 +27,7 @@
           :max="5"
           :contained="true"
           :tooltip-formatter="(val) => val.toFixed(1) + 'x'"
+          :disabled="playData.started"
           @change="changeSpeed"
         ></vue-slider>
       </span>
@@ -144,7 +145,15 @@ export default {
       this.playData.visualizerInstance.setVisualizerByKey(name);
     },
     changeSpeed(speed) {
+      // Persist selection as pre-game setting; do not mutate runtime game speed once started.
+      if (this.playData && this.playData.started) {
+        // If game already started, only update global store (won't affect running session)
+        if (this.$store && typeof this.$store.commit === 'function') this.$store.commit('setSpeedMultiplier', speed);
+        return;
+      }
+      // Pre-game: update UI value and store
       this.playData.noteSpeed = speed;
+      if (this.$store && typeof this.$store.commit === 'function') this.$store.commit('setSpeedMultiplier', speed);
     },
   },
   computed: {

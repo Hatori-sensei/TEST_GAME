@@ -63,7 +63,8 @@ export default {
   },
   watch: {
     noteSpeed() {
-      this.instance.reposition();
+      // Only reposition before game start; once started, noteSpeed is session-locked
+      if (!this.started && this.instance) this.instance.reposition();
     },
     showStartButton() {
       if (this.showStartButton) {

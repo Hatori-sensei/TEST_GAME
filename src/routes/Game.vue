@@ -57,10 +57,6 @@
 
       <div class="gear-overlay">
         <div class="gear-display">
-          <div class="display-item speed-display">
-            <span class="label">SPEED</span>
-            <span class="value">{{ (noteSpeed || 1.0).toFixed(1) }}x</span>
-          </div>
           <div class="display-item stats-display">
             <span class="stat perfect">P: {{ result.marks.perfect }}</span>
             <span class="stat good">G: {{ result.marks.good }}</span>
@@ -366,8 +362,11 @@ export default {
       if (!this.started) {
         // 배속 설정 적용 (선곡 화면에서 설정된 값)
         if (this.$store.state.userProfile?.noteSpeed) {
-          this.noteSpeed = this.$store.state.userProfile.noteSpeed;
-          this.instance.reposition();
+          // apply only as initial preference before game start
+          if (!this.started) {
+            this.noteSpeed = this.$store.state.userProfile.noteSpeed;
+            this.instance.reposition();
+          }
         }
         // first loaded
         if (this.srcMode !== "youtube") {

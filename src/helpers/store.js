@@ -41,6 +41,7 @@ export const store = new Vuex.Store({
     remoteConfig: null,
     // Game play settings
     speedMultiplier: 1.0,
+    pendingSheetId: null,
   },
   actions: {
     async fetchUserProfile() {
@@ -196,6 +197,9 @@ export const store = new Vuex.Store({
       // clamp to reasonable range
       const v = Math.max(0.5, Math.min(8.0, Number(val) || 1.0));
       state.speedMultiplier = v;
+    },
+    setPendingSheetId(state, val) {
+      state.pendingSheetId = val;
     },
     async toggleFullscreen(state) {
       state.isFullscreen = document.fullscreen;

@@ -3,7 +3,6 @@
     <canvas ref="gameCanvas" class="demo-canvas"></canvas>
     <div class="demo-overlay">
       <div class="info">Demo: Set speed, then press Start. Press D when the note reaches the judgment line.</div>
-      <div style="margin-top:8px"><SpeedSelector /></div>
       <div style="margin-top:8px">
         <button @click="startGame" :disabled="started">Start</button>
         <button @click="stopGame" :disabled="!started">Stop</button>
@@ -16,11 +15,10 @@
 <script>
 import GameInstance from "../gameInstance";
 import Track from "../track";
-import SpeedSelector from "../components/ui/SpeedSelector.vue";
 
 export default {
   name: "DemoGame",
-  components: { SpeedSelector },
+  components: {},
   data() {
     return {
       gameInstance: null,

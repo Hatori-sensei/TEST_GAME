@@ -6,6 +6,7 @@ import Auth from "../routes/Auth.vue";
 import Result from "../routes/Result.vue";
 import Rankings from "../routes/Rankings.vue";
 import SongSelect from "../routes/SongSelect.vue";
+import SpeedSetup from "../routes/SpeedSetup.vue";
 import MyStudio from "../routes/MyStudio.vue";
 import SheetEditor from "../routes/SheetEditor.vue";
 import GameOverScreen from "../routes/GameOverScreen.vue";
@@ -42,6 +43,18 @@ const router = new VueRouter({
       path: "/rankings",
       component: Rankings,
       meta: { requireBg: true, title: "Rankings" },
+    },
+    {
+      path: "/speed-setup",
+      component: SpeedSetup,
+      children: [
+        {
+          name: "speed-setup",
+          path: ":sheet",
+          component: SpeedSetup,
+          meta: { requireSignin: true, title: "Speed Setup" },
+        },
+      ],
     },
     {
       path: "/game",
