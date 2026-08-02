@@ -1,6 +1,7 @@
 import VueRouter from "vue-router";
 import Home from "../routes/Home.vue";
 import Game from "../routes/Game.vue";
+import DemoGame from "../routes/DemoGame.vue";
 import Auth from "../routes/Auth.vue";
 import Result from "../routes/Result.vue";
 import Rankings from "../routes/Rankings.vue";
@@ -53,6 +54,12 @@ const router = new VueRouter({
           meta: { requireSignin: true, title: "Game" },
         },
       ],
+    },
+    {
+      name: "demo",
+      path: "/demo",
+      component: DemoGame,
+      meta: { requireBg: false, requireSignin: false, title: "Demo" },
     },
     {
       name: "tutorial",
