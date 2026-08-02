@@ -31,6 +31,7 @@
               <div class="detail-card">
                 <span class="label">Speed</span>
                 <strong>{{ noteSpeed.toFixed(1) }}x</strong>
+                <div style="margin-top:6px"><SpeedSelector :value="noteSpeed" /></div>
               </div>
             </div>
 
@@ -89,12 +90,13 @@
 
 <script>
 import Loading from "../components/ui/Loading.vue";
+import SpeedSelector from "../components/ui/SpeedSelector.vue";
 import { getSheetList, getSongListCached, getPlaylist } from "../javascript/db";
 import { logEvent } from "../helpers/analytics";
 
 export default {
   name: "SongSelect",
-  components: { Loading },
+  components: { Loading, SpeedSelector },
   data() {
     return {
       allSongs: null,
@@ -170,12 +172,14 @@ export default {
       // 1,2 번 키로 배속 조정 (1.0x ~ 8.0x)
       if (e.keyCode === 49) { // 1 key
         e.preventDefault();
-        this.noteSpeed = Math.max(1.0, this.noteSpeed - 0.1);
+        this.noteSpeed = Math.max(0.5, this.noteSpeed - 0.1);
+        this.$store.commit('setSpeedMultiplier', this.noteSpeed);
         this.$store.state.audio.playHoverEffect("ui/ta");
         return;
       } else if (e.keyCode === 50) { // 2 key
         e.preventDefault();
         this.noteSpeed = Math.min(8.0, this.noteSpeed + 0.1);
+        this.$store.commit('setSpeedMultiplier', this.noteSpeed);
         this.$store.state.audio.playHoverEffect("ui/ta");
         return;
       }
@@ -210,9 +214,8 @@ export default {
       });
     },
     playGame(sheetId) {
-      // 배속을 $store에 저장해서 게임에서 사용
-      this.$store.state.userProfile = this.$store.state.userProfile || {};
-      this.$store.state.userProfile.noteSpeed = this.noteSpeed;
+      // 배속을 $store에 저장해서 게임에서 사용 (pre-game only)
+      this.$store.commit('setSpeedMultiplier', this.noteSpeed);
       this.$store.state.audio.playEffect("ui/slide2");
       this.$router.push(`/game/${sheetId}`);
     },

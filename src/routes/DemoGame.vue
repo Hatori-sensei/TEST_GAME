@@ -2,8 +2,11 @@
   <div class="demo-game">
     <canvas ref="gameCanvas" class="demo-canvas"></canvas>
     <div class="demo-overlay">
-      <div class="info">
-        Demo: Press D when the note reaches the judgment line.
+      <div class="info">Demo: Set speed, then press Start. Press D when the note reaches the judgment line.</div>
+      <div style="margin-top:8px"><SpeedSelector /></div>
+      <div style="margin-top:8px">
+        <button @click="startGame" :disabled="started">Start</button>
+        <button @click="stopGame" :disabled="!started">Stop</button>
       </div>
       <div class="judge-text">{{ judgeText }}</div>
     </div>
@@ -13,9 +16,11 @@
 <script>
 import GameInstance from "../gameInstance";
 import Track from "../track";
+import SpeedSelector from "../components/ui/SpeedSelector.vue";
 
 export default {
   name: "DemoGame",
+  components: { SpeedSelector },
   data() {
     return {
       gameInstance: null,
@@ -24,31 +29,16 @@ export default {
       canvas: null,
       ctx: null,
       noteSpawned: false,
-    };
+      started: false,
+      baseNoteSpeed: 560,
+      };
   },
   async mounted() {
     this.canvas = this.$refs.gameCanvas;
     this.ctx = this.canvas.getContext("2d");
     this.resizeCanvas();
-    this.track = new Track(this.ctx, {
-      x: Math.round(this.canvas.width / 2 - 90),
-      width: 180,
-      judgeLineY: Math.round(this.canvas.height * 0.82),
-      keyBind: "d",
-      speedPxPerSec: 560,
-      onJudge: this.handleJudge,
-    });
 
-    this.gameInstance = new GameInstance({
-      audioSrc: "/audio/effects/ta.mp3",
-      onTick: this.onGameTick,
-    });
-
-    await this.gameInstance.load();
-    this.track.spawnNote();
-    this.noteSpawned = true;
-    this.gameInstance.play();
-
+    // Do not create gameInstance/track until user starts the demo. Only wire input and resize.
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
     window.addEventListener("resize", this.resizeCanvas);
@@ -93,10 +83,10 @@ export default {
       this.track.render();
     },
     onKeyDown(event) {
-      this.track?.handleKeyDown(event.key);
+      if (this.track) this.track.handleKeyDown(event.key);
     },
     onKeyUp(event) {
-      this.track?.handleKeyUp(event.key);
+      if (this.track) this.track.handleKeyUp(event.key);
     },
     handleJudge(payload) {
       this.judgeText = payload.judge;
@@ -104,6 +94,43 @@ export default {
       this._judgeTimeout = window.setTimeout(() => {
         this.judgeText = "";
       }, 600);
+    },
+    async startGame() {
+      if (this.started) return;
+      this.started = true;
+      // create GameInstance and Track with immutable speedMultiplier from store
+      const multiplier = this.$store?.state?.speedMultiplier || 1.0;
+      this.gameInstance = new GameInstance({
+        audioSrc: "/audio/effects/ta.mp3",
+        onTick: this.onGameTick,
+        speedMultiplier: multiplier,
+      });
+
+      // baseNoteSpeed * multiplier -> fixed speedPxPerSec for the session
+      const speedPxPerSec = this.baseNoteSpeed * multiplier;
+
+      this.track = new Track(this.ctx, {
+        x: Math.round((this.canvas.width / (window.devicePixelRatio || 1)) / 2 - 90),
+        width: 180,
+        judgeLineY: Math.round((this.canvas.height / (window.devicePixelRatio || 1)) * 0.82),
+        keyBind: "d",
+        speedPxPerSec,
+        onJudge: this.handleJudge,
+      });
+
+      await this.gameInstance.load();
+      this.track.spawnNote();
+      this.noteSpawned = true;
+      this.gameInstance.play();
+    },
+    stopGame() {
+      if (!this.started) return;
+      this.started = false;
+      if (this.gameInstance) this.gameInstance.stop();
+      this.gameInstance = null;
+      this.track = null;
+      this.judgeText = "";
+      this.noteSpawned = false;
     },
   },
 };

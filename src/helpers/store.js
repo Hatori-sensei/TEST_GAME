@@ -39,6 +39,8 @@ export const store = new Vuex.Store({
     build: process.env.COMMIT_HASH + (isDev ? "-dev-build" : ""),
     isDev,
     remoteConfig: null,
+    // Game play settings
+    speedMultiplier: 1.0,
   },
   actions: {
     async fetchUserProfile() {
@@ -189,6 +191,11 @@ export const store = new Vuex.Store({
     },
     setRemoteConfig(state, val) {
       state.remoteConfig = val;
+    },
+    setSpeedMultiplier(state, val) {
+      // clamp to reasonable range
+      const v = Math.max(0.5, Math.min(8.0, Number(val) || 1.0));
+      state.speedMultiplier = v;
     },
     async toggleFullscreen(state) {
       state.isFullscreen = document.fullscreen;

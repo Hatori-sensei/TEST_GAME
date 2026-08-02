@@ -65,33 +65,32 @@ export class Note {
 
   update(dt) {
     if (this.noteFailed) return;
-    this.y += this.speedPxPerSec * dt;
+    // simple linear motion: y increases by constant speed * dt
+    const move = this.speedPxPerSec * dt;
+    this.y += move;
+
+    // check miss: if bottom passed beyond Good window -> miss
     const passedPx = this.bottomY - this.judgeLineY;
     const missDistancePx = (GOOD_WINDOW_MS / 1000) * this.speedPxPerSec;
     if (passedPx > missDistancePx) {
       this.noteFailed = true;
-      if (typeof this.onMiss === "function") {
-        this.onMiss(this);
-      }
+      if (typeof this.onMiss === "function") this.onMiss(this);
     }
   }
 
   hit() {
     if (this.noteFailed) return null;
+    if (!this.speedPxPerSec || this.speedPxPerSec <= 0) return null;
     const diffPx = Math.abs(this.bottomY - this.judgeLineY);
     const diffMs = (diffPx / this.speedPxPerSec) * 1000;
-    if (diffMs > GOOD_WINDOW_MS) {
-      return null;
-    }
+    if (diffMs > GOOD_WINDOW_MS) return null;
 
     let judgment = "Good";
     if (diffMs <= PERFECT_WINDOW_MS) judgment = "Perfect";
     else if (diffMs <= GREAT_WINDOW_MS) judgment = "Great";
 
     this.noteFailed = true;
-    if (typeof this.onHit === "function") {
-      this.onHit(this, judgment);
-    }
+    if (typeof this.onHit === "function") this.onHit(this, judgment);
     return judgment;
   }
 

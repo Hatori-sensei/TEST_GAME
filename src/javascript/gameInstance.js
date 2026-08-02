@@ -18,7 +18,6 @@ export default class GameInstance {
     this.playTime = 0; 
     this.paused = true; 
     this.keyHoldingStatus = {};
-    this.speedPopupTimer = 0; 
 
     this.ytPlayer = new YoutubePlayer(vm);
     this.feverEff = new FeverEffect(vm, this);
@@ -71,7 +70,9 @@ export default class GameInstance {
     // 캔버스가 자기 멋대로 곱하기(* 0.82) 하던 것을 CSS와 똑같이 바닥에서 140px로 고정합니다.
     this.checkHitLineY = this.canvas.height - 320; 
     
-    this.noteSpeedPxPerSec = 400 * (this.vm.noteSpeed || 1.0) * (this.vm.playbackSpeed || 1);
+    // noteSpeedPxPerSec is derived from a session-locked multiplier to avoid runtime changes
+    const sessionMultiplier = this.sessionSpeedMultiplier !== undefined ? this.sessionSpeedMultiplier : (this.vm.noteSpeed || 1.0);
+    this.noteSpeedPxPerSec = 400 * sessionMultiplier * (this.vm.playbackSpeed || 1);
     this.noteDelay = this.checkHitLineY / this.noteSpeedPxPerSec;
     
     const foundIdx = this.timeArr.findIndex(e => e.t > this.currentTime);
@@ -81,15 +82,7 @@ export default class GameInstance {
   registerInput() {
     this.keydownEvent = (event) => {
       const key = this.getKeyName(event);
-      if (event.keyCode === 49) { 
-        this.vm.noteSpeed = Math.max(1.0, (this.vm.noteSpeed || 1.0) - 0.5);
-        this.speedPopupTimer = 80;
-        this.reposition();
-      } else if (event.keyCode === 50) { 
-        this.vm.noteSpeed = Math.min(8.0, (this.vm.noteSpeed || 1.0) + 0.5);
-        this.speedPopupTimer = 80;
-        this.reposition();
-      }
+      // Removed in-game speed adjustment keys to keep speed constant during gameplay
       this.onKeyDown(key);
       if (event.keyCode === KeyCode.ESC) {
         this.paused ? this.resumeGame(true) : this.pauseGame();
@@ -114,9 +107,7 @@ export default class GameInstance {
       // ignore
     }
     // clear timers/intervals
-    try { clearInterval(this.intervalPlay); } catch (e) {}
-    try { clearInterval(this.speedPopupTimer); } catch (e) {}
-    // pause audio and youtube player
+    try { clearInterval(this.intervalPlay); } catch (e) {};    // pause audio and youtube player
     try {
       if (this.vm.srcMode === "youtube" && this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') this.ytPlayer.pauseVideo();
       if (this.audio && typeof this.audio.pause === 'function') this.audio.pause();
@@ -151,19 +142,11 @@ export default class GameInstance {
   }
 
   drawUI() {
-    const currentSpeed = (this.vm.noteSpeed || 1.0).toFixed(1);
+    const currentSpeed = (this.sessionSpeedMultiplier !== undefined ? this.sessionSpeedMultiplier : (this.vm.noteSpeed || 1.0)).toFixed(1);
     this.ctx.textAlign = "center";
     this.ctx.fillStyle = "white";
     this.ctx.font = "20px Arial";
     this.ctx.fillText(`SPEED x${currentSpeed}`, (this.startX + this.endX) / 2, 40);
-
-    if (this.speedPopupTimer > 0) {
-      const alpha = Math.min(1, this.speedPopupTimer / 40);
-      this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-      this.ctx.font = "bold 60px Arial";
-      this.ctx.fillText(`x${currentSpeed}`, this.canvas.width / 2, this.canvas.height / 2);
-      this.speedPopupTimer--;
-    }
   }
 
   drawDecoration() {
@@ -190,6 +173,10 @@ export default class GameInstance {
   startSong() {
     this.resetPlaying();
     this.vm.started = true;
+
+    // Lock the session speed at song start to prevent runtime changes
+    this.sessionSpeedMultiplier = this.vm.noteSpeed || 1.0;
+
     this.reposition();
     this.resumeGame(true);
     // 노트 스폰 딜레이 (음악 시작 후 1초 뒤에 노트 등장)

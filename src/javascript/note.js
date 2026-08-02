@@ -52,11 +52,12 @@ export default class Note {
     if (this.game.paused) return;
 
     const timeDiff = this.game.currentTime - this.keyObj.t;
-    this.y = timeDiff * this.game.noteSpeedPxPerSec + this.game.checkHitLineY;
+    const speed = this.game.noteSpeedPxPerSec || 1;
+    this.y = timeDiff * speed + this.game.checkHitLineY;
 
     const noteBottomY = this.y + (this.height || this.singleNoteHeight);
     const passedPx = noteBottomY - this.game.checkHitLineY;
-    const passedMs = (passedPx / this.game.noteSpeedPxPerSec) * 1000;
+    const passedMs = (passedPx / speed) * 1000;
 
     if (!this.noteFailed && passedMs > 175) {
       this.missNote();
