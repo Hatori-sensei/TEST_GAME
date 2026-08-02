@@ -16,6 +16,8 @@ export default class DropTrack {
     this.keyBind = Array.isArray(keyBind) ? keyBind : [keyBind.toLowerCase()];
     this.noteArr = [];
     this.isKeyDown = false;
+    this.isHolding = false;
+    this.holdingNote = null;
 
     // 🚨 실제 엔진의 판정 높이를 밑에서 140px 위로 정확히 고정
     this.game.checkHitLineY = this.game.canvas.height - 320;
@@ -36,118 +38,163 @@ export default class DropTrack {
   }
 
 keyDown(key) {
-    if (this.keyBind.includes(key.toLowerCase())) {
-      this.isKeyDown = true;
-      const activeNoteIdx = this.noteArr.findIndex(n => !n.noteFailed);
-      
-      // 1. 유효 판정 범위 (MAX 100% ~ 1%)
-      const HIT_WINDOW = 175; 
-      
-      // 🚨 2. 미리 치기(Early Miss) 함정 구역 (175ms ~ 300ms)
-      // 노트가 이 구역에 들어왔을 때 너무 일찍 치면 Miss가 뜹니다!
-      const EARLY_MISS_WINDOW = 300; 
+    if (!this.keyBind.includes(key.toLowerCase())) return;
 
-      if (activeNoteIdx !== -1) {
-        const note = this.noteArr[activeNoteIdx];
-        
-        // 판정 기준: 노트의 밑바닥
-        const noteBottomY = note.y + (note.height || 15);
-        const diffPx = Math.abs(this.game.checkHitLineY - noteBottomY);
-        const diffMs = (diffPx / this.game.noteSpeedPxPerSec) * 1000;
-        
-        // 노트가 판정선보다 '위에' 있는지(일찍 쳤는지) 확인
-        const isEarly = noteBottomY < this.game.checkHitLineY;
+    this.isKeyDown = true;
+    const activeNoteIdx = this.noteArr.findIndex(n => !n.noteFailed);
+    if (activeNoteIdx === -1) return;
 
-        // ==========================================
-        // 🎯 [정상 판정] 175ms 범위 안쪽
-        // ==========================================
-        if (diffMs <= HIT_WINDOW) {
-          
-          let rawPercent = 0;
-          if (diffMs <= 41.67) rawPercent = 100;
-          else if (diffMs <= 75.0) rawPercent = 99 - ((diffMs - 41.67) / 33.33) * 9;
-          else if (diffMs <= 108.33) rawPercent = 89 - ((diffMs - 75.0) / 33.33) * 19;
-          else if (diffMs <= 141.67) rawPercent = 69 - ((diffMs - 108.33) / 33.33) * 59;
-          else rawPercent = 9 - ((diffMs - 141.67) / 33.33) * 8;
+    const note = this.noteArr[activeNoteIdx];
+    const noteBottomY = note.y + note.singleNoteHeight;
+    const diffPx = Math.abs(this.game.checkHitLineY - noteBottomY);
+    const diffMs = (diffPx / this.game.noteSpeedPxPerSec) * 1000;
+    const isEarly = noteBottomY < this.game.checkHitLineY;
 
-          let judgePercent = 100;
-          if (rawPercent >= 100) judgePercent = 100;
-          else if (rawPercent >= 10) judgePercent = Math.floor(rawPercent / 10) * 10;
-          else judgePercent = 1;
+    const HIT_WINDOW = 175;
+    const EARLY_MISS_WINDOW = 300;
 
-          const judgeString = judgePercent === 100 ? "MAX 100%" : `MAX ${judgePercent}%`;
+    if (note.isLong) {
+      if (note.hitRegistered) return;
+      if (diffMs <= HIT_WINDOW) {
+        let rawPercent = 0;
+        if (diffMs <= 41.67) rawPercent = 100;
+        else if (diffMs <= 75.0) rawPercent = 99 - ((diffMs - 41.67) / 33.33) * 9;
+        else if (diffMs <= 108.33) rawPercent = 89 - ((diffMs - 75.0) / 33.33) * 19;
+        else if (diffMs <= 141.67) rawPercent = 69 - ((diffMs - 108.33) / 33.33) * 59;
+        else rawPercent = 9 - ((diffMs - 141.67) / 33.33) * 8;
 
-          this.vm.result.combo += (this.vm.result.feverMultiplier || 1); 
-          this.vm.result.maxCombo = Math.max(this.vm.result.combo, this.vm.result.maxCombo || 0);
-          this.vm.result.totalHitNotes += 1;
+        let judgePercent = 100;
+        if (rawPercent >= 100) judgePercent = 100;
+        else if (rawPercent >= 10) judgePercent = Math.floor(rawPercent / 10) * 10;
+        else judgePercent = 1;
 
-          let gaugeCharge = judgePercent === 100 ? 5 : (judgePercent >= 90 ? 3 : 1);
-          this.vm.result.feverGauge = (this.vm.result.feverGauge || 0) + gaugeCharge;
+        const judgeString = judgePercent === 100 ? "MAX 100%" : `MAX ${judgePercent}%`;
 
-          if (this.vm.result.feverGauge >= 100) {
-            if ((this.vm.result.feverMultiplier || 1) < 5) this.vm.result.feverMultiplier++;
-            this.vm.result.feverGauge -= 100;
-          }
+        this.vm.result.combo += (this.vm.result.feverMultiplier || 1);
+        this.vm.result.maxCombo = Math.max(this.vm.result.combo, this.vm.result.maxCombo || 0);
+        this.vm.result.totalHitNotes += 1;
 
-          const totalNotes = this.vm.sheet ? this.vm.sheet.length : 500;
-          const maxScorePerNote = 1000000 / totalNotes;
-          this.vm.result.score += maxScorePerNote * (judgePercent / 100);
+        let gaugeCharge = judgePercent === 100 ? 5 : (judgePercent >= 90 ? 3 : 1);
+        this.vm.result.feverGauge = (this.vm.result.feverGauge || 0) + gaugeCharge;
+        if (this.vm.result.feverGauge >= 100) {
+          if ((this.vm.result.feverMultiplier || 1) < 5) this.vm.result.feverMultiplier++;
+          this.vm.result.feverGauge -= 100;
+        }
 
-          if (judgePercent === 100) {
-            this.vm.result.marks.perfect += 1;
-            // Perfect 판정: 체력 10% 회복
-            this.vm.health = Math.min(100, this.vm.health + 10);
+        const totalNotes = this.vm.sheet ? this.vm.sheet.length : 500;
+        const maxScorePerNote = 1000000 / totalNotes;
+        this.vm.result.score += maxScorePerNote * (judgePercent / 100);
+
+        if (judgePercent === 100) {
+          this.vm.result.marks.perfect += 1;
+          this.vm.health = Math.min(100, this.vm.health + 10);
+        } else {
+          this.vm.result.marks.good += 1;
+          this.vm.health = Math.min(100, this.vm.health + 5);
+        }
+
+        if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge(judgeString, this.vm.result.combo);
+        if (this.particleEffect) this.particleEffect.create(this.x, this.game.checkHitLineY, this.width, judgeString);
+
+        note.beginLongHold();
+        this.isHolding = true;
+        this.holdingNote = note;
+        return;
+      }
+
+      if (isEarly && diffMs <= EARLY_MISS_WINDOW) {
+        this.vm.result.combo = 0;
+        this.vm.result.feverMultiplier = 1;
+        this.vm.result.feverGauge = 0;
+        this.vm.result.marks.miss += 1;
+        this.vm.health = Math.max(0, this.vm.health - 20);
+        if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge("Miss", 0);
+        if (this.vm.health <= 0) {
+          if (typeof this.vm.triggerGameOverImmediate === 'function') {
+            this.vm.triggerGameOverImmediate();
           } else {
-            this.vm.result.marks.good += 1;
-            // Good 판정: 체력 5% 회복
-            this.vm.health = Math.min(100, this.vm.health + 5);
+            this.vm.isGameEnded = true;
+            this.game.pauseGame();
           }
+        }
+        this.noteArr.splice(activeNoteIdx, 1);
+      }
 
-          if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge(judgeString, this.vm.result.combo);
-          if (this.particleEffect) this.particleEffect.create(this.x, this.game.checkHitLineY, this.width, judgeString);
-          
-          this.noteArr.splice(activeNoteIdx, 1);
-        }
-        // ==========================================
-        // 🚨 [Early Miss 함정] 175ms ~ 300ms 사이에서 너무 일찍 친 경우
-        // ==========================================
-        else if (isEarly && diffMs <= EARLY_MISS_WINDOW) {
-          this.vm.result.combo = 0;
-          this.vm.result.feverMultiplier = 1;
-          this.vm.result.feverGauge = 0;
-          this.vm.result.marks.miss += 1;
-          // Miss 판정: 체력 20% 감소
-          this.vm.health = Math.max(0, this.vm.health - 20);
-          if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge("Miss", 0);
-          
-          // 체력이 0 이하가 되면 게임오버
-          if (this.vm.health <= 0) {
-            if (typeof this.vm.triggerGameOverImmediate === 'function') {
-              this.vm.triggerGameOverImmediate();
-            } else {
-              this.vm.isGameEnded = true;
-              this.game.pauseGame();
-            }
-          }
-          
-          // Miss 처리 후 노트를 파괴하여 이중 타격을 방지
-          this.noteArr.splice(activeNoteIdx, 1);
-        }
-        // ==========================================
-        // 🛡️ [완전 무시] 300ms 밖에서 허공을 친 경우 (그냥 무시)
-        // ==========================================
-        else {
-          return; 
+      return;
+    }
+
+    if (diffMs <= HIT_WINDOW) {
+      let rawPercent = 0;
+      if (diffMs <= 41.67) rawPercent = 100;
+      else if (diffMs <= 75.0) rawPercent = 99 - ((diffMs - 41.67) / 33.33) * 9;
+      else if (diffMs <= 108.33) rawPercent = 89 - ((diffMs - 75.0) / 33.33) * 19;
+      else if (diffMs <= 141.67) rawPercent = 69 - ((diffMs - 108.33) / 33.33) * 59;
+      else rawPercent = 9 - ((diffMs - 141.67) / 33.33) * 8;
+
+      let judgePercent = 100;
+      if (rawPercent >= 100) judgePercent = 100;
+      else if (rawPercent >= 10) judgePercent = Math.floor(rawPercent / 10) * 10;
+      else judgePercent = 1;
+
+      const judgeString = judgePercent === 100 ? "MAX 100%" : `MAX ${judgePercent}%`;
+
+      this.vm.result.combo += (this.vm.result.feverMultiplier || 1);
+      this.vm.result.maxCombo = Math.max(this.vm.result.combo, this.vm.result.maxCombo || 0);
+      this.vm.result.totalHitNotes += 1;
+
+      let gaugeCharge = judgePercent === 100 ? 5 : (judgePercent >= 90 ? 3 : 1);
+      this.vm.result.feverGauge = (this.vm.result.feverGauge || 0) + gaugeCharge;
+      if (this.vm.result.feverGauge >= 100) {
+        if ((this.vm.result.feverMultiplier || 1) < 5) this.vm.result.feverMultiplier++;
+        this.vm.result.feverGauge -= 100;
+      }
+
+      const totalNotes = this.vm.sheet ? this.vm.sheet.length : 500;
+      const maxScorePerNote = 1000000 / totalNotes;
+      this.vm.result.score += maxScorePerNote * (judgePercent / 100);
+
+      if (judgePercent === 100) {
+        this.vm.result.marks.perfect += 1;
+        this.vm.health = Math.min(100, this.vm.health + 10);
+      } else {
+        this.vm.result.marks.good += 1;
+        this.vm.health = Math.min(100, this.vm.health + 5);
+      }
+
+      if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge(judgeString, this.vm.result.combo);
+      if (this.particleEffect) this.particleEffect.create(this.x, this.game.checkHitLineY, this.width, judgeString);
+      this.noteArr.splice(activeNoteIdx, 1);
+      return;
+    }
+
+    if (isEarly && diffMs <= EARLY_MISS_WINDOW) {
+      this.vm.result.combo = 0;
+      this.vm.result.feverMultiplier = 1;
+      this.vm.result.feverGauge = 0;
+      this.vm.result.marks.miss += 1;
+      this.vm.health = Math.max(0, this.vm.health - 20);
+      if (this.vm.$refs.judgeDisplay) this.vm.$refs.judgeDisplay.judge("Miss", 0);
+      if (this.vm.health <= 0) {
+        if (typeof this.vm.triggerGameOverImmediate === 'function') {
+          this.vm.triggerGameOverImmediate();
+        } else {
+          this.vm.isGameEnded = true;
+          this.game.pauseGame();
         }
       }
-      // 🛡️ 트랙에 노트가 아예 없을 때도 무시 (return)
+      this.noteArr.splice(activeNoteIdx, 1);
     }
   }
 
   // 🚨 키 빔 꺼짐을 담당하는 핵심 함수
   keyUp(key) {
-    if (this.keyBind.includes(key.toLowerCase())) {
-      this.isKeyDown = false;
+    if (!this.keyBind.includes(key.toLowerCase())) return;
+    this.isKeyDown = false;
+
+    if (this.holdingNote) {
+      this.holdingNote.releaseLongHold();
+      this.holdingNote = null;
+      this.isHolding = false;
     }
   }
 
@@ -167,14 +214,33 @@ keyDown(key) {
         continue;
       }
       
-      // 🚨 여기도 똑같이 노트의 밑바닥(Bottom)을 기준으로 계산!
-      const noteBottomY = this.noteArr[i].y + (this.noteArr[i].height || 15);
+      const note = this.noteArr[i];
+      const speed = this.game.noteSpeedPxPerSec || 1;
+
+      if (note.isLong) {
+        const tailY = note.y - (note.duration * speed);
+        const tailPassedPx = tailY - this.game.checkHitLineY;
+        const tailPassedMs = (tailPassedPx / speed) * 1000;
+
+        if (note.holding) {
+          continue;
+        }
+
+        if (!note.hitRegistered && tailPassedMs > 175) {
+          if (typeof note.missNote === 'function') note.missNote();
+          this.noteArr.splice(i, 1);
+        }
+
+        continue;
+      }
+
+      const noteBottomY = note.y + (note.height || 15);
       const passedPx = noteBottomY - this.game.checkHitLineY;
-      const passedMs = (passedPx / this.game.noteSpeedPxPerSec) * 1000;
+      const passedMs = (passedPx / speed) * 1000;
 
       // 판정 범위를 지나쳐서 떨어지면 완벽하게 놓친 것으로 처리 (Miss)
       if (passedMs > 175) {
-        if (typeof this.noteArr[i].missNote === 'function') this.noteArr[i].missNote();
+        if (typeof note.missNote === 'function') note.missNote();
         this.noteArr.splice(i, 1);
       }
     }

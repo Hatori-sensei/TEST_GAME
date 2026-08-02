@@ -207,13 +207,18 @@ export default class GameInstance {
     
     while (this.timeArr && this.timeArrIdx < this.timeArr.length) {
       const noteObj = this.timeArr[this.timeArrIdx];
-      
-      if (noteObj.t > this.playTime) break;
-      
+      const noteStartTime = noteObj.startTime ?? noteObj.t;
+      if (noteStartTime === undefined) {
+        this.timeArrIdx++;
+        continue;
+      }
+
+      if (noteStartTime > this.playTime) break;
+
       const fallbackKeys = ["d", "f", "j", "k"];
       let k = noteObj.k;
       if (k === undefined && noteObj.key !== undefined) k = fallbackKeys[noteObj.key];
-      
+
       if (k) {
         this.dropTrackArr.forEach(track => track.dropNote(k, noteObj));
       }
