@@ -1,5 +1,5 @@
-import { Howl, Howler } from "howler";
 const assetsBaseUrl = "https://assets.rhythm-plus.com/bgm/";
+const mediaBaseUrl = "http://localhost:3000";
 
 export default class Audio {
   constructor() {
@@ -11,7 +11,11 @@ export default class Audio {
     };
     this.maxVolume = 0.7;
     this.player = null;
+    this.mediaSourceNode = null;
     this.muteBg = false;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    this.audioData.audioCtx = AudioCtx ? new AudioCtx() : null;
+    this.installAudioUnlock();
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         this.pause();
@@ -28,45 +32,158 @@ export default class Audio {
     finishedCallback,
     errorCallback
   ) {
-    this.player?.unload();
+    this.stop(true);
     this.asBackground = asBackground;
 
-    this.player = new Howl({
-      volume: this.muteBg && asBackground ? 0 : this.maxVolume,
-      src: [songSrc],
-      loop: asBackground,
-    });
+    const resolvedSrc = this.toMediaUrl(songSrc);
+    const audioElement = new window.Audio();
+    audioElement.crossOrigin = "anonymous";
+    audioElement.preload = "auto";
+    audioElement.loop = !!asBackground;
+    audioElement.volume = this.muteBg && asBackground ? 0 : this.maxVolume;
+    audioElement.src = resolvedSrc;
+    this.player = audioElement;
 
-    // ref https://stackoverflow.com/questions/32460123/connect-analyzer-to-howler-sound
+    this.bindAnalyser(audioElement);
 
-    // Create an analyser node in the Howler WebAudio context
-    let analyser = Howler.ctx.createAnalyser();
-
-    // Connect the masterGain -> analyser (disconnecting masterGain -> destination)
-    Howler.masterGain.connect(analyser);
-
-    analyser.fftSize = 256;
-
-    this.audioData.bufferLength = analyser.frequencyBinCount;
-
-    this.audioData.dataArray = new Uint8Array(this.audioData.bufferLength);
-
-    this.audioData.analyser = analyser;
-    this.audioData.audioCtx = Howler.ctx;
-
-    if (asBackground) this.player.play();
-
-    this.player.on("load", () => {
+    const onCanPlay = () => {
       if (loadedCallback) loadedCallback();
       Logger.log("Audio loaded");
-    });
-    this.player.on("end", () => {
+      if (asBackground) {
+        this.safePlay(audioElement, "Audio play blocked");
+      }
+    };
+
+    const onEnded = () => {
       if (finishedCallback) finishedCallback();
-      if (asBackground) this.playBgm(this.player._src);
-    });
-    this.player.on("loaderror", () => {
+      if (asBackground) this.playBgm(audioElement.src);
+    };
+
+    const onError = () => {
       if (errorCallback) errorCallback();
+    };
+
+    this.attachMediaHandler(audioElement, "canplaythrough", onCanPlay, true);
+    this.attachMediaHandler(audioElement, "ended", onEnded);
+    this.attachMediaHandler(audioElement, "error", onError, true);
+
+    if (
+      audioElement instanceof HTMLMediaElement &&
+      typeof audioElement.load === "function"
+    ) {
+      audioElement.load();
+    }
+  }
+
+  toMediaUrl(songSrc) {
+    if (!songSrc) return "";
+    const src = String(songSrc).trim();
+    if (/^https?:\/\//i.test(src) || /^data:/i.test(src)) return src;
+    const clean = src.replace(/^\.?[\\/]+/, "").replace(/\\/g, "/");
+    if (clean.startsWith("songs/")) return `${mediaBaseUrl}/${clean}`;
+    return `${mediaBaseUrl}/songs/${clean}`;
+  }
+
+  bindAnalyser(sound) {
+    const ctx = this.audioData.audioCtx;
+    if (!ctx || !sound) return;
+
+    const audioElement =
+      sound instanceof HTMLMediaElement
+        ? sound
+        : sound?._sounds?.[0]?._node instanceof HTMLMediaElement
+          ? sound._sounds[0]._node
+          : null;
+
+    if (!audioElement) return;
+
+    if (
+      this.mediaSourceNode &&
+      this.mediaSourceElement &&
+      this.mediaSourceElement === audioElement &&
+      this.audioData.analyser
+    ) {
+      return;
+    }
+
+    if (this.mediaSourceNode) {
+      try {
+        this.mediaSourceNode.disconnect();
+      } catch (e) {
+        // ignore
+      }
+      this.mediaSourceNode = null;
+      this.mediaSourceElement = null;
+    }
+
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+
+    try {
+      this.mediaSourceNode = ctx.createMediaElementSource(audioElement);
+      this.mediaSourceElement = audioElement;
+    } catch (e) {
+      if (e && e.name === "InvalidStateError") {
+        return;
+      }
+      throw e;
+    }
+
+    this.mediaSourceNode.connect(analyser);
+    analyser.connect(ctx.destination);
+
+    this.audioData.bufferLength = analyser.frequencyBinCount;
+    this.audioData.dataArray = new Uint8Array(this.audioData.bufferLength);
+    this.audioData.analyser = analyser;
+  }
+
+  attachMediaHandler(sound, eventName, handler, once = false) {
+    if (!sound || typeof handler !== "function") return;
+    if (sound instanceof HTMLMediaElement) {
+      sound.addEventListener(eventName, handler, once ? { once: true } : false);
+      return;
+    }
+    if (typeof sound.on === "function") {
+      if (once && typeof sound.once === "function") {
+        sound.once(eventName, handler);
+      } else {
+        sound.on(eventName, handler);
+      }
+    }
+  }
+
+  safePlay(sound, warnMessage = "Audio play blocked") {
+    if (!sound || typeof sound.play !== "function") return;
+    this.resumeCtx().then(() => {
+      try {
+        const playResult = sound.play();
+        if (playResult && typeof playResult.catch === "function") {
+          playResult.catch((err) => {
+            Logger.warn(warnMessage, err);
+          });
+        }
+      } catch (err) {
+        Logger.warn(warnMessage, err);
+      }
     });
+  }
+
+  installAudioUnlock() {
+    const unlock = () => {
+      this.resumeCtx();
+    };
+    document.addEventListener("keydown", unlock, true);
+    document.addEventListener("mousedown", unlock, true);
+  }
+
+  async resumeCtx() {
+    const ctx = this.audioData.audioCtx;
+    if (!ctx || ctx.state !== "suspended") return;
+    try {
+      await ctx.resume();
+    } catch (e) {
+      // ignore and retry on next input
+    }
   }
 
   playBgm(songToExclude) {
@@ -85,14 +202,10 @@ export default class Audio {
   }
 
   playEffect(name) {
-    // 2nd param: override
     const url = `/audio/effects/${name}.mp3`;
-    const effectPlayer = new Howl({
-      volume: 0.5,
-      src: [url],
-      loop: false,
-    });
-    effectPlayer.play();
+    const effectPlayer = new window.Audio(url);
+    effectPlayer.volume = 0.5;
+    this.safePlay(effectPlayer, "Effect audio play blocked");
   }
 
   playHoverEffect(name) {
@@ -101,26 +214,47 @@ export default class Audio {
 
   stop(stopBackground) {
     if (!stopBackground && this.asBackground) return;
+    if (!this.player) return;
     Logger.warn("stop", this.player, this.asBackground);
-    this.player?.stop();
+    if (typeof this.player.stop === "function") {
+      this.player.stop();
+    } else if (typeof this.player.pause === "function") {
+      this.player.pause();
+    }
+
+    if (typeof this.player.currentTime === "number") {
+      this.player.currentTime = 0;
+    }
+
+    if (this.player instanceof HTMLMediaElement) {
+      if (typeof this.player.removeAttribute === "function") {
+        this.player.removeAttribute("src");
+      }
+      if (typeof this.player.load === "function") {
+        this.player.load();
+      }
+    }
+
     if (this.asBackground) {
-      this.player?.unload();
       this.player = null;
     }
   }
 
   pause() {
-    this.player?.pause();
+    if (!this.player) return;
+    if (typeof this.player.pause === "function") {
+      this.player.pause();
+    }
   }
 
   play() {
-    this.player?.pause();
-    this.player?.play();
+    if (!this.player) return;
+    this.safePlay(this.player, "Audio play blocked");
   }
 
   mute(mute) {
-    if (mute) this.player.fade(this.maxVolume, 0, 500);
-    else this.player.fade(0, this.maxVolume, 2000);
+    if (!this.player) return;
+    this.player.volume = mute ? 0 : this.maxVolume;
   }
 
   toggleBgMute() {
@@ -129,25 +263,37 @@ export default class Audio {
   }
 
   fadeOut(duration = 300) {
-    if (!this.player || typeof this.player.fade !== "function") return;
-    const currentVolume = this.player.volume ? this.player.volume() : this.maxVolume;
-    this.player.fade(currentVolume, 0, duration);
+    if (!this.player) return;
+    const start = this.player.volume;
+    const stepMs = 30;
+    const steps = Math.max(1, Math.floor(duration / stepMs));
+    let idx = 0;
+    const timer = setInterval(() => {
+      idx += 1;
+      const nextVolume = Math.max(0, start * (1 - idx / steps));
+      this.player.volume = nextVolume;
+      if (idx >= steps) {
+        clearInterval(timer);
+      }
+    }, stepMs);
   }
 
   getCurrentTime() {
-    return this.player ? this.player.seek() : 0;
+    return this.player ? this.player.currentTime : 0;
   }
 
   seek(sec) {
-    this.player?.seek(sec);
+    if (!this.player) return;
+    this.player.currentTime = sec;
   }
 
   getDuration() {
-    return this.player?.duration();
+    return this.player?.duration;
   }
 
   setRate(rate) {
-    this.player?.rate(rate);
+    if (!this.player) return;
+    this.player.playbackRate = rate;
   }
 }
 

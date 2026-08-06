@@ -5,10 +5,7 @@
       <div class="tv-off-line bottom"></div>
       <div class="tv-off-flash"></div>
     </div>
-    <ProgressBar
-      v-if="currentSong && currentSong.length"
-      :progress="progress"
-    ></ProgressBar>
+    <ProgressBar v-if="currentSong" :progress="progress"></ProgressBar>
 
     <Countdown
       style="z-index: 1000; pointer-events: none"
@@ -48,6 +45,17 @@
     </transition>
 
     <div class="gameWrapper" :class="{ 'no-events': hideGameForYtButton }">
+      <video
+        v-if="currentSong?.bgaPath"
+        ref="bgaVideo"
+        :src="resolveMediaUrl(currentSong.bgaPath)"
+        class="bga-video"
+        muted
+        playsinline
+        preload="auto"
+        @error="(e) => { e.target.style.display = 'none'; }"
+      ></video>
+      <div v-if="currentSong?.bgaPath" class="bga-overlay"></div>
       <canvas ref="effectCanvas" id="effectCanvas"></canvas>
       <canvas
         ref="mainCanvas"
@@ -65,13 +73,24 @@
         </div>
         <div class="judgment-line"></div>
       </div>
-      
       <div class="arcade-buttons">
         <div class="buttons-container">
-          <div class="arcade-btn d-key" :class="{ 'is-pressed': keyState.key1 }"></div>
-          <div class="arcade-btn f-key" :class="{ 'is-pressed': keyState.key2 }"></div>
-          <div class="arcade-btn j-key" :class="{ 'is-pressed': keyState.key3 }"></div>
-          <div class="arcade-btn k-key" :class="{ 'is-pressed': keyState.key4 }"></div>
+          <div
+            class="arcade-btn d-key"
+            :class="{ 'is-pressed': keyState.key1 }"
+          ></div>
+          <div
+            class="arcade-btn f-key"
+            :class="{ 'is-pressed': keyState.key2 }"
+          ></div>
+          <div
+            class="arcade-btn j-key"
+            :class="{ 'is-pressed': keyState.key3 }"
+          ></div>
+          <div
+            class="arcade-btn k-key"
+            :class="{ 'is-pressed': keyState.key4 }"
+          ></div>
         </div>
       </div>
     </div>
@@ -264,12 +283,14 @@ import {
   updatePlay,
 } from "../javascript/db";
 import { logEvent, logError } from "../helpers/analytics";
+import { resolveMediaUrl as resolveMediaPath } from "../utils/pathResolver";
 import VanillaTilt from "vanilla-tilt";
 import "vue-awesome/icons/regular/pause-circle";
 import "vue-awesome/icons/play";
 import "vue-awesome/icons/cog";
 import "vue-awesome/icons/info-circle";
 const isDev = process.env.NODE_ENV === "development";
+const GAME_START_DELAY_MS = 4000;
 
 export default {
   name: "Game",
@@ -304,14 +325,61 @@ export default {
   },
   computed: {
     progress() {
-      const startAt = this.currentSong.startAt ?? 0;
-      let time = (this.instance.playTime - startAt) / this.currentSong.length;
-      return time > 0 ? time : 0;
+      if (!this.currentSong || !this.instance) return 0;
+      const startAt = Number(this.currentSong.startAt ?? 0);
+      const duration = Number(
+        this.currentSong.runtimeLength ??
+          this.instance.songDurationSeconds ??
+          this.currentSong.length
+      );
+      const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 1;
+      const elapsed = Math.max(0, Number(this.instance.currentTime || 0) - startAt);
+      return Math.min(1, elapsed / safeDuration);
+    },
+  },
+  watch: {
+    currentSong() {
+      this.$nextTick(() => {
+        if (
+          this.instance &&
+          typeof this.instance.setVideoElement === "function"
+        ) {
+          this.instance.setVideoElement(this.$refs.bgaVideo || null);
+        }
+      });
     },
   },
   mounted() {
+    this.$nextTick(() => {
+      if (this.state) {
+        this.state.loading = false;
+      } else if (this.gameState) {
+        this.gameState.loading = false;
+      } else if (Object.prototype.hasOwnProperty.call(this.$data, "loading")) {
+        this.loading = false;
+      }
+    });
+
+    if (this.instance) {
+      this.instance.onTick = (timeData) => {
+        if (
+          this.$refs.trackComponent &&
+          typeof this.$refs.trackComponent.update === "function"
+        ) {
+          this.$refs.trackComponent.update(timeData.audioTime);
+        }
+
+        const bgaVideo = this.$refs.bgaVideo;
+        if (bgaVideo && bgaVideo.paused && timeData.audioTime > 0) {
+          bgaVideo.play().catch((e) => console.warn(e));
+        }
+      };
+    }
+
     if (this.$route.params.sheet) {
-      this.instance.loading = true;
+      if (this.instance) {
+        this.instance.loading = true;
+      }
       this.playWithId(this.$route.params.sheet);
     } else if (this.$route.path.includes("tutorial")) {
       // tutorial mode
@@ -325,7 +393,6 @@ export default {
         okCallback: this.exitGame,
       });
     }
-    
     window.addEventListener("keydown", this.handleUIKeyDown);
     window.addEventListener("keyup", this.handleUIKeyUp);
   },
@@ -337,6 +404,9 @@ export default {
     window.removeEventListener("keyup", this.handleUIKeyUp);
   },
   methods: {
+    resolveMediaUrl(path) {
+      return resolveMediaPath(path);
+    },
     async playWithId(sheetId) {
       try {
         let song = await getGameSheet(sheetId);
@@ -385,6 +455,27 @@ export default {
         this.resumeGame();
       }
     },
+    onAudioLoaded(audioPath) {
+      Logger.log("audio loaded", audioPath);
+      this.instance.loading = false;
+      this.youtubeBuffering = false;
+      if (!this.started && this.srcMode !== "youtube") {
+        this.showStartButton = false;
+        this.startGameDirect();
+      }
+    },
+    handleAudioLoadError(error, audioPath) {
+      Logger.error("audio load error", audioPath, error);
+      this.instance.loading = false;
+      this.youtubeBuffering = false;
+      this.$store.state.gModal.show({
+        bodyText:
+          "Unable to load the song audio or the song data is missing. Returning to song select.",
+        isError: true,
+        showCancel: false,
+        okCallback: () => this.exitGame(null, "audio-load-failed"),
+      });
+    },
     videoCued() {
       if (this.srcMode !== "youtube") return;
       Logger.log("cued");
@@ -416,13 +507,13 @@ export default {
         this.ytPlayer?.playVideo();
         this.ytPlayer?.setVolume(0);
         this.$refs.zoom.show("Get Ready...");
-        // Get Ready 표시 후 2초 뒤에 게임 시작
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
+        await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
         this.instance.startSong();
       } else {
         if (!this.tutorial) this.$refs.zoom.show("Get Ready...");
-        // Get Ready 표시 후 2초 뒤에 게임 시작
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
+        await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
         this.instance.startSong();
       }
       if (isDev) return;
@@ -435,8 +526,8 @@ export default {
       logEvent("start_game", { songId: this.currentSong.songId });
       this.health = 100;
       this.$refs.zoom.show("Get Ready...");
-      // Get Ready 표시 후 2초 뒤에 게임 시작
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
+      await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
       this.instance.startSong();
       if (isDev) return;
       this.playId = await createPlay(
@@ -453,7 +544,9 @@ export default {
           this.gameEnded(true);
         } catch (e) {
           this.isGameEnded = true;
-          if (this.instance && typeof this.instance.pauseGame === 'function') this.instance.pauseGame();
+          if (this.instance && typeof this.instance.pauseGame === "function") {
+            this.instance.pauseGame();
+          }
         }
       }, 300);
     },
@@ -461,12 +554,21 @@ export default {
       if (this.srcMode === "youtube") {
         this.fadeOutYoutube(300);
       }
-      if (this.$store.state.audio && typeof this.$store.state.audio.fadeOut === "function") {
+      if (
+        this.$store.state.audio &&
+        typeof this.$store.state.audio.fadeOut === "function"
+      ) {
         this.$store.state.audio.fadeOut(300);
       }
     },
     fadeOutYoutube(duration = 300) {
-      if (!this.ytPlayer || typeof this.ytPlayer.getVolume !== "function" || typeof this.ytPlayer.setVolume !== "function") return;
+      if (
+        !this.ytPlayer ||
+        typeof this.ytPlayer.getVolume !== "function" ||
+        typeof this.ytPlayer.setVolume !== "function"
+      ) {
+        return;
+      }
       const stepTime = 50;
       const steps = Math.max(1, Math.ceil(duration / stepTime));
       let currentVolume = this.ytPlayer.getVolume();
@@ -533,6 +635,9 @@ export default {
     async gameEnded(isGameOver) {
       this.instance.destroyInstance();
       this.isGameEnded = true;
+      if (typeof this.finalizeResultMetrics === "function") {
+        this.finalizeResultMetrics();
+      }
       let achievementPromise = Promise.resolve();
       if (isGameOver === true) {
         this.$router.push("/game-over/" + this.currentSong.sheetId);
@@ -588,26 +693,30 @@ export default {
     },
     addTilt() {
       if (this.$refs.playButton) {
-        VanillaTilt.init(this.$refs.playButton, { max: 8, glare: true, "max-glare": 0.5, scale: 1.1, });
+        VanillaTilt.init(this.$refs.playButton, {
+          max: 8,
+          glare: true,
+          "max-glare": 0.5,
+          scale: 1.1,
+        });
       }
     },
     // 🚨 4버튼 UI 전용 키보드 이벤트 핸들러
     handleUIKeyDown(e) {
       const key = e.key.toLowerCase();
-      if (key === 'd') this.keyState.key1 = true;
-      if (key === 'f') this.keyState.key2 = true;
-      if (key === 'j') this.keyState.key3 = true;
-      if (key === 'k') this.keyState.key4 = true;
+      if (key === "d") this.keyState.key1 = true;
+      if (key === "f") this.keyState.key2 = true;
+      if (key === "j") this.keyState.key3 = true;
+      if (key === "k") this.keyState.key4 = true;
     },
     handleUIKeyUp(e) {
       const key = e.key.toLowerCase();
-      if (key === 'd') this.keyState.key1 = false;
-      if (key === 'f') this.keyState.key2 = false;
-      if (key === 'j') this.keyState.key3 = false;
-      if (key === 'k') this.keyState.key4 = false;
-    }
+      if (key === "d") this.keyState.key1 = false;
+      if (key === "f") this.keyState.key2 = false;
+      if (key === "j") this.keyState.key3 = false;
+      if (key === "k") this.keyState.key4 = false;
+    },
   },
-  
 };
 </script>
 
@@ -623,6 +732,56 @@ export default {
   width: 100%;
 }
 
+.gameWrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+.bga-video,
+.bga-overlay,
+#effectCanvas,
+#gameCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.bga-video {
+  object-fit: contain;
+  object-position: center center;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bga-overlay {
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 1;
+  pointer-events: none;
+}
+
+#effectCanvas {
+  z-index: 2;
+}
+
+#gameCanvas {
+  z-index: 3;
+}
+
+.gear-overlay {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .perspective {
   transform: rotateX(30deg) scaleY(1.5);
   transform-origin: 50% 100%;
@@ -634,7 +793,7 @@ export default {
    ======================================================= */
 /* 불필요한 기존 오버레이 요소들 숨김 */
 .tv-off-screen {
-  display: none; 
+  display: none;
 }
 
 /* 게임 화면 전체가 중심을 기준으로 0.35초 만에 확 찌그러짐 */
@@ -647,24 +806,24 @@ export default {
 
 /* 진짜 티비 꺼지듯 슉! -> 점 -> 쾅! 소멸하는 애니메이션 */
 @keyframes crt_off_game {
-  0% { 
-    transform: scale(1, 1); 
-    filter: brightness(1) contrast(1); 
+  0% {
+    transform: scale(1, 1);
+    filter: brightness(1) contrast(1);
   }
-  40% { 
+  40% {
     /* 순식간에 높이를 쳐내서 극단적으로 얇고 눈부신 가로선으로 압축 */
-    transform: scale(1, 0.005); 
-    filter: brightness(5) contrast(3); 
+    transform: scale(1, 0.005);
+    filter: brightness(5) contrast(3);
   }
-  70% { 
+  70% {
     /* 가로선이 중앙의 점으로 빨려 들어감 */
-    transform: scale(0, 0.005); 
-    filter: brightness(5); 
+    transform: scale(0, 0.005);
+    filter: brightness(5);
   }
-  100% { 
+  100% {
     /* 완전 소멸 */
-    transform: scale(0, 0); 
-    filter: brightness(0); 
+    transform: scale(0, 0);
+    filter: brightness(0);
   }
 }
 
@@ -833,19 +992,19 @@ export default {
   width: 500px;
   height: 100%;
   background: repeating-linear-gradient(
-    90deg,
-    transparent,
-    transparent 20px,
-    rgba(0, 240, 255, 0.03) 20px,
-    rgba(0, 240, 255, 0.03) 21px
-  ),
-  repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 40px,
-    rgba(0, 240, 255, 0.02) 40px,
-    rgba(0, 240, 255, 0.02) 41px
-  );
+      90deg,
+      transparent,
+      transparent 20px,
+      rgba(0, 240, 255, 0.03) 20px,
+      rgba(0, 240, 255, 0.03) 21px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 40px,
+      rgba(0, 240, 255, 0.02) 40px,
+      rgba(0, 240, 255, 0.02) 41px
+    );
   border-left: 2px solid rgba(255, 255, 255, 0.15);
   border-right: 2px solid rgba(255, 255, 255, 0.15);
   pointer-events: none;
@@ -859,7 +1018,11 @@ export default {
   left: 0;
   right: 0;
   height: 60px;
-  background: linear-gradient(180deg, rgba(0, 240, 255, 0.1) 0%, transparent 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(0, 240, 255, 0.1) 0%,
+    transparent 100%
+  );
   border-bottom: 1px solid rgba(0, 240, 255, 0.2);
   display: flex;
   align-items: center;
@@ -945,12 +1108,12 @@ export default {
    ======================================================= */
 .judgment-line {
   position: absolute;
-  bottom: 320px; 
-  left: 0; 
-  width: 100%; 
-  height: 18px; 
-  background-color: #ffffff; 
-  z-index: 50; 
+  bottom: 320px;
+  left: 0;
+  width: 100%;
+  height: 18px;
+  background-color: #ffffff;
+  z-index: 50;
   box-shadow: 0px 0px 15px #ffffff, 0px 0px 30px #00f0ff;
 }
 
@@ -959,7 +1122,7 @@ export default {
    ======================================================= */
 .arcade-btn {
   flex: 1;
-  height: 100%; 
+  height: 100%;
   background: linear-gradient(180deg, #222 0%, #000 100%);
   border-top: 3px solid #444; /* 기어와 확실히 구분되는 경계선 */
   position: relative;
@@ -973,13 +1136,15 @@ export default {
 }
 
 /* D, K 키 (시안색 계열) */
-.arcade-btn.d-key.is-pressed, .arcade-btn.k-key.is-pressed {
+.arcade-btn.d-key.is-pressed,
+.arcade-btn.k-key.is-pressed {
   background: linear-gradient(180deg, rgba(0, 240, 255, 0.4) 0%, #000 100%);
   box-shadow: inset 0px 0px 20px rgba(0, 240, 255, 0.6);
 }
 
 /* F, J 키 (마젠타색 계열) */
-.arcade-btn.f-key.is-pressed, .arcade-btn.j-key.is-pressed {
+.arcade-btn.f-key.is-pressed,
+.arcade-btn.j-key.is-pressed {
   background: linear-gradient(180deg, rgba(255, 0, 160, 0.4) 0%, #000 100%);
   box-shadow: inset 0px 0px 20px rgba(255, 0, 160, 0.6);
 }

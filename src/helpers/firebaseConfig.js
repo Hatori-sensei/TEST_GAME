@@ -8,16 +8,16 @@ const dummyCollection = {
     get: () => Promise.resolve({ exists: false, data: () => ({}) }),
     set: () => Promise.resolve(),
     update: () => Promise.resolve(),
-    collection: () => dummyCollection // 혹시 모를 하위 컬렉션 방어
+    collection: () => dummyCollection, // 혹시 모를 하위 컬렉션 방어
   }),
   where: () => dummyCollection,
-  get: () => Promise.resolve({ docs: [], empty: true })
+  get: () => Promise.resolve({ docs: [], empty: true }),
 };
 
 // 🚨 2. remoteConfig 에러 방어: fetchAndActivate() 대응
 const dummyRemoteConfig = {
   fetchAndActivate: () => Promise.resolve(true),
-  getValue: () => ({ asString: () => "" })
+  getValue: () => ({ asString: () => "" }),
 };
 
 // 🚨 3. analytics 에러 방어: analytics() 함수 호출 대응
@@ -25,30 +25,32 @@ const dummyAnalytics = () => ({
   logEvent: () => {},
   setUserId: () => {},
   setCurrentScreen: () => {},
-  setUserProperties: () => {}
+  setUserProperties: () => {},
 });
 
 // 가짜 유저 및 인증 로직 (이전과 동일)
-const fakeUser = { 
-  uid: "festival-admin", 
+const fakeUser = {
+  uid: "festival-admin",
   displayName: "Player 1",
-  getIdToken: () => Promise.resolve("festival-token-dummy")
+  getIdToken: () => Promise.resolve("festival-token-dummy"),
 };
 const dummyAuth = {
   currentUser: fakeUser,
   onAuthStateChanged: (callback) => {
-    setTimeout(() => { callback(fakeUser); }, 100);
+    setTimeout(() => {
+      callback(fakeUser);
+    }, 100);
     return () => {};
   },
   signInAnonymously: () => Promise.resolve({ user: fakeUser }),
   signInWithEmailAndPassword: () => Promise.resolve({ user: fakeUser }),
   getRedirectResult: () => Promise.resolve({ user: fakeUser }),
-  signOut: () => Promise.resolve()
+  signOut: () => Promise.resolve(),
 };
 
 const dummyFunc = () => ({});
 
-// export 
+// export
 export const db = dummyCollection;
 export const firestore = dummyCollection;
 export const analytics = dummyAnalytics; // 수정됨

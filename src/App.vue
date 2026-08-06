@@ -133,7 +133,11 @@ export default {
     async "$store.state.remoteConfig"(config) {
       if (!config) return;
       const currentVersion = this.$store.state.appVersion;
-      const minimumVersion = config.minimumVersion._value;
+      const minimumVersionParam = config?.minimumVersion;
+      const minimumVersion =
+        typeof minimumVersionParam?.asString === "function"
+          ? minimumVersionParam.asString()
+          : minimumVersionParam?._value ?? "";
 
       // 버전 체크 및 업데이트 알림 강제 차단 (조건문을 모조리 false로 변경)
       if (false) {

@@ -6,14 +6,14 @@
     <transition name="modal-fade">
       <div
         class="low_health"
-        v-if="!vm.instance.paused && vm.health < 20"
+        v-if="vm.instance && !vm.instance.paused && vm.health < 20"
       ></div>
     </transition>
     <div class="score" v-if="vm.instance">
       <div
         class="performanceWarning"
         v-if="
-          vm.fps && vm.started && !vm.instance.paused && vm.instance.fps < 35
+          vm.fps && vm.started && vm.instance && !vm.instance.paused && vm.instance.fps < 35
         "
       >
         Game Performance Degraded

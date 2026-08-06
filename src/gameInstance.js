@@ -20,7 +20,10 @@ class GameInstance {
     this.html5 = options.html5 !== undefined ? options.html5 : true;
 
     // Immutable speed multiplier injected at session start; do NOT modify during gameplay
-    this.speedMultiplier = options.speedMultiplier !== undefined ? Number(options.speedMultiplier) : 1.0;
+    this.speedMultiplier =
+      options.speedMultiplier !== undefined
+        ? Number(options.speedMultiplier)
+        : 1.0;
 
     this.howl = null;
     this._rafId = null;

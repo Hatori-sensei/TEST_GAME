@@ -45,8 +45,7 @@ Vue.component("v-icon", Icon);
 if (!isDev) {
   Sentry.init({
     Vue,
-    dsn:
-      "https://7c0cf5f165ab4854994380c0a0d9711e@o424134.ingest.sentry.io/5355558",
+    dsn: "https://7c0cf5f165ab4854994380c0a0d9711e@o424134.ingest.sentry.io/5355558",
     integrations: [
       new Integrations.BrowserTracing({
         routingInstrumentation: Sentry.vueRouterInstrumentation(router),
@@ -96,7 +95,8 @@ new Vue({
     remoteConfig
       .fetchAndActivate()
       .then(() => {
-        const config = remoteConfig.getAll();
+        const config =
+          typeof remoteConfig?.getAll === "function" ? remoteConfig.getAll() : {};
         this.$store.commit("setRemoteConfig", config);
         Logger.log("got config", config);
       })
