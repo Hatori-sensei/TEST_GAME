@@ -3,6 +3,27 @@ import GameInstance from "../javascript/gameInstance";
 let pauseTime = 0;
 let pauseTimeout = null;
 
+const createJudgeSummary = () => ({
+  max100: 0,
+  max1To90: 0,
+  break: 0,
+});
+
+const createJudgeDetails = () => ({
+  "MAX 100%": 0,
+  "MAX 90%": 0,
+  "MAX 80%": 0,
+  "MAX 70%": 0,
+  "MAX 60%": 0,
+  "MAX 50%": 0,
+  "MAX 40%": 0,
+  "MAX 30%": 0,
+  "MAX 20%": 0,
+  "MAX 10%": 0,
+  "MAX 1%": 0,
+  BREAK: 0,
+});
+
 export default {
   data() {
     return {
@@ -17,11 +38,14 @@ export default {
       currentSong: null,
       result: {
         score: 0,
+        accuracy: 0,
         totalPercentage: 0,
         totalHitNotes: 0,
         combo: 0,
         maxCombo: 0,
         marks: { perfect: 0, good: 0, offbeat: 0, miss: 0 },
+        judgeSummary: createJudgeSummary(),
+        judgeDetails: createJudgeDetails(),
       },
       fever: { value: 1, time: 0, percent: 0 },
       health: 100,
@@ -169,6 +193,29 @@ export default {
       this.scoreAccRaw += perJudge * (safePercent / 100);
       this.result.score = Math.max(0, Math.min(1000000, Math.floor(this.scoreAccRaw)));
     },
+    registerJudgeLabel(judgeText) {
+      const label = String(judgeText || "BREAK");
+      if (!this.result.judgeSummary) {
+        this.result.judgeSummary = createJudgeSummary();
+      }
+      if (!this.result.judgeDetails) {
+        this.result.judgeDetails = createJudgeDetails();
+      }
+
+      if (Object.prototype.hasOwnProperty.call(this.result.judgeDetails, label)) {
+        this.result.judgeDetails[label] += 1;
+      } else {
+        this.result.judgeDetails[label] = 1;
+      }
+
+      if (label === "BREAK") {
+        this.result.judgeSummary.break += 1;
+      } else if (label === "MAX 100%") {
+        this.result.judgeSummary.max100 += 1;
+      } else {
+        this.result.judgeSummary.max1To90 += 1;
+      }
+    },
     finalizeResultMetrics() {
       this.recalculateScoreAndAccuracy();
     },
@@ -181,6 +228,8 @@ export default {
         combo: 0,
         maxCombo: 0,
         marks: { perfect: 0, good: 0, offbeat: 0, miss: 0 },
+        judgeSummary: createJudgeSummary(),
+        judgeDetails: createJudgeDetails(),
       };
       this.scoreAccRaw = 0;
       this.scorePerJudge =

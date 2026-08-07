@@ -126,6 +126,8 @@ const MOCK_SHEETS = {
   [MOCK_SHEET_KAMUI.id]: MOCK_SHEET_KAMUI,
 };
 
+const LOCAL_RESULTS = {};
+
 // ... (이 아래 함수들은 그대로 유지) ...
 // =================================================================
 // 🚨 에러 원천 차단된 가짜 데이터 반환 함수들 🚨
@@ -191,8 +193,8 @@ export async function getUserProfile() {
 export function getPlayCount() {
   return Promise.resolve(0);
 }
-export function getResult() {
-  return Promise.resolve(null);
+export function getResult(resultId) {
+  return Promise.resolve(LOCAL_RESULTS[resultId] || null);
 }
 
 // 👇 여기가 방금 에러를 일으킨 주범을 완벽하게 고친 부분입니다!
@@ -223,8 +225,39 @@ export function createSheet() {
 export function updateSheet() {
   return Promise.resolve();
 }
-export function uploadResult() {
-  return Promise.resolve();
+export function uploadResult(payload) {
+  const accuracy = Number(payload?.result?.accuracy || 0);
+  const percentage = Math.floor(accuracy * 100) / 100;
+  const resultId = `local-result-${Date.now()}`;
+  const uid = store?.state?.currentUser?.uid || "local-user";
+  const score = Number(payload?.result?.score || 0);
+  const rank =
+    score >= 970000
+      ? "S"
+      : score >= 900000
+      ? "A"
+      : score >= 800000
+      ? "B"
+      : "C";
+
+  LOCAL_RESULTS[resultId] = {
+    resultId,
+    uid,
+    rank,
+    isFullCombo: (payload?.result?.marks?.miss || 0) === 0,
+    songId: payload.songId,
+    sheetId: payload.sheetId,
+    result: {
+      ...payload.result,
+      percentage,
+    },
+  };
+
+  return Promise.resolve({
+    data: {
+      resultId,
+    },
+  });
 }
 export function updateUserProfile() {
   return Promise.resolve();

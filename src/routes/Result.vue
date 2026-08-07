@@ -61,22 +61,20 @@
               </div>
             </div>
 
-            <div class="rightScore" style="text-align: left;">
-              <div>
-                <div class="markChip perfect">Perfect</div>
-                <ICountUp :endVal="result.result.marks.perfect" />
+            <div class="rightScore judgePanel" style="text-align: left;">
+              <div class="judgeColumn">
+                <div class="judgeHeader">Summary</div>
+                <div v-for="entry in summaryJudgeEntries" :key="entry.label">
+                  <div class="markChip" :class="entry.className">{{ entry.label }}</div>
+                  <ICountUp :endVal="entry.value" :options="{ decimalPlaces: 0 }" />
+                </div>
               </div>
-              <div>
-                <div class="markChip good">Good</div>
-                <ICountUp :endVal="result.result.marks.good" />
-              </div>
-              <div>
-                <div class="markChip offbeat">Offbeat</div>
-                <ICountUp :endVal="result.result.marks.offbeat" />
-              </div>
-              <div>
-                <div class="markChip miss">Miss</div>
-                <ICountUp :endVal="result.result.marks.miss" />
+              <div class="judgeColumn judgeDetailColumn">
+                <div class="judgeHeader">Detailed</div>
+                <div v-for="entry in detailedJudgeEntries" :key="entry.label">
+                  <div class="markChip" :class="entry.className">{{ entry.label }}</div>
+                  <ICountUp :endVal="entry.value" :options="{ decimalPlaces: 0 }" />
+                </div>
               </div>
             </div>
           </div>
@@ -189,6 +187,55 @@ export default {
     };
   },
   computed: {
+    summaryJudgeEntries() {
+      const summary = this.result?.result?.judgeSummary || {};
+      return [
+        {
+          label: "MAX 100%",
+          value: Number(summary.max100 || 0),
+          className: "perfect",
+        },
+        {
+          label: "MAX 1%~90%",
+          value: Number(summary.max1To90 || 0),
+          className: "good",
+        },
+        {
+          label: "BREAK",
+          value: Number(summary.break || 0),
+          className: "miss",
+        },
+      ];
+    },
+    detailedJudgeEntries() {
+      const details = this.result?.result?.judgeDetails || {};
+      const orderedLabels = [
+        "MAX 100%",
+        "MAX 90%",
+        "MAX 80%",
+        "MAX 70%",
+        "MAX 60%",
+        "MAX 50%",
+        "MAX 40%",
+        "MAX 30%",
+        "MAX 20%",
+        "MAX 10%",
+        "MAX 1%",
+        "BREAK",
+      ];
+      return orderedLabels.map((label) => ({
+        label,
+        value: Number(details[label] || 0),
+        className:
+          label === "MAX 100%"
+            ? "perfect"
+            : label === "BREAK"
+            ? "miss"
+            : label === "MAX 1%"
+            ? "offbeat"
+            : "good",
+      }));
+    },
     gradient() {
       switch (this.result.rank) {
         case "S":
@@ -325,6 +372,24 @@ export default {
   font-size: 1.2em;
   width: 25%;
 }
+.judgePanel {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+.judgeColumn {
+  min-width: 160px;
+}
+.judgeDetailColumn {
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+.judgeHeader {
+  font-size: 0.95em;
+  opacity: 0.7;
+  margin: 0 0 8px 6px;
+}
 .circleBg {
   position: absolute;
   top: 0;
@@ -342,7 +407,7 @@ export default {
   padding: 0px 10px;
   color: rgba(255, 255, 255, 0.8);
   border-radius: 50px;
-  width: 70px;
+  width: 96px;
   text-align: center;
   font-size: 15px;
   line-height: 20px;

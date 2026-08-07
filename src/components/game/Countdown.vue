@@ -30,12 +30,14 @@ export default {
         if (this.num <= 0) {
           this.clear();
         }
-      }, 800); // 0.8초 간격 카운트다운
+      }, 1000);
     },
-    clear() {
+    clear(emitFinish = true) {
       this.show = false;
       clearInterval(this.interval);
-      this.$emit("finish");
+      if (emitFinish) {
+        this.$emit("finish");
+      }
     },
   },
   watch: {

@@ -74,9 +74,12 @@ export default class DropTrack {
     return Math.floor(percent / 10) * 10;
   }
 
-  _recordJudgement(percent) {
+  _recordJudgement(percent, judgeText) {
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(percent);
+    }
+    if (typeof this.vm.registerJudgeLabel === "function") {
+      this.vm.registerJudgeLabel(judgeText);
     }
   }
 
@@ -108,7 +111,7 @@ export default class DropTrack {
           this.vm.result.combo,
           this.vm.result.maxCombo || 0
         );
-        this._recordJudgement(judgePercent);
+        this._recordJudgement(judgePercent, judgeString);
 
         let gaugeCharge = judgePercent === 100 ? 5 : judgePercent >= 90 ? 3 : 1;
         this.vm.result.feverGauge =
@@ -153,7 +156,7 @@ export default class DropTrack {
         this.vm.result.feverMultiplier = 1;
         this.vm.result.feverGauge = 0;
         this.vm.result.marks.miss += 1;
-        this._recordJudgement(0);
+        this._recordJudgement(0, "BREAK");
         this.vm.health = Math.max(0, this.vm.health - MISS_HEALTH_PENALTY);
         if (this.vm.$refs.judgeDisplay) {
           this.vm.$refs.judgeDisplay.judge("BREAK", 0);
@@ -182,7 +185,7 @@ export default class DropTrack {
         this.vm.result.combo,
         this.vm.result.maxCombo || 0
       );
-      this._recordJudgement(judgePercent);
+      this._recordJudgement(judgePercent, judgeString);
 
       let gaugeCharge = judgePercent === 100 ? 5 : judgePercent >= 90 ? 3 : 1;
       this.vm.result.feverGauge =
@@ -224,7 +227,7 @@ export default class DropTrack {
       this.vm.result.feverMultiplier = 1;
       this.vm.result.feverGauge = 0;
       this.vm.result.marks.miss += 1;
-      this._recordJudgement(0);
+      this._recordJudgement(0, "BREAK");
       this.vm.health = Math.max(0, this.vm.health - MISS_HEALTH_PENALTY);
       if (this.vm.$refs.judgeDisplay) {
         this.vm.$refs.judgeDisplay.judge("BREAK", 0);

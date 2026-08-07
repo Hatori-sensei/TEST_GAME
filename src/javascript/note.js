@@ -1,6 +1,7 @@
 const MISS_HEALTH_PENALTY = 9;
 const RELEASE_BREAK_EARLY_MS = 175;
-const RELEASE_BREAK_LATE_MS = 300;
+const RELEASE_MAX_ONE_EARLY_MS = 150;
+const RELEASE_MAX_ONE_LATE_MS = 250;
 
 export default class Note {
   constructor(vm, game, keyObj, key, x, y = 0, width) {
@@ -60,6 +61,9 @@ export default class Note {
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(0);
     }
+    if (typeof this.vm.registerJudgeLabel === "function") {
+      this.vm.registerJudgeLabel("BREAK");
+    }
     this.vm.result.combo = 0;
     this.vm.result.feverMultiplier = 1;
     this.vm.result.feverGauge = 0;
@@ -115,6 +119,9 @@ export default class Note {
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(judgePercent);
     }
+    if (typeof this.vm.registerJudgeLabel === "function") {
+      this.vm.registerJudgeLabel(judgeText);
+    }
 
     if (judgeText === "MAX 100%") {
       this.vm.result.marks.perfect += 1;
@@ -127,9 +134,12 @@ export default class Note {
       );
     } else if (judgeText === "MAX 1%") {
       this.vm.result.marks.offbeat += 1;
-      this.vm.result.combo = 0;
-      this.vm.result.feverMultiplier = 1;
-      this.vm.result.feverGauge = 0;
+      const multiplier = this.vm.result.feverMultiplier || 1;
+      this.vm.result.combo += multiplier;
+      this.vm.result.maxCombo = Math.max(
+        this.vm.result.combo,
+        this.vm.result.maxCombo || 0
+      );
     } else {
       this.vm.result.marks.miss += 1;
       this.vm.result.combo = 0;
@@ -166,15 +176,14 @@ export default class Note {
       return;
     }
 
-    // BREAK 허용 범위를 크게 벗어난 늦은 릴리즈는 MAX 1%
-    if (releaseDeltaMs > RELEASE_BREAK_LATE_MS) {
+    // 너무 오래 늦게 떼면 MAX 1%
+    if (releaseDeltaMs > RELEASE_MAX_ONE_LATE_MS) {
       this._applyLongReleaseJudge("MAX 1%", 1);
       this.completeLongHold();
       return;
     }
 
-    const basePercent = this._getBaseJudgePercent(absReleaseMs);
-    if (basePercent < 10) {
+    if (releaseDeltaMs < 0 && absReleaseMs >= RELEASE_MAX_ONE_EARLY_MS) {
       this._applyLongReleaseJudge("MAX 1%", 1);
     } else {
       this._applyLongReleaseJudge("MAX 100%", 100);
@@ -234,7 +243,10 @@ export default class Note {
       if (this.holding) {
         this._processHoldTicks();
 
-        if (this.game.currentTime >= this.endTime) {
+        if (
+          this.game.currentTime >=
+          this.endTime + RELEASE_MAX_ONE_LATE_MS / 1000
+        ) {
           // 끝까지 누르고 떼지 못했을 경우: MAX 1%
           this._applyLongReleaseJudge("MAX 1%", 1);
           this.completeLongHold();

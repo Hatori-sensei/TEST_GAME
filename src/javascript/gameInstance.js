@@ -26,6 +26,8 @@ export default class GameInstance {
     this.loading = false;
     this.songDurationSeconds = 0;
     this.usingFallbackNotes = false;
+    this.currentHowlId = null;
+    this.songEndedNotified = false;
 
     this.feverEff = new FeverEffect(vm, this);
     this.createTracks(4);
@@ -223,6 +225,15 @@ export default class GameInstance {
           }
         });
       },
+      onend: () => {
+        if (this.songEndedNotified) return;
+        this.songEndedNotified = true;
+        this.paused = true;
+        this.pauseVideo();
+        if (this.vm && typeof this.vm.handleSongFinished === "function") {
+          this.vm.handleSongFinished();
+        }
+      },
     });
     return new Promise((resolve, reject) => {
       this.howl.once("load", () => resolve(this.howl));
@@ -275,11 +286,29 @@ export default class GameInstance {
     this.keydownEvent = (event) => {
       this.resumeAudioContext();
       const key = this.getKeyName(event);
+      if (event.keyCode === KeyCode.ESC) {
+        event.preventDefault();
+        if (this.paused) {
+          if (this.vm && typeof this.vm.resumeGame === "function") {
+            this.vm.resumeGame(true);
+          } else {
+            this.resumeGame(false);
+          }
+        } else if (this.vm && typeof this.vm.pauseGame === "function") {
+          this.vm.pauseGame();
+        } else {
+          this.pauseGame();
+        }
+        return;
+      }
+
+      // Pause 상태에서는 노트 입력 판정을 완전히 차단
+      if (this.paused) {
+        return;
+      }
+
       // Removed in-game speed adjustment keys to keep speed constant during gameplay
       this.onKeyDown(key);
-      if (event.keyCode === KeyCode.ESC) {
-        this.paused ? this.resumeGame(true) : this.pauseGame();
-      }
     };
     this.pointerdownEvent = () => {
       this.resumeAudioContext();
@@ -361,6 +390,12 @@ export default class GameInstance {
 
   async onKeyUp(key) {
     this.keyHoldingStatus[key] = false;
+
+    // Pause 상태에서의 keyup은 키 상태만 해제하고 판정 로직은 막는다.
+    if (this.paused) {
+      return;
+    }
+
     this.dropTrackArr.forEach((track) => track.keyUp(key));
   }
 
@@ -464,6 +499,7 @@ export default class GameInstance {
     this.resetPlaying();
     this.audioPath = preservedAudioPath;
     this.vm.started = true;
+    this.songEndedNotified = false;
 
     // Lock the session speed at song start to prevent runtime changes
     const storeSpeed =
@@ -536,6 +572,8 @@ export default class GameInstance {
     this.loading = false;
     this.songDurationSeconds = 0;
     this.usingFallbackNotes = false;
+    this.currentHowlId = null;
+    this.songEndedNotified = false;
   }
 
   loadSong(song) {
@@ -798,12 +836,12 @@ export default class GameInstance {
   pauseGame() {
     this.paused = true;
     if (this.howl && typeof this.howl.pause === "function") {
-      this.howl.pause();
+      this.howl.pause(this.currentHowlId || undefined);
     }
     this.pauseVideo();
   }
 
-  async resumeGame(firstPlay) {
+  async resumeGame(firstPlay = false) {
     this.paused = false;
     if (firstPlay) this.seekTo(this.startSongAt);
 
@@ -816,7 +854,11 @@ export default class GameInstance {
     }
 
     if (this.howl && typeof this.howl.play === "function") {
-      this.howl.play();
+      if (this.currentHowlId !== null && this.currentHowlId !== undefined) {
+        this.currentHowlId = this.howl.play(this.currentHowlId);
+      } else {
+        this.currentHowlId = this.howl.play();
+      }
     }
     this.playVideo();
   }

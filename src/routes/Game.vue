@@ -1,5 +1,5 @@
 <template>
-  <div class="game" :class="{ 'tv-off-active': tvOff }">
+  <div class="game" :class="{ 'tv-off-active': tvOff, 'song-fade-out': songFadeOut }">
     <div class="tv-off-screen" v-if="tvOff">
       <div class="tv-off-line top"></div>
       <div class="tv-off-line bottom"></div>
@@ -10,7 +10,7 @@
     <Countdown
       style="z-index: 1000; pointer-events: none"
       ref="countdown"
-      @finish="instance.resumeGame()"
+      @finish="handleCountdownFinished"
     ></Countdown>
 
     <transition name="modal-fade">
@@ -291,6 +291,7 @@ import "vue-awesome/icons/cog";
 import "vue-awesome/icons/info-circle";
 const isDev = process.env.NODE_ENV === "development";
 const GAME_START_DELAY_MS = 4000;
+const SONG_END_FADE_DELAY_MS = 2200;
 
 export default {
   name: "Game",
@@ -321,6 +322,8 @@ export default {
       keyState: { key1: false, key2: false, key3: false, key4: false },
       // TV off animation flag
       tvOff: false,
+      songFadeOut: false,
+      isEndingSong: false,
     };
   },
   computed: {
@@ -370,7 +373,12 @@ export default {
         }
 
         const bgaVideo = this.$refs.bgaVideo;
-        if (bgaVideo && bgaVideo.paused && timeData.audioTime > 0) {
+        if (
+          bgaVideo &&
+          !timeData.paused &&
+          bgaVideo.paused &&
+          timeData.audioTime > 0
+        ) {
           bgaVideo.play().catch((e) => console.warn(e));
         }
       };
@@ -424,6 +432,19 @@ export default {
     },
     handleHover() {
       this.$store.state.audio.playHoverEffect("ui/ta");
+    },
+    handleCountdownFinished() {
+      if (this.instance) {
+        this.instance.resumeGame(false);
+      }
+    },
+    async handleSongFinished() {
+      if (this.isGameEnded || this.isEndingSong) return;
+      this.isEndingSong = true;
+      this.songFadeOut = true;
+      this.instance?.pauseVideo?.();
+      await new Promise((resolve) => setTimeout(resolve, SONG_END_FADE_DELAY_MS));
+      this.gameEnded(false);
     },
     songLoaded() {
       Logger.log("playing");
@@ -599,8 +620,8 @@ export default {
     resumeGame(fromMenu) {
       this.hideMenu(true);
       if (!fromMenu) {
-        this.$refs.countdown.clear();
-        this.instance.resumeGame();
+        this.$refs.countdown.clear(false);
+        this.instance.resumeGame(false);
       } else {
         this.$refs.countdown.start();
       }
@@ -635,6 +656,7 @@ export default {
     async gameEnded(isGameOver) {
       this.instance.destroyInstance();
       this.isGameEnded = true;
+      this.isEndingSong = false;
       if (typeof this.finalizeResultMetrics === "function") {
         this.finalizeResultMetrics();
       }
@@ -730,6 +752,12 @@ export default {
   top: 0;
   left: 0;
   width: 100%;
+  opacity: 1;
+  transition: opacity 1.2s ease;
+}
+
+.game.song-fade-out {
+  opacity: 0;
 }
 
 .gameWrapper {
