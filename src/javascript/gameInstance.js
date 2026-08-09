@@ -28,6 +28,13 @@ export default class GameInstance {
     this.usingFallbackNotes = false;
     this.currentHowlId = null;
     this.songEndedNotified = false;
+    this.gimmicks = [];
+    this.reverseGimmicks = [];
+    this.visualTimeline = [];
+    this.visualSpeedEvents = [];
+    this.visualStopIntervals = [];
+    this.currentGlobalVisualPos = 0;
+    this.isReverse = false;
 
     this.feverEff = new FeverEffect(vm, this);
     this.createTracks(4);
@@ -171,6 +178,7 @@ export default class GameInstance {
                 this._generateFallbackNotes(fallbackSong),
                 fallbackSong
               );
+              this.bakeVisualPositions(this.timeArr, this.gimmicks);
               this.timeArrIdx = 0;
               if (this.vm) {
                 const longNoteCount = this.timeArr.reduce((count, noteObj) => {
@@ -488,6 +496,8 @@ export default class GameInstance {
       cTime = typeof seekValue === "number" ? seekValue : 0;
     }
     this.currentTime = cTime || 0;
+    this.currentGlobalVisualPos = this.getVisualPositionAtTime(this.currentTime);
+    this.isReverse = this.getReverseStateAtTime(this.currentTime);
     this.playTime =
       this.currentTime +
       (typeof this.noteStartDelay === "number" ? this.noteStartDelay : 0) +
@@ -642,6 +652,10 @@ export default class GameInstance {
       this.usingFallbackNotes = false;
     }
 
+    const gimmicks = Array.isArray(song?.gimmicks) ? song.gimmicks : [];
+    this.gimmicks = gimmicks;
+    this.bakeVisualPositions(parsedNotes, gimmicks);
+
     this.timeArr = parsedNotes;
     if (this.vm) {
       const longNoteCount = this.timeArr.reduce((count, noteObj) => {
@@ -694,6 +708,165 @@ export default class GameInstance {
       return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
     }
     return 0;
+  }
+
+  _getGimmickStartTime(gimmick) {
+    const t = gimmick?.time ?? gimmick?.startTime ?? gimmick?.t;
+    const num = Number(t);
+    return Number.isFinite(num) ? Math.max(0, num) : 0;
+  }
+
+  _getGimmickEndTime(gimmick) {
+    const endRaw = gimmick?.endTime;
+    const durationRaw = gimmick?.duration ?? gimmick?.d ?? gimmick?.l;
+    const start = this._getGimmickStartTime(gimmick);
+    const endNum = Number(endRaw);
+    if (Number.isFinite(endNum) && endNum >= start) return endNum;
+    const durationNum = Number(durationRaw);
+    if (Number.isFinite(durationNum) && durationNum > 0) return start + durationNum;
+    return start;
+  }
+
+  buildVisualTimeline(gimmicks = []) {
+    const speedEvents = [];
+    const stopIntervals = [];
+    const points = new Set([0]);
+
+    gimmicks.forEach((g) => {
+      const type = String(g?.type || "").toLowerCase();
+      if (type === "speed") {
+        const at = this._getGimmickStartTime(g);
+        const speedRaw = g?.value ?? g?.speed ?? g?.multiplier ?? g?.v;
+        const speed = Number(speedRaw);
+        speedEvents.push({ at, speed: Number.isFinite(speed) ? speed : 1.0 });
+        points.add(at);
+      } else if (type === "stop") {
+        const start = this._getGimmickStartTime(g);
+        const end = this._getGimmickEndTime(g);
+        if (end > start) {
+          stopIntervals.push({ start, end });
+          points.add(start);
+          points.add(end);
+        }
+      }
+    });
+
+    speedEvents.sort((a, b) => a.at - b.at);
+    stopIntervals.sort((a, b) => a.start - b.start);
+
+    const sortedPoints = Array.from(points).sort((a, b) => a - b);
+    const timeline = [];
+    let currentSpeed = 1.0;
+    let speedIdx = 0;
+    let cumulative = 0;
+
+    for (let i = 0; i < sortedPoints.length; i += 1) {
+      const t0 = sortedPoints[i];
+
+      while (speedIdx < speedEvents.length && speedEvents[speedIdx].at <= t0) {
+        currentSpeed = speedEvents[speedIdx].speed;
+        speedIdx += 1;
+      }
+
+      const t1 = i + 1 < sortedPoints.length ? sortedPoints[i + 1] : null;
+      if (t1 === null || t1 <= t0) continue;
+
+      const mid = (t0 + t1) / 2;
+      const stopped = stopIntervals.some((s) => mid >= s.start && mid < s.end);
+      const rate = stopped ? 0 : currentSpeed;
+
+      timeline.push({ start: t0, end: t1, rate, cumulativeAtStart: cumulative });
+      cumulative += (t1 - t0) * rate;
+    }
+
+    this.visualTimeline = timeline;
+    this.visualSpeedEvents = speedEvents;
+    this.visualStopIntervals = stopIntervals;
+    this.reverseGimmicks = gimmicks
+      .filter((g) => String(g?.type || "").toLowerCase() === "reverse")
+      .sort((a, b) => this._getGimmickStartTime(a) - this._getGimmickStartTime(b));
+  }
+
+  getVisualRateAtTime(timeSec) {
+    const t = Math.max(0, Number(timeSec) || 0);
+    let speed = 1.0;
+    if (Array.isArray(this.visualSpeedEvents)) {
+      for (let i = 0; i < this.visualSpeedEvents.length; i += 1) {
+        const evt = this.visualSpeedEvents[i];
+        if (evt.at <= t) {
+          speed = evt.speed;
+        } else {
+          break;
+        }
+      }
+    }
+    const stopped = Array.isArray(this.visualStopIntervals)
+      ? this.visualStopIntervals.some((s) => t >= s.start && t < s.end)
+      : false;
+    return stopped ? 0 : speed;
+  }
+
+  getVisualPositionAtTime(timeSec) {
+    const t = Math.max(0, Number(timeSec) || 0);
+    if (!this.visualTimeline || this.visualTimeline.length === 0) {
+      return t;
+    }
+
+    let last = this.visualTimeline[0];
+    for (let i = 0; i < this.visualTimeline.length; i += 1) {
+      const seg = this.visualTimeline[i];
+      if (t < seg.start) {
+        return seg.cumulativeAtStart;
+      }
+      if (t >= seg.start && t < seg.end) {
+        return seg.cumulativeAtStart + (t - seg.start) * seg.rate;
+      }
+      last = seg;
+    }
+
+    const cumulativeAtLastEnd =
+      last.cumulativeAtStart + (last.end - last.start) * last.rate;
+    const tailRate = this.getVisualRateAtTime(t);
+    return cumulativeAtLastEnd + (t - last.end) * tailRate;
+  }
+
+  getReverseStateAtTime(timeSec) {
+    const t = Math.max(0, Number(timeSec) || 0);
+    if (!this.reverseGimmicks || this.reverseGimmicks.length === 0) {
+      return false;
+    }
+
+    let active = false;
+    for (const gimmick of this.reverseGimmicks) {
+      const start = this._getGimmickStartTime(gimmick);
+      const end = this._getGimmickEndTime(gimmick);
+      const hasRange = end > start;
+      const flag = gimmick?.enabled ?? gimmick?.on ?? gimmick?.value ?? true;
+      const enabled = Boolean(flag);
+
+      if (hasRange) {
+        if (t >= start && t < end) {
+          active = enabled;
+        }
+      } else if (t >= start) {
+        active = enabled;
+      }
+    }
+
+    return active;
+  }
+
+  bakeVisualPositions(notes, gimmicks = []) {
+    this.buildVisualTimeline(gimmicks);
+    if (!Array.isArray(notes)) return notes;
+
+    notes.forEach((noteObj) => {
+      const startTime = Number(noteObj?.startTime ?? noteObj?.t ?? 0);
+      const safeStart = Number.isFinite(startTime) ? Math.max(0, startTime) : 0;
+      noteObj.visualPos = this.getVisualPositionAtTime(safeStart);
+    });
+
+    return notes;
   }
 
   _generateFallbackNotes(song) {

@@ -1,0 +1,26 @@
+곡 추가 가이드 (song)
+
+곡이름: createSongTemplate({
+      id: "곡이름",
+      title: "곡이름",
+      artist: "아티스트",
+      subtitle: "서브타이틀",
+      audioPath: "곡 경로 복붙" ex : "songs/NNN.mp3",
+      bgaPath: "브가 경로 복붙" ex: "videos/NNN.mp4",
+      tags: ["local", "곡이름", "bga"],
+      keys: [4],
+      searchTags: ["곡이름", "local"],
+      length: "분:초".  ex : "2:13",
+      })
+
+
+차트 추가 가이드 
+
+"곡이름-sheet-1": createChartTemplate({
+      id: "곡이름-sheet-1",
+      songId: "곡이름",
+      title: "곡이름",
+      difficulty: 4,
+      tags: ["곡이름", "local", "bga"],
+      sheet: JSON.stringify([ 나중에 채보 파일 추가]),	
+})

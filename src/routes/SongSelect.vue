@@ -22,16 +22,11 @@
             <div class="detail-grid">
               <div class="detail-card">
                 <span class="label">BPM</span>
-                <strong>{{ selectedSong.bpm || '120' }}</strong>
+                <strong>{{ selectedSongBpm }}</strong>
               </div>
               <div class="detail-card">
                 <span class="label">Length</span>
-                <strong>{{ selectedSong.duration || '3:24' }}</strong>
-              </div>
-              <div class="detail-card">
-                <span class="label">Speed</span>
-                <strong>{{ noteSpeed.toFixed(1) }}x</strong>
-                <div style="margin-top:6px"><!-- SpeedSelector removed: move speed selection to SpeedSetup step --></div>
+                <strong>{{ selectedSongLength }}</strong>
               </div>
             </div>
 
@@ -57,9 +52,7 @@
         </div>
 
         <div class="tabs">
-          <div class="tab" :class="{ active: tab === 'recom' }" @click="changeTab('recom')">Recommended</div>
-          <div class="tab" :class="{ active: tab === 'new' }" @click="changeTab('new')">New</div>
-          <div class="tab" :class="{ active: tab === 'all' }" @click="changeTab('all')">All Songs</div>
+          <div class="tab active">All Songs</div>
         </div>
 
         <div class="list-container" ref="listContainer">
@@ -68,7 +61,7 @@
             :key="song.id"
             class="song-item"
             :class="{ active: selectedIndex === index }"
-            @click="selectSong(index)"
+            @click="selectSong(index, false)"
             @mouseenter="hoverSong(index)"
           >
             <div class="song-item-content">
@@ -90,8 +83,9 @@
 
 <script>
 import Loading from "../components/ui/Loading.vue";
-import { getSheetList, getSongListCached, getPlaylist } from "../javascript/db";
+import { getSheetList, getSongListCached } from "../javascript/db";
 import { logEvent } from "../helpers/analytics";
+import { resolveSongPreviewRange } from "../javascript/localCatalog";
 
 export default {
   name: "SongSelect",
@@ -103,8 +97,9 @@ export default {
       sheetList: null,
       selectedSong: null,
       selectedIndex: 0,
-      tab: "recom",
-      noteSpeed: 1.0,
+      previewStopTimer: null,
+      previewFadeOutTimer: null,
+      previewToken: 0,
     };
   },
   computed: {
@@ -118,6 +113,26 @@ export default {
     },
     bgImage() {
       return this.coverImage ? `url(${this.coverImage})` : 'none';
+    },
+    selectedSongBpm() {
+      const bpm = this.selectedSong?.bpm;
+      if (typeof bpm === "number") return String(Math.round(bpm));
+      if (typeof bpm === "string" && bpm.trim()) return bpm;
+      return "120";
+    },
+    selectedSongLength() {
+      const length = this.selectedSong?.length;
+      if (typeof length === "number" && Number.isFinite(length)) {
+        const minutes = Math.floor(length / 60);
+        const seconds = Math.floor(length % 60)
+          .toString()
+          .padStart(2, "0");
+        return `${minutes}:${seconds}`;
+      }
+      if (typeof length === "string" && length.trim()) return length;
+      const duration = this.selectedSong?.duration;
+      if (typeof duration === "string" && duration.trim()) return duration;
+      return "0:00";
     }
   },
   watch: {
@@ -126,32 +141,86 @@ export default {
       if (this.selectedSong) {
         this.sheetList = await getSheetList(this.selectedSong.id);
         logEvent("song_selected", { id: this.selectedSong.id });
+        this.playSelectedSongPreview(this.selectedSong);
       }
-    },
-    async tab() {
-      if (this.tab === "recom") {
-        await this.filterRecommended(true);
-      } else if (this.tab === "new") {
-        await this.getNewSongs();
-      } else if (this.tab === "all") {
-        await this.getAllSongs();
-        this.songList = this.allSongs;
-      }
-      this.selectSong(0);
     },
   },
-  mounted() {
-    this.filterRecommended(true);
+  async mounted() {
+    await this.getAllSongs();
+    this.songList = this.allSongs || [];
+    this.selectSong(0);
     window.addEventListener('keydown', this.handleKeydown);
   },
   beforeDestroy() {
+    this.clearPreviewTimer();
     window.removeEventListener('keydown', this.handleKeydown);
   },
+  deactivated() {
+    this.clearPreviewTimer();
+  },
   methods: {
-    changeTab(tab) {
-      if (this.tab !== tab) {
-        this.tab = tab;
-        this.$store.state.audio.playEffect("ui/slide2");
+    clearPreviewTimer() {
+      if (this.previewStopTimer) {
+        clearTimeout(this.previewStopTimer);
+        this.previewStopTimer = null;
+      }
+      if (this.previewFadeOutTimer) {
+        clearTimeout(this.previewFadeOutTimer);
+        this.previewFadeOutTimer = null;
+      }
+    },
+    getSongPreviewRange(song) {
+      return resolveSongPreviewRange(song, 60);
+    },
+    async playSelectedSongPreview(song) {
+      const audio = this.$store?.state?.audio;
+      if (!audio || !song) return;
+
+      const songSrc = song.audioPath || song.url;
+      if (!songSrc) return;
+
+      this.previewToken += 1;
+      const token = this.previewToken;
+      this.clearPreviewTimer();
+
+      const { startSec, durationSec } = this.getSongPreviewRange(song);
+      if (durationSec <= 0) return;
+
+      const durationMs = Math.floor(durationSec * 1000);
+      const fadeMs = Math.max(250, Math.min(1200, Math.floor(durationMs / 3)));
+      const fadeOutStartMs = Math.max(0, durationMs - fadeMs);
+      const loopGapMs = 200;
+
+      try {
+        await audio.loadSong(songSrc, false);
+        if (token !== this.previewToken) return;
+
+        const runPreviewCycle = () => {
+          if (token !== this.previewToken) return;
+
+          audio.seek(startSec);
+          audio.setVolume(0);
+          audio.play();
+          audio.fadeIn(fadeMs);
+
+          this.previewFadeOutTimer = setTimeout(() => {
+            if (token !== this.previewToken) return;
+            audio.fadeOut(fadeMs);
+          }, fadeOutStartMs);
+
+          this.previewStopTimer = setTimeout(() => {
+            if (token !== this.previewToken) return;
+            audio.pause();
+            this.previewStopTimer = setTimeout(() => {
+              if (token !== this.previewToken) return;
+              runPreviewCycle();
+            }, loopGapMs);
+          }, durationMs);
+        };
+
+        runPreviewCycle();
+      } catch (error) {
+        console.warn("Song preview load failed", error);
       }
     },
     hoverSong(index) {
@@ -159,11 +228,13 @@ export default {
         this.$store.state.audio.playHoverEffect("ui/ta");
       }
     },
-    selectSong(index) {
+    selectSong(index, shouldAutoScroll = true) {
       if (!this.songList || this.songList.length === 0) return;
       this.selectedIndex = index;
       this.selectedSong = this.songList[index];
-      this.scrollToSelected();
+      if (shouldAutoScroll) {
+        this.scrollToSelected();
+      }
     },
     handleKeydown(e) {
       if (!this.songList || this.songList.length === 0) return;
@@ -173,13 +244,13 @@ export default {
         e.preventDefault();
         let next = this.selectedIndex + 1;
         if (next >= this.songList.length) next = 0;
-        this.selectSong(next);
+        this.selectSong(next, true);
         this.$store.state.audio.playHoverEffect("ui/ta");
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         let next = this.selectedIndex - 1;
         if (next < 0) next = this.songList.length - 1;
-        this.selectSong(next);
+        this.selectSong(next, true);
         this.$store.state.audio.playHoverEffect("ui/ta");
       } else if (e.key === 'Enter') {
         e.preventDefault();
@@ -194,7 +265,7 @@ export default {
         if (!container) return;
         const activeEl = container.querySelector('.song-item.active');
         if (activeEl) {
-          activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
         }
       });
     },
@@ -207,23 +278,6 @@ export default {
 
     async getAllSongs() {
       if (!this.allSongs) this.allSongs = await getSongListCached();
-    },
-    async filterRecommended(getRecommended) {
-      await this.getAllSongs();
-      const playlist = await getPlaylist("recommended");
-      if (getRecommended) {
-        this.songList = this.allSongs.filter(e => playlist.items.includes(e.id));
-      } else {
-        this.songList = this.allSongs.filter(e => !playlist.items.includes(e.id));
-      }
-      this.selectSong(0);
-    },
-    async getNewSongs() {
-      await this.getAllSongs();
-      this.songList = [...this.allSongs]
-        .sort((a, b) => (b.dateUpdated?.seconds || 0) - (a.dateUpdated?.seconds || 0))
-        .slice(0, 35);
-      this.selectSong(0);
     },
   },
 };
@@ -287,6 +341,8 @@ export default {
 
 .right-panel {
   flex: 0.95;
+  height: calc(100vh - 80px);
+  min-height: 0;
   background: rgba(10, 14, 30, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(18px);
@@ -298,6 +354,7 @@ export default {
 .panel-head {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   gap: 10px;
   margin-bottom: 20px;
 }
@@ -323,8 +380,8 @@ export default {
 
 .album-art-wrapper {
   width: 100%;
-  aspect-ratio: 16/9;
   position: relative;
+  display: block;
   border-radius: 22px;
   overflow: hidden;
   box-shadow: 0 24px 80px rgba(0, 13, 71, 0.5);
@@ -333,8 +390,8 @@ export default {
 
 .album-art {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  display: block;
 }
 
 .album-overlay {
@@ -459,7 +516,8 @@ export default {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr;
+  flex-shrink: 0;
   gap: 10px;
   padding: 14px;
   background: rgba(0, 0, 0, 0.14);
@@ -491,11 +549,15 @@ export default {
 }
 
 .list-container {
-  flex: 1;
-  max-height: 190px;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 10px 12px 12px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -509,7 +571,7 @@ export default {
 }
 
 .song-item {
-  padding: 10px 12px;
+  padding: 8px 12px;
   cursor: pointer;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -518,7 +580,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  min-height: 48px;
+  min-height: 0;
 }
 
 .song-item:hover {

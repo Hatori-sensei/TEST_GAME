@@ -11,6 +11,14 @@ import {
 } from "../helpers/firebaseConfig";
 import { store } from "../helpers/store";
 import { Validator } from "jsonschema";
+import {
+  localCatalog,
+  createLocalCatalogData,
+  getChartById,
+  getChartForSong,
+  getSongById,
+  getSongListCatalog,
+} from "./localCatalog";
 
 const assetsBaseUrl = "https://assets.rhythm-plus.com/songs";
 const v = new Validator();
@@ -30,101 +38,10 @@ const mockDate = {
   seconds: Math.floor(Date.now() / 1000),
 };
 
-const MOCK_SONG = {
-  id: "local-test-1",
-  title: "디맥 판정 테스트 곡",
-  artist: "NCS Music",
-  subtitle: "진짜 음악으로 테스트!",
-  image: "",
-  audioPath: "songs/local-test-1.mp3",
-  bgaPath: "videos/song1.mp4",
-  tags: ["test", "local", "recommended"],
-  keys: [4, 5, 6],
-  genres: [],
-  categories: [],
-  searchTags: [],
-  visibility: "public",
-  dateCreated: mockDate,
-  dateUpdated: mockDate,
-  createdBy: "local-admin",
-  length: 60,
-};
+const { songs: localSongs, charts: localCharts } = createLocalCatalogData(mockDate);
 
-const MOCK_SONG_KAMUI = {
-  id: "kamui",
-  title: "KAMUI",
-  artist: "Hatori Sensei",
-  subtitle: "Local BGA Test",
-  image: "",
-  audioPath: "songs/kamui.mp3",
-  bgaPath: "videos/kamui.mp4",
-  tags: ["local", "kamui", "bga"],
-  keys: [4],
-  genres: [],
-  categories: [],
-  searchTags: ["kamui", "local"],
-  visibility: "public",
-  dateCreated: mockDate,
-  dateUpdated: mockDate,
-  createdBy: "local-admin",
-  length: 24,
-};
-
-const MOCK_SONGS = {
-  [MOCK_SONG.id]: MOCK_SONG,
-  [MOCK_SONG_KAMUI.id]: MOCK_SONG_KAMUI,
-};
-
-const MOCK_SHEET = {
-  id: "local-sheet-1",
-  songId: "local-test-1",
-  title: "테스트 패턴 - 4K 무한",
-  difficulty: 5,
-  keys: [4],
-  tags: ["test", "local", "recommended"],
-  visibility: "public",
-  dateCreated: mockDate,
-  dateUpdated: mockDate,
-  createdBy: "local-admin",
-  sheet: JSON.stringify(
-    (() => {
-      let notes = [];
-      for (let i = 1.0; i <= 150.0; i += 0.4) {
-        let isLongNote = Math.random() > 0.6;
-        notes.push({
-          t: i,
-          key: Math.floor(Math.random() * 4),
-          l: isLongNote ? 0.3 : 0,
-        });
-      }
-      return notes;
-    })()
-  ),
-};
-
-const MOCK_SHEET_KAMUI = {
-  id: "kamui-sheet-1",
-  songId: "kamui",
-  title: "KAMUI Test Chart",
-  difficulty: 4,
-  keys: [4],
-  tags: ["kamui", "local", "bga"],
-  visibility: "public",
-  dateCreated: mockDate,
-  dateUpdated: mockDate,
-  createdBy: "local-admin",
-  sheet: JSON.stringify([
-    { startTime: 1.0, endTime: 1.6, key: 0 },
-    { t: 2.4, key: 1 },
-    { t: 3.2, key: 2, l: 0.5 },
-    { t: 4.4, key: 3 },
-  ]),
-};
-
-const MOCK_SHEETS = {
-  [MOCK_SHEET.id]: MOCK_SHEET,
-  [MOCK_SHEET_KAMUI.id]: MOCK_SHEET_KAMUI,
-};
+const MOCK_SONGS = localSongs;
+const MOCK_SHEETS = localCharts;
 
 const LOCAL_RESULTS = {};
 
@@ -137,29 +54,27 @@ export async function getSongListCached() {
   return Object.values(MOCK_SONGS);
 }
 export function getSongList() {
-  return Promise.resolve(Object.values(MOCK_SONGS));
+  return Promise.resolve(getSongListCatalog());
 }
 export async function getSongsInIdArray() {
-  return Object.values(MOCK_SONGS);
+  return getSongListCatalog();
 }
-export function getSong() {
-  return Promise.resolve(MOCK_SONG);
+export function getSong(songId = "local-test-1") {
+  return Promise.resolve(getSongById(songId) || getSongListCatalog()[0] || null);
 }
 export function getSheetList(songId) {
   const sheets = Object.values(MOCK_SHEETS).filter(
     (sheet) => sheet.songId === songId
   );
-  return Promise.resolve(sheets.length ? sheets : [MOCK_SHEET]);
+  return Promise.resolve(sheets.length ? sheets : [MOCK_SHEETS["local-sheet-1"]]);
 }
-export function getSheet() {
-  return Promise.resolve(MOCK_SHEET);
+export function getSheet(sheetId = "local-sheet-1") {
+  return Promise.resolve(MOCK_SHEETS[sheetId] || MOCK_SHEETS["local-sheet-1"] || null);
 }
 
 export async function getGameSheet(sheetId) {
-  const sheet =
-    Object.values(MOCK_SHEETS).find((item) => item.id === sheetId) ||
-    MOCK_SHEET;
-  const song = MOCK_SONGS[sheet.songId] || MOCK_SONG;
+  const sheet = getChartById(sheetId) || MOCK_SHEETS["local-sheet-1"];
+  const song = getSongById(sheet.songId) || MOCK_SONGS["local-test-1"];
   const resultSheet = { ...sheet };
   resultSheet.audioPath = resultSheet.audioPath ?? song.audioPath;
   resultSheet.bgaPath = resultSheet.bgaPath ?? song.bgaPath;

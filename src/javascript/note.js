@@ -25,6 +25,7 @@ export default class Note {
     this.lastTickTime = null;
     this.tickIntervalMs = 100; // 롱노트 유지 보상 간격
     this.initialJudgeString = null;
+    this.visualPos = Number(this.keyObj?.visualPos ?? 0) || 0;
     this._configureTiming();
   }
 
@@ -236,8 +237,12 @@ export default class Note {
     if (this.game.paused) return;
 
     const speed = this.game.noteSpeedPxPerSec || 1;
-    const timeDiff = this.game.currentTime - this.startTime;
-    this.y = timeDiff * speed + this.game.checkHitLineY;
+    const distance = this.visualPos - (this.game.currentGlobalVisualPos || 0);
+    if (this.game.isReverse) {
+      this.y = this.game.checkHitLineY + distance * speed;
+    } else {
+      this.y = this.game.checkHitLineY - distance * speed;
+    }
 
     if (this.isLong) {
       if (this.holding) {
@@ -269,20 +274,27 @@ export default class Note {
       }
     }
 
-    const color = this.noteFailed
-      ? "rgba(100, 100, 100, 0.3)"
-      : this.isLong
-      ? "#ffaa00"
-      : "#ffcc00";
-    this.ctx.fillStyle = color;
-
     if (this.isLong) {
       const bodyHeight = Math.max(0, this.duration * speed);
       const bodyTop = this.y - bodyHeight;
-      this.ctx.fillRect(this.x, bodyTop, this.width, bodyHeight);
-      this.ctx.fillRect(this.x, this.y, this.width, this.singleNoteHeight);
+      const canvasHeight = this.game.canvas.height;
+      const isVisible = bodyTop <= canvasHeight + 150 && this.y >= -150;
+      if (isVisible) {
+        const color = this.noteFailed
+          ? "rgba(100, 100, 100, 0.3)"
+          : "#ffaa00";
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(this.x, bodyTop, this.width, bodyHeight);
+        this.ctx.fillRect(this.x, this.y, this.width, this.singleNoteHeight);
+      }
     } else {
-      this.ctx.fillRect(this.x, this.y, this.width, this.singleNoteHeight);
+      if (this.y >= -150 && this.y <= this.game.canvas.height + 150) {
+        const color = this.noteFailed
+          ? "rgba(100, 100, 100, 0.3)"
+          : "#ffcc00";
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(this.x, this.y, this.width, this.singleNoteHeight);
+      }
     }
   }
 }

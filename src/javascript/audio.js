@@ -10,6 +10,7 @@ export default class Audio {
       dataArray: null,
     };
     this.maxVolume = 0.7;
+    this.fadeTimer = null;
     this.player = null;
     this.mediaSourceNode = null;
     this.muteBg = false;
@@ -257,25 +258,57 @@ export default class Audio {
     this.player.volume = mute ? 0 : this.maxVolume;
   }
 
+  setVolume(volume) {
+    if (!this.player) return;
+    const normalized = Math.min(1, Math.max(0, Number(volume) || 0));
+    this.player.volume = normalized;
+  }
+
   toggleBgMute() {
     this.muteBg = !this.muteBg;
     this.mute(this.muteBg);
   }
 
-  fadeOut(duration = 300) {
+  clearFadeTimer() {
+    if (!this.fadeTimer) return;
+    clearInterval(this.fadeTimer);
+    this.fadeTimer = null;
+  }
+
+  fadeTo(targetVolume = this.maxVolume, duration = 300, onDone = null) {
     if (!this.player) return;
-    const start = this.player.volume;
+    this.clearFadeTimer();
+
+    const start = Number(this.player.volume) || 0;
+    const target = Math.min(1, Math.max(0, Number(targetVolume) || 0));
+    if (duration <= 0 || Math.abs(target - start) < 0.001) {
+      this.player.volume = target;
+      if (typeof onDone === "function") onDone();
+      return;
+    }
+
     const stepMs = 30;
     const steps = Math.max(1, Math.floor(duration / stepMs));
     let idx = 0;
-    const timer = setInterval(() => {
+    this.fadeTimer = setInterval(() => {
       idx += 1;
-      const nextVolume = Math.max(0, start * (1 - idx / steps));
+      const ratio = idx / steps;
+      const nextVolume = start + (target - start) * ratio;
       this.player.volume = nextVolume;
       if (idx >= steps) {
-        clearInterval(timer);
+        this.clearFadeTimer();
+        this.player.volume = target;
+        if (typeof onDone === "function") onDone();
       }
     }, stepMs);
+  }
+
+  fadeOut(duration = 300, onDone = null) {
+    this.fadeTo(0, duration, onDone);
+  }
+
+  fadeIn(duration = 300, targetVolume = this.maxVolume, onDone = null) {
+    this.fadeTo(targetVolume, duration, onDone);
   }
 
   getCurrentTime() {
