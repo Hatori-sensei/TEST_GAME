@@ -2,6 +2,7 @@ const MISS_HEALTH_PENALTY = 9;
 const RELEASE_BREAK_EARLY_MS = 175;
 const RELEASE_MAX_ONE_EARLY_MS = 150;
 const RELEASE_MAX_ONE_LATE_MS = 250;
+const SHIFT_SPEED_MULTIPLIER = 1.8;
 
 export default class Note {
   constructor(vm, game, keyObj, key, x, y = 0, width) {
@@ -9,8 +10,10 @@ export default class Note {
     this.game = game;
     this.keyObj = keyObj;
     this.key = key;
+    this.baseX = x;
     this.x = x;
     this.y = y;
+    this.judgeY = y;
     this.width = width;
     this.ctx = vm.ctx;
     this.noteFailed = false;
@@ -238,10 +241,44 @@ export default class Note {
 
     const speed = this.game.noteSpeedPxPerSec || 1;
     const distance = this.visualPos - (this.game.currentGlobalVisualPos || 0);
-    if (this.game.isReverse) {
-      this.y = this.game.checkHitLineY + distance * speed;
+    const baseY = this.game.checkHitLineY - distance * speed;
+    this.judgeY = baseY;
+
+    const reverseBlend = Number(this.game.reverseBlend) || 0;
+    if (reverseBlend > 0) {
+      const mirroredY = this.game.canvas.height - baseY;
+      this.y = baseY + (mirroredY - baseY) * reverseBlend;
     } else {
-      this.y = this.game.checkHitLineY - distance * speed;
+      this.y = baseY;
+    }
+
+    const shift = this.keyObj && this.keyObj.shift;
+    const isShiftNote = !!(shift && typeof shift === "object");
+    if (shift && typeof shift === "object") {
+      const fromXNum = Number(shift.fromX);
+      const durationNum = Number(shift.duration);
+      const topEntryTravelSec =
+        (this.game.checkHitLineY + 150) / Math.max(speed, 1e-6);
+      const defaultStart = this.startTime - topEntryTravelSec;
+      const startNumRaw = shift.startTime;
+      const startTime =
+        Number.isFinite(Number(startNumRaw)) ? Number(startNumRaw) : defaultStart;
+      const effectiveDuration =
+        Number.isFinite(durationNum) && durationNum > 0
+          ? Math.max(0.1, durationNum / SHIFT_SPEED_MULTIPLIER)
+          : 0;
+
+      if (Number.isFinite(fromXNum) && effectiveDuration > 0) {
+        const progress = Math.min(
+          1,
+          Math.max(0, (this.game.currentTime - startTime) / effectiveDuration)
+        );
+        this.x = fromXNum + (this.baseX - fromXNum) * progress;
+      } else {
+        this.x = this.baseX;
+      }
+    } else {
+      this.x = this.baseX;
     }
 
     if (this.isLong) {
@@ -265,8 +302,8 @@ export default class Note {
         }
       }
     } else {
-      const noteBottomY = this.y + this.singleNoteHeight;
-      const passedPx = noteBottomY - this.game.checkHitLineY;
+      const judgeReferenceY = this.judgeY + this.singleNoteHeight;
+      const passedPx = judgeReferenceY - this.game.checkHitLineY;
       const passedMs = (passedPx / speed) * 1000;
 
       if (!this.noteFailed && passedMs > 175) {
@@ -282,6 +319,8 @@ export default class Note {
       if (isVisible) {
         const color = this.noteFailed
           ? "rgba(100, 100, 100, 0.3)"
+          : isShiftNote
+          ? "#3ad5ff"
           : "#ffaa00";
         this.ctx.fillStyle = color;
         this.ctx.fillRect(this.x, bodyTop, this.width, bodyHeight);
@@ -291,6 +330,8 @@ export default class Note {
       if (this.y >= -150 && this.y <= this.game.canvas.height + 150) {
         const color = this.noteFailed
           ? "rgba(100, 100, 100, 0.3)"
+          : isShiftNote
+          ? "#58e6ff"
           : "#ffcc00";
         this.ctx.fillStyle = color;
         this.ctx.fillRect(this.x, this.y, this.width, this.singleNoteHeight);

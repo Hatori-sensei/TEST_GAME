@@ -42,6 +42,8 @@ export const store = new Vuex.Store({
     // Game play settings
     speedMultiplier: 1.0,
     pendingSheetId: null,
+    pendingGameOptions: null,
+    randomGimmickMode: "off",
   },
   actions: {
     async fetchUserProfile() {
@@ -200,6 +202,17 @@ export const store = new Vuex.Store({
     },
     setPendingSheetId(state, val) {
       state.pendingSheetId = val;
+    },
+    setPendingGameOptions(state, val) {
+      state.pendingGameOptions = val && typeof val === "object" ? { ...val } : null;
+    },
+    setRandomGimmickMode(state, val) {
+      const mode = String(val || "off").toLowerCase();
+      const allowed = ["off", "speed", "lane", "both"];
+      state.randomGimmickMode = allowed.includes(mode) ? mode : "off";
+    },
+    setRandomGimmicksEnabled(state, val) {
+      state.randomGimmickMode = Boolean(val) ? "both" : "off";
     },
     async toggleFullscreen(state) {
       state.isFullscreen = document.fullscreen;

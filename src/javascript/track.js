@@ -80,10 +80,11 @@ export default class DropTrack {
     if (activeNoteIdx === -1) return;
 
     const note = this.noteArr[activeNoteIdx];
-    const noteBottomY = note.y + note.singleNoteHeight;
-    const diffPx = Math.abs(this.game.checkHitLineY - noteBottomY);
+    const judgeBaseY = Number.isFinite(Number(note.judgeY)) ? note.judgeY : note.y;
+    const judgeReferenceY = judgeBaseY + note.singleNoteHeight;
+    const diffPx = Math.abs(this.game.checkHitLineY - judgeReferenceY);
     const diffMs = (diffPx / this.game.noteSpeedPxPerSec) * 1000;
-    const isEarly = noteBottomY < this.game.checkHitLineY;
+    const isEarly = judgeReferenceY < this.game.checkHitLineY;
 
     const HIT_WINDOW = 175;
     const EARLY_MISS_WINDOW = 300;
@@ -281,8 +282,10 @@ export default class DropTrack {
         continue;
       }
 
-      const noteBottomY = note.y + (note.height || 15);
-      const passedPx = noteBottomY - this.game.checkHitLineY;
+      const singleHeight = note.singleNoteHeight || note.height || 15;
+      const judgeBaseY = Number.isFinite(Number(note.judgeY)) ? note.judgeY : note.y;
+      const judgeReferenceY = judgeBaseY + singleHeight;
+      const passedPx = judgeReferenceY - this.game.checkHitLineY;
       const passedMs = (passedPx / speed) * 1000;
 
       // 판정 범위를 지나쳐서 떨어지면 완벽하게 놓친 것으로 처리 (Miss)

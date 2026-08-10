@@ -35,6 +35,9 @@ export default class GameInstance {
     this.visualStopIntervals = [];
     this.currentGlobalVisualPos = 0;
     this.isReverse = false;
+    this.reverseBlend = 0;
+    this.enableRandomGimmicks = false;
+    this.randomGimmickMode = "off";
 
     this.feverEff = new FeverEffect(vm, this);
     this.createTracks(4);
@@ -54,6 +57,25 @@ export default class GameInstance {
     }
 
     return resolved;
+  }
+
+  getConfiguredBgmVolume() {
+    const fromStore = Number(this.vm?.$store?.state?.audio?.maxVolume);
+    if (Number.isFinite(fromStore)) {
+      return Math.min(1, Math.max(0, fromStore));
+    }
+
+    const fromAudio = Number(this.audio?.maxVolume);
+    if (Number.isFinite(fromAudio)) {
+      return Math.min(1, Math.max(0, fromAudio));
+    }
+
+    return 0.7;
+  }
+
+  applyConfiguredBgmVolume() {
+    if (!this.howl || typeof this.howl.volume !== "function") return;
+    this.howl.volume(this.getConfiguredBgmVolume());
   }
 
   createTracks(trackNum) {
@@ -134,6 +156,7 @@ export default class GameInstance {
         typeof this.howl.state === "function" &&
         this.howl.state() === "loaded"
       ) {
+        this.applyConfiguredBgmVolume();
         if (this.vm && this.vm.instance) this.vm.instance.loading = false;
         return Promise.resolve(this.howl);
       }
@@ -153,6 +176,7 @@ export default class GameInstance {
       format: ["mp3"],
       onload: () => {
         this.loading = false;
+        this.applyConfiguredBgmVolume();
         const loadedDuration =
           this.howl && typeof this.howl.duration === "function"
             ? Number(this.howl.duration())
@@ -174,10 +198,24 @@ export default class GameInstance {
                 ...(this.vm?.currentSong || {}),
                 length: loadedDuration,
               };
-              this.timeArr = this._normalizeRandomNotes(
+              let regeneratedNotes = this._normalizeRandomNotes(
                 this._generateFallbackNotes(fallbackSong),
                 fallbackSong
               );
+              if (this.enableRandomGimmicks) {
+                const randomBundle = this._generateRandomFallbackGimmicksAndShifts(
+                  regeneratedNotes,
+                  fallbackSong,
+                  this.randomGimmickMode
+                );
+                regeneratedNotes = randomBundle.notes;
+                this.gimmicks = randomBundle.gimmicks;
+                if (this.vm && this.vm.currentSong) {
+                  this.vm.currentSong.gimmicks = this.gimmicks;
+                }
+              }
+
+              this.timeArr = regeneratedNotes;
               this.bakeVisualPositions(this.timeArr, this.gimmicks);
               this.timeArrIdx = 0;
               if (this.vm) {
@@ -244,7 +282,10 @@ export default class GameInstance {
       },
     });
     return new Promise((resolve, reject) => {
-      this.howl.once("load", () => resolve(this.howl));
+      this.howl.once("load", () => {
+        this.applyConfiguredBgmVolume();
+        resolve(this.howl);
+      });
       this.howl.once("loaderror", (id, err) => reject(err));
     });
   }
@@ -497,7 +538,8 @@ export default class GameInstance {
     }
     this.currentTime = cTime || 0;
     this.currentGlobalVisualPos = this.getVisualPositionAtTime(this.currentTime);
-    this.isReverse = this.getReverseStateAtTime(this.currentTime);
+    this.isReverse = false;
+    this.reverseBlend = 0;
     this.playTime =
       this.currentTime +
       (typeof this.noteStartDelay === "number" ? this.noteStartDelay : 0) +
@@ -586,8 +628,13 @@ export default class GameInstance {
     this.songEndedNotified = false;
   }
 
-  loadSong(song) {
+  loadSong(song, options = {}) {
     this.resetPlaying();
+    this.randomGimmickMode = this._normalizeRandomGimmickMode(
+      options?.randomGimmickMode,
+      options?.enableRandomGimmicks
+    );
+    this.enableRandomGimmicks = this.randomGimmickMode !== "off";
     const resolvedAudioPath = resolveMediaUrl(song.audioPath || song.url);
     const resolvedBgaPath = resolveMediaUrl(song.bgaPath);
     this.vm.currentSong = {
@@ -648,13 +695,42 @@ export default class GameInstance {
       parsedNotes = this._normalizeRandomNotes(parsedNotes, song);
     }
 
+    let effectiveGimmicks = Array.isArray(song?.gimmicks) ? [...song.gimmicks] : [];
+    if (this.usingFallbackNotes && this.enableRandomGimmicks) {
+      const randomBundle = this._generateRandomFallbackGimmicksAndShifts(
+        parsedNotes,
+        song,
+        this.randomGimmickMode
+      );
+      parsedNotes = randomBundle.notes;
+      effectiveGimmicks = randomBundle.gimmicks;
+      song.gimmicks = effectiveGimmicks;
+    }
+
     if (!this.usingFallbackNotes) {
       this.usingFallbackNotes = false;
     }
 
-    const gimmicks = Array.isArray(song?.gimmicks) ? song.gimmicks : [];
-    this.gimmicks = gimmicks;
-    this.bakeVisualPositions(parsedNotes, gimmicks);
+    // Bake lane-shift source X once during chart parsing to avoid runtime lookups.
+    if (Array.isArray(parsedNotes) && Array.isArray(this.dropTrackArr)) {
+      parsedNotes.forEach((noteObj) => {
+        if (!noteObj || typeof noteObj !== "object") return;
+        const shift = noteObj.shift;
+        if (!shift || typeof shift !== "object") return;
+
+        const fromLaneNum = Number(shift.fromLane);
+        if (!Number.isFinite(fromLaneNum)) return;
+
+        const fromLaneIndex = Math.trunc(fromLaneNum);
+        const fromTrack = this.dropTrackArr[fromLaneIndex];
+        if (!fromTrack) return;
+
+        shift.fromX = fromTrack.x;
+      });
+    }
+
+    this.gimmicks = effectiveGimmicks;
+    this.bakeVisualPositions(parsedNotes, this.gimmicks);
 
     this.timeArr = parsedNotes;
     if (this.vm) {
@@ -782,9 +858,7 @@ export default class GameInstance {
     this.visualTimeline = timeline;
     this.visualSpeedEvents = speedEvents;
     this.visualStopIntervals = stopIntervals;
-    this.reverseGimmicks = gimmicks
-      .filter((g) => String(g?.type || "").toLowerCase() === "reverse")
-      .sort((a, b) => this._getGimmickStartTime(a) - this._getGimmickStartTime(b));
+    this.reverseGimmicks = [];
   }
 
   getVisualRateAtTime(timeSec) {
@@ -831,29 +905,11 @@ export default class GameInstance {
   }
 
   getReverseStateAtTime(timeSec) {
-    const t = Math.max(0, Number(timeSec) || 0);
-    if (!this.reverseGimmicks || this.reverseGimmicks.length === 0) {
-      return false;
-    }
+    return false;
+  }
 
-    let active = false;
-    for (const gimmick of this.reverseGimmicks) {
-      const start = this._getGimmickStartTime(gimmick);
-      const end = this._getGimmickEndTime(gimmick);
-      const hasRange = end > start;
-      const flag = gimmick?.enabled ?? gimmick?.on ?? gimmick?.value ?? true;
-      const enabled = Boolean(flag);
-
-      if (hasRange) {
-        if (t >= start && t < end) {
-          active = enabled;
-        }
-      } else if (t >= start) {
-        active = enabled;
-      }
-    }
-
-    return active;
+  getReverseBlendAtTime(timeSec) {
+    return 0;
   }
 
   bakeVisualPositions(notes, gimmicks = []) {
@@ -902,6 +958,126 @@ export default class GameInstance {
     }
 
     return notes;
+  }
+
+  _pickDifferentLane(targetLane) {
+    const candidates = [0, 1, 2, 3].filter((lane) => lane !== targetLane);
+    if (candidates.length === 0) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  _getBaseSpeedForGimmickGeneration() {
+    const fromSession = Number(this.sessionSpeedMultiplier);
+    if (Number.isFinite(fromSession) && fromSession > 0) return fromSession;
+
+    const fromStore = Number(this.vm?.$store?.state?.speedMultiplier);
+    if (Number.isFinite(fromStore) && fromStore > 0) return fromStore;
+
+    const fromVm = Number(this.vm?.noteSpeed);
+    if (Number.isFinite(fromVm) && fromVm > 0) return fromVm;
+
+    return 1.0;
+  }
+
+  _normalizeRandomGimmickMode(mode, legacyEnabled = false) {
+    const normalized = String(mode || "").toLowerCase();
+    const allowed = ["off", "speed", "lane", "both"];
+    if (allowed.includes(normalized)) {
+      return normalized;
+    }
+    return legacyEnabled ? "both" : "off";
+  }
+
+  _generateRandomFallbackGimmicksAndShifts(noteArr, song, mode = "both") {
+    const notes = Array.isArray(noteArr)
+      ? noteArr.map((note) => ({ ...note }))
+      : [];
+
+    const resolvedMode = this._normalizeRandomGimmickMode(mode, false);
+    const includeSpeed = resolvedMode === "speed" || resolvedMode === "both";
+    const includeLane = resolvedMode === "lane" || resolvedMode === "both";
+
+    const durationSeconds = Math.max(
+      10,
+      this._parseDuration(song?.length) ||
+        this._parseDuration(song?.duration) ||
+        this._parseDuration(song?.song?.length) ||
+        30
+    );
+    const endTime = Math.max(1.5, durationSeconds - 0.1);
+    const generatedGimmicks = [];
+    const baseSpeed = this._getBaseSpeedForGimmickGeneration();
+    const effectiveMin = Math.max(0.5, baseSpeed - 1.0);
+    const effectiveMax = Math.min(9.9, baseSpeed + 1.0);
+    const multiplierMin = Math.max(0.25, effectiveMin / baseSpeed);
+    const multiplierMax = Math.max(multiplierMin, effectiveMax / baseSpeed);
+
+    if (includeSpeed) {
+      let speedAt = 5 + Math.random() * 5;
+      while (speedAt < endTime - 0.25) {
+        const speedValue = Number(
+          (
+            multiplierMin + Math.random() * (multiplierMax - multiplierMin)
+          ).toFixed(3)
+        );
+        generatedGimmicks.push({
+          type: "speed",
+          startTime: Number(speedAt.toFixed(3)),
+          value: speedValue,
+        });
+        speedAt += 5 + Math.random() * 5;
+      }
+    }
+
+    generatedGimmicks.sort(
+      (a, b) => this._getGimmickStartTime(a) - this._getGimmickStartTime(b)
+    );
+
+    const singleCandidates = notes.filter((note) => {
+      const start = Number(note?.startTime ?? note?.t ?? 0);
+      const len = Number(note?.l ?? 0);
+      const endFromObj = Number(note?.endTime);
+      const end =
+        Number.isFinite(endFromObj) && endFromObj > start
+          ? endFromObj
+          : Number.isFinite(start) && Number.isFinite(len)
+          ? start + Math.max(0, len)
+          : start;
+      const isSingle = !(end > start + 0.001);
+      return isSingle && !note.shift;
+    });
+
+    if (includeLane) {
+      const ratio = 0.1 + Math.random() * 0.05;
+      const shiftCount = Math.min(
+        singleCandidates.length,
+        Math.max(0, Math.floor(singleCandidates.length * ratio))
+      );
+
+      if (shiftCount > 0) {
+        const pool = [...singleCandidates];
+        for (let i = 0; i < shiftCount; i += 1) {
+          const pickIndex = Math.floor(Math.random() * pool.length);
+          const note = pool.splice(pickIndex, 1)[0];
+          if (!note) continue;
+
+          const targetLane = this._resolveLaneFromNote(note);
+          if (targetLane === null) continue;
+          const fromLane = this._pickDifferentLane(targetLane);
+          if (fromLane === null) continue;
+
+          note.shift = {
+            fromLane,
+            duration: 0.5,
+          };
+        }
+      }
+    }
+
+    return {
+      notes,
+      gimmicks: generatedGimmicks,
+    };
   }
 
   _resolveLaneFromNote(noteObj) {
@@ -1017,6 +1193,7 @@ export default class GameInstance {
   async resumeGame(firstPlay = false) {
     this.paused = false;
     if (firstPlay) this.seekTo(this.startSongAt);
+    this.applyConfiguredBgmVolume();
 
     if (Howler.ctx && Howler.ctx.state === "suspended") {
       try {

@@ -108,6 +108,22 @@
               </div>
               <strong>{{ Number(quickGameSt.noteSpeed).toFixed(1) }}x</strong>
             </div>
+            <div class="settings-row">
+              <label for="randomGimmickMode">랜덤 기믹 테스트</label>
+              <div class="slider-wrap">
+                <select
+                  id="randomGimmickMode"
+                  v-model="quickGameSt.randomGimmickMode"
+                  @change="onRandomGimmickModeChange"
+                >
+                  <option value="off">끄기</option>
+                  <option value="speed">변속만</option>
+                  <option value="lane">레인 이동만</option>
+                  <option value="both">변속 + 레인 이동</option>
+                </select>
+              </div>
+              <strong>{{ randomGimmickModeText(quickGameSt.randomGimmickMode) }}</strong>
+            </div>
             <KeyMappings v-model="quickPreference.keyMap"></KeyMappings>
           </div>
 
@@ -191,6 +207,7 @@ export default {
       showQuickSettings: false,
       quickGameSt: {
         noteSpeed: 1,
+        randomGimmickMode: "off",
       },
       quickPreference: {
         keyMap: { ...DEFAULT_KEY_MAP },
@@ -267,6 +284,9 @@ export default {
 
       const speed = Number(gameSt.noteSpeed ?? this.$store.state.speedMultiplier ?? 1);
       this.quickGameSt.noteSpeed = this.clamp(speed, 1, 9.9, 1);
+      this.quickGameSt.randomGimmickMode = this.normalizeRandomGimmickMode(
+        this.$store.state.randomGimmickMode
+      );
       this.quickPreference.keyMap = {
         ...DEFAULT_KEY_MAP,
         ...(preference.keyMap || {}),
@@ -293,6 +313,24 @@ export default {
     },
     onQuickSpeedChange(value) {
       this.quickGameSt.noteSpeed = this.clamp(value, 1, 9.9, 1);
+    },
+    normalizeRandomGimmickMode(mode) {
+      const normalized = String(mode || "off").toLowerCase();
+      const allowed = ["off", "speed", "lane", "both"];
+      return allowed.includes(normalized) ? normalized : "off";
+    },
+    randomGimmickModeText(mode) {
+      const normalized = this.normalizeRandomGimmickMode(mode);
+      if (normalized === "speed") return "변속만";
+      if (normalized === "lane") return "레인만";
+      if (normalized === "both") return "둘 다";
+      return "끄기";
+    },
+    onRandomGimmickModeChange() {
+      this.$store.commit(
+        "setRandomGimmickMode",
+        this.normalizeRandomGimmickMode(this.quickGameSt.randomGimmickMode)
+      );
     },
     onBgmVolumeChange(value) {
       const next = this.clamp(value, 0, 1, 0.7);
@@ -322,6 +360,10 @@ export default {
       };
 
       this.$store.commit("setSpeedMultiplier", this.quickGameSt.noteSpeed);
+      this.$store.commit(
+        "setRandomGimmickMode",
+        this.normalizeRandomGimmickMode(this.quickGameSt.randomGimmickMode)
+      );
       this.$store.commit("setUserProfile", {
         ...profile,
         gameSt,
@@ -462,6 +504,12 @@ export default {
     playGame(sheetId) {
       // Route to speed setup step before actual game start
       this.$store.commit('setPendingSheetId', sheetId);
+      const randomGimmickMode = this.normalizeRandomGimmickMode(
+        this.quickGameSt.randomGimmickMode || this.$store.state.randomGimmickMode
+      );
+      this.$store.commit('setPendingGameOptions', {
+        randomGimmickMode,
+      });
       this.$store.state.audio.playEffect("ui/slide2");
       this.$router.push(`/speed-setup/${sheetId}`);
     },

@@ -418,7 +418,14 @@ export default {
     async playWithId(sheetId) {
       try {
         let song = await getGameSheet(sheetId);
-        this.instance.loadSong(song);
+        const pendingOptions = this.$store.state.pendingGameOptions;
+        const gameOptions = pendingOptions && typeof pendingOptions === "object"
+          ? pendingOptions
+          : {
+              randomGimmickMode: this.$store.state.randomGimmickMode || "off",
+            };
+        this.instance.loadSong(song, gameOptions);
+        this.$store.commit("setPendingGameOptions", null);
         document.title = song.title + " - Rhythm+ Music Game";
       } catch (err) {
         this.$store.state.gModal.show({

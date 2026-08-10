@@ -36,7 +36,15 @@
 export default {
   name: "SpeedSetup",
   data() {
-    return { speed: this.$store.state.speedMultiplier || 1.0 };
+    const storeSpeed = Number(this.$store.state.speedMultiplier);
+    const profileSpeed = Number(this.$store.state.userProfile?.gameSt?.noteSpeed);
+    const initialSpeed = Number.isFinite(profileSpeed) && profileSpeed > 0
+      ? profileSpeed
+      : Number.isFinite(storeSpeed) && storeSpeed > 0
+      ? storeSpeed
+      : 1.0;
+
+    return { speed: Math.min(9.9, Math.max(1.0, initialSpeed)) };
   },
   computed: {
     formattedSpeed() {
@@ -52,6 +60,9 @@ export default {
       return;
     }
 
+    // Keep store speed synchronized with the initial value shown in this setup screen.
+    this.$store.commit('setSpeedMultiplier', parseFloat(parseFloat(this.speed).toFixed(1)));
+
     // Register global key listener for 1 and 2 keys
     window.addEventListener('keydown', this.onKeyDown);
   },
@@ -65,12 +76,26 @@ export default {
       // commit numeric value
       const numeric = parseFloat(parseFloat(this.speed).toFixed(1));
       this.$store.commit('setSpeedMultiplier', numeric);
+      const existingOptions = this.$store.state.pendingGameOptions || {};
+      const modeRaw =
+        existingOptions.randomGimmickMode !== undefined
+          ? existingOptions.randomGimmickMode
+          : this.$store.state.randomGimmickMode;
+      const mode = String(modeRaw || 'off').toLowerCase();
+      const randomGimmickMode = ['off', 'speed', 'lane', 'both'].includes(mode)
+        ? mode
+        : 'off';
+      this.$store.commit('setPendingGameOptions', {
+        ...existingOptions,
+        randomGimmickMode,
+      });
       // clear pending
       this.$store.commit('setPendingSheetId', null);
       this.$router.push(`/game/${sheetId}`);
     },
     cancel() {
       this.$store.commit('setPendingSheetId', null);
+      this.$store.commit('setPendingGameOptions', null);
       this.$router.push('/menu');
     },
     onKeyDown(e) {
