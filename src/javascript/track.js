@@ -1,19 +1,8 @@
 import Note from "./note";
 
-// 가짜 jQuery 폴리필 (카운트다운 에러 방지)
-if (typeof window.$ === "undefined") {
-  window.$ = function () {
-    return {
-      circleProgress: function () {},
-      on: function () {},
-      off: function () {},
-    };
-  };
+if (typeof window.$ !== "undefined" && !window.$.isArray) {
+  window.$.isArray = Array.isArray;
 }
-window.$.isArray = Array.isArray;
-window.$.type = function (obj) {
-  return Object.prototype.toString.call(obj).slice(8, -1).toLowerCase();
-};
 
 const MISS_HEALTH_PENALTY = 9;
 

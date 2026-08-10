@@ -2,8 +2,9 @@
   <div class="speed-setup">
     <div class="container" :style="{'--speed': speed}">
       <div class="panel">
-        <h2>Speed Configuration</h2>
-        <p class="subtitle">Set the play speed before starting. Use keys 1 (decrease) and 2 (increase).</p>
+        <h2>배속 설정</h2>
+        <p class="subtitle">게임 시작 전 배속 설정(1:배속 감소, 2:배속 증가) <br>
+          오른쪽에서 미리보기를 참고해주세요..</p>
 
         <div class="center" role="region" aria-label="speed-controls">
           <!-- Slider removed per requirements; keyboard controls used instead -->
@@ -14,7 +15,7 @@
             <button @click="cancel">Cancel</button>
           </div>
 
-          <div class="hint">Press 1 / 2 to decrease/increase speed (min 1.0, max 9.9)</div>
+          <div class="hint">1 / 2 키로 배속 조절 (최소 1.0, 최대 9.9)</div>
         </div>
       </div>
 

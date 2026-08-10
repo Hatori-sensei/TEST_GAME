@@ -10,6 +10,7 @@ export default class Audio {
       dataArray: null,
     };
     this.maxVolume = 0.7;
+    this.effectVolume = 0.5;
     this.fadeTimer = null;
     this.player = null;
     this.mediaSourceNode = null;
@@ -205,7 +206,10 @@ export default class Audio {
   playEffect(name) {
     const url = `/audio/effects/${name}.mp3`;
     const effectPlayer = new window.Audio(url);
-    effectPlayer.volume = 0.5;
+    effectPlayer.volume = Math.min(
+      1,
+      Math.max(0, Number(this.effectVolume) || 0.5)
+    );
     this.safePlay(effectPlayer, "Effect audio play blocked");
   }
 

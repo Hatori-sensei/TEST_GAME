@@ -645,9 +645,15 @@ export default {
       return updatePlay(this.playId, data);
     },
     reportExit(status) {
+      const playTime =
+        this.gameInstance && Number.isFinite(Number(this.gameInstance.playTime))
+          ? Number(this.gameInstance.playTime)
+          : this.instance && Number.isFinite(Number(this.instance.playTime))
+            ? Number(this.instance.playTime)
+            : 0;
       const data = {
         status,
-        playTime: this.instance.playTime,
+        playTime,
         result: this.result,
       };
       this.updatePlay(data);

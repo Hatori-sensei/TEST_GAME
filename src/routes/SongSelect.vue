@@ -78,18 +78,106 @@
         </div>
       </div>
     </div>
+
+    <transition name="modal-fade">
+      <div
+        v-if="showQuickSettings"
+        class="quick-settings-backdrop"
+        @click.self="closeQuickSettings"
+      >
+        <div class="quick-settings-panel blurBackground">
+          <div class="quick-settings-header">
+            <h2>설정</h2>
+            <div class="hint">ESC를 눌러 닫기</div>
+          </div>
+
+          <div class="quick-settings-section">
+            <h3>키,배속 설정</h3>
+            <div class="settings-row">
+              <label>배속</label>
+              <div class="slider-wrap">
+                <vue-slider
+                  :value="quickGameSt.noteSpeed"
+                  :interval="0.1"
+                  :min="1"
+                  :max="9.9"
+                  :contained="true"
+                  :tooltip-formatter="(val) => `${Number(val).toFixed(1)}x`"
+                  @change="onQuickSpeedChange"
+                ></vue-slider>
+              </div>
+              <strong>{{ Number(quickGameSt.noteSpeed).toFixed(1) }}x</strong>
+            </div>
+            <KeyMappings v-model="quickPreference.keyMap"></KeyMappings>
+          </div>
+
+          <div class="quick-settings-section">
+            <h3>사운드 설정</h3>
+            <div class="settings-row">
+              <label>BGM</label>
+              <div class="slider-wrap">
+                <vue-slider
+                  :value="quickSound.bgmVolume"
+                  :interval="0.01"
+                  :min="0"
+                  :max="1"
+                  :contained="true"
+                  :tooltip-formatter="(val) => `${Math.round(Number(val) * 100)}%`"
+                  @change="onBgmVolumeChange"
+                ></vue-slider>
+              </div>
+              <strong>{{ Math.round(quickSound.bgmVolume * 100) }}%</strong>
+            </div>
+            <div class="settings-row">
+              <label>효과음</label>
+              <div class="slider-wrap">
+                <vue-slider
+                  :value="quickSound.effectVolume"
+                  :interval="0.01"
+                  :min="0"
+                  :max="1"
+                  :contained="true"
+                  :tooltip-formatter="(val) => `${Math.round(Number(val) * 100)}%`"
+                  @change="onEffectVolumeChange"
+                ></vue-slider>
+              </div>
+              <strong>{{ Math.round(quickSound.effectVolume * 100) }}%</strong>
+            </div>
+          </div>
+
+          <div class="quick-settings-actions">
+            <button class="settings-btn save" @click="saveQuickSettings">Apply</button>
+            <button class="settings-btn" @click="closeQuickSettings">Close</button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script>
 import Loading from "../components/ui/Loading.vue";
-import { getSheetList, getSongListCached } from "../javascript/db";
+import KeyMappings from "../components/menus/KeyMappings.vue";
+import VueSlider from "vue-slider-component";
+import { getSheetList, getSongListCached, updateUserProfile } from "../javascript/db";
 import { logEvent } from "../helpers/analytics";
 import { resolveSongPreviewRange } from "../javascript/localCatalog";
 
+const DEFAULT_KEY_MAP = {
+  a: "a",
+  s: "s",
+  d: "d",
+  f: "f",
+  " ": " ",
+  j: "j",
+  k: "k",
+  l: "l",
+  ";": ";",
+};
+
 export default {
   name: "SongSelect",
-  components: { Loading },
+  components: { Loading, KeyMappings, VueSlider },
   data() {
     return {
       allSongs: null,
@@ -100,6 +188,17 @@ export default {
       previewStopTimer: null,
       previewFadeOutTimer: null,
       previewToken: 0,
+      showQuickSettings: false,
+      quickGameSt: {
+        noteSpeed: 1,
+      },
+      quickPreference: {
+        keyMap: { ...DEFAULT_KEY_MAP },
+      },
+      quickSound: {
+        bgmVolume: 0.7,
+        effectVolume: 0.5,
+      },
     };
   },
   computed: {
@@ -149,6 +248,7 @@ export default {
     await this.getAllSongs();
     this.songList = this.allSongs || [];
     this.selectSong(0);
+    this.initQuickSettings();
     window.addEventListener('keydown', this.handleKeydown);
   },
   beforeDestroy() {
@@ -159,6 +259,84 @@ export default {
     this.clearPreviewTimer();
   },
   methods: {
+    initQuickSettings() {
+      const profile = this.$store.state.userProfile || {};
+      const gameSt = profile.gameSt || {};
+      const preference = profile.preference || {};
+      const audio = this.$store.state.audio;
+
+      const speed = Number(gameSt.noteSpeed ?? this.$store.state.speedMultiplier ?? 1);
+      this.quickGameSt.noteSpeed = this.clamp(speed, 1, 9.9, 1);
+      this.quickPreference.keyMap = {
+        ...DEFAULT_KEY_MAP,
+        ...(preference.keyMap || {}),
+      };
+
+      const bgmVolume = Number(audio?.maxVolume ?? 0.7);
+      const effectVolume = Number(audio?.effectVolume ?? 0.5);
+      this.quickSound.bgmVolume = this.clamp(bgmVolume, 0, 1, 0.7);
+      this.quickSound.effectVolume = this.clamp(effectVolume, 0, 1, 0.5);
+    },
+    clamp(value, min, max, fallback) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return fallback;
+      return Math.min(max, Math.max(min, num));
+    },
+    openQuickSettings() {
+      this.initQuickSettings();
+      this.showQuickSettings = true;
+      this.$store.state.audio.playEffect("ui/pop");
+    },
+    closeQuickSettings() {
+      this.showQuickSettings = false;
+      this.$store.state.audio.playEffect("ui/loose");
+    },
+    onQuickSpeedChange(value) {
+      this.quickGameSt.noteSpeed = this.clamp(value, 1, 9.9, 1);
+    },
+    onBgmVolumeChange(value) {
+      const next = this.clamp(value, 0, 1, 0.7);
+      this.quickSound.bgmVolume = next;
+      const audio = this.$store.state.audio;
+      if (!audio) return;
+      audio.maxVolume = next;
+      audio.setVolume(next);
+    },
+    onEffectVolumeChange(value) {
+      const next = this.clamp(value, 0, 1, 0.5);
+      this.quickSound.effectVolume = next;
+      const audio = this.$store.state.audio;
+      if (!audio) return;
+      audio.effectVolume = next;
+      audio.playEffect("ui/click2");
+    },
+    async saveQuickSettings() {
+      const profile = this.$store.state.userProfile || {};
+      const gameSt = {
+        ...(profile.gameSt || {}),
+        noteSpeed: this.quickGameSt.noteSpeed,
+      };
+      const preference = {
+        ...(profile.preference || {}),
+        keyMap: { ...this.quickPreference.keyMap },
+      };
+
+      this.$store.commit("setSpeedMultiplier", this.quickGameSt.noteSpeed);
+      this.$store.commit("setUserProfile", {
+        ...profile,
+        gameSt,
+        preference,
+      });
+
+      try {
+        await updateUserProfile({ gameSt, preference });
+      } catch (error) {
+        Logger.warn("quick settings save failed", error);
+      }
+
+      this.$store.state.audio.playEffect("ui/slide2");
+      this.showQuickSettings = false;
+    },
     clearPreviewTimer() {
       if (this.previewStopTimer) {
         clearTimeout(this.previewStopTimer);
@@ -237,6 +415,18 @@ export default {
       }
     },
     handleKeydown(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (this.showQuickSettings) {
+          this.closeQuickSettings();
+        } else {
+          this.openQuickSettings();
+        }
+        return;
+      }
+
+      if (this.showQuickSettings) return;
+
       if (!this.songList || this.songList.length === 0) return;
 
 
@@ -320,6 +510,105 @@ export default {
   padding: 40px;
   gap: 30px;
   box-sizing: border-box;
+}
+
+.quick-settings-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(4, 8, 20, 0.65);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.quick-settings-panel {
+  width: min(920px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 12, 24, 0.92);
+  padding: 24px;
+}
+
+.quick-settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.quick-settings-header h2 {
+  margin: 0;
+}
+
+.quick-settings-header .hint {
+  opacity: 0.65;
+  font-size: 13px;
+}
+
+.quick-settings-section {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 14px;
+}
+
+.quick-settings-section h3 {
+  margin: 0 0 12px;
+  font-size: 17px;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.slider-wrap {
+  width: 100%;
+}
+
+.quick-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.settings-btn {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #eef6ff;
+  background: rgba(20, 34, 60, 0.8);
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.settings-btn.save {
+  background: linear-gradient(90deg, #12a3ff, #36d6ff);
+  color: #03121d;
+  border-color: rgba(255, 255, 255, 0.35);
+  font-weight: 700;
+}
+
+@media only screen and (max-width: 900px) {
+  .quick-settings-panel {
+    padding: 16px;
+  }
+
+  .settings-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
 }
 
 .left-panel,

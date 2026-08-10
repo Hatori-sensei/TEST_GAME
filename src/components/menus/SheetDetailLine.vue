@@ -73,8 +73,14 @@ export default {
       );
     },
     getLengthFormatted(sec) {
-      if (!sec) return "-";
-      return new Date(sec * 1000).toISOString().substr(14, 5);
+      const seconds = Number(sec);
+      if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
+
+      const totalSeconds = Math.floor(seconds);
+      const minutes = Math.floor(totalSeconds / 60);
+      const remainSeconds = totalSeconds % 60;
+
+      return `${String(minutes).padStart(2, "0")}:${String(remainSeconds).padStart(2, "0")}`;
     },
   },
 };
