@@ -8,7 +8,16 @@ export default class Note {
   constructor(vm, game, keyObj, key, x, y = 0, width) {
     this.vm = vm;
     this.game = game;
-    this.keyObj = keyObj;
+    this.keyObj =
+      keyObj && typeof keyObj === "object"
+        ? {
+            ...keyObj,
+            shift:
+              keyObj.shift && typeof keyObj.shift === "object"
+                ? { ...keyObj.shift }
+                : keyObj.shift,
+          }
+        : {};
     this.key = key;
     this.baseX = x;
     this.x = x;
@@ -29,6 +38,26 @@ export default class Note {
     this.tickIntervalMs = 100; // 롱노트 유지 보상 간격
     this.initialJudgeString = null;
     this.visualPos = Number(this.keyObj?.visualPos ?? 0) || 0;
+    this.shiftFromX = null;
+
+    // Resolve shift source once per note instance without mutating source chart data.
+    if (this.keyObj?.shift && typeof this.keyObj.shift === "object") {
+      const shift = this.keyObj.shift;
+      const fromXNum = Number(shift.fromX);
+      if (!Number.isFinite(fromXNum)) {
+        const fromLaneNum = Number(shift.fromLane);
+        if (Number.isFinite(fromLaneNum)) {
+          const fromLaneIndex = Math.trunc(fromLaneNum);
+          const fromTrack = this.game?.dropTrackArr?.[fromLaneIndex];
+          if (fromTrack && Number.isFinite(Number(fromTrack.x))) {
+            this.shiftFromX = Number(fromTrack.x);
+          }
+        }
+      } else {
+        this.shiftFromX = fromXNum;
+      }
+    }
+
     this._configureTiming();
   }
 
@@ -252,14 +281,25 @@ export default class Note {
       this.y = baseY;
     }
 
-    const shift = this.keyObj && this.keyObj.shift;
+    const shift = !this.isLong && this.keyObj && this.keyObj.shift;
     const isShiftNote = !!(shift && typeof shift === "object");
     if (shift && typeof shift === "object") {
-      const fromXNum = Number(shift.fromX);
+      const fromXNum = Number(this.shiftFromX);
       const durationNum = Number(shift.duration);
       const topEntryTravelSec =
         (this.game.checkHitLineY + 150) / Math.max(speed, 1e-6);
-      const defaultStart = this.startTime - topEntryTravelSec;
+      const spawnLeadSecRaw = Number(this.game.noteSpawnLeadSec);
+      const spawnLeadSec =
+        Number.isFinite(spawnLeadSecRaw) && spawnLeadSecRaw > 0
+          ? spawnLeadSecRaw
+          : Number.isFinite(Number(this.game.getNoteSpawnLeadSec?.()))
+          ? Number(this.game.getNoteSpawnLeadSec())
+          : Number.isFinite(Number(this.game.noteDelay)) && Number(this.game.noteDelay) > 0
+          ? Number(this.game.noteDelay)
+          : 1.0;
+      const topEntryStart = this.startTime - topEntryTravelSec;
+      const spawnAlignedStart = this.startTime - Math.max(0.05, spawnLeadSec * 0.85);
+      const defaultStart = Math.max(topEntryStart, spawnAlignedStart);
       const startNumRaw = shift.startTime;
       const startTime =
         Number.isFinite(Number(startNumRaw)) ? Number(startNumRaw) : defaultStart;

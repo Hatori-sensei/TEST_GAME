@@ -9,7 +9,7 @@ export default class Audio {
       bufferLength: null,
       dataArray: null,
     };
-    this.maxVolume = 0.7;
+    this.maxVolume = 0.25;
     this.effectVolume = 0.5;
     this.fadeTimer = null;
     this.player = null;

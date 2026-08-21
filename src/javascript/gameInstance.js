@@ -78,6 +78,14 @@ export default class GameInstance {
     this.howl.volume(this.getConfiguredBgmVolume());
   }
 
+  getNoteSpawnLeadSec() {
+    const speed = Math.max(1e-6, Number(this.noteSpeedPxPerSec) || 1);
+    // Keep notes off-screen initially so they enter from outside the top edge.
+    const hiddenTopPaddingPx = 180;
+    const hitLineY = Math.max(0, Number(this.checkHitLineY) || 0);
+    return (hitLineY + hiddenTopPaddingPx) / speed;
+  }
+
   createTracks(trackNum) {
     this.dropTrackArr = [];
     this.trackNum = trackNum;
@@ -143,6 +151,7 @@ export default class GameInstance {
     this.noteSpeedPxPerSec =
       400 * sessionMultiplier * (this.vm.playbackSpeed || 1);
     this.noteDelay = this.checkHitLineY / this.noteSpeedPxPerSec;
+    this.noteSpawnLeadSec = this.getNoteSpawnLeadSec();
 
     const foundIdx = this.timeArr.findIndex((e) => e.t > this.currentTime);
     this.timeArrIdx = foundIdx !== -1 ? foundIdx : 0;
@@ -540,18 +549,21 @@ export default class GameInstance {
     this.currentGlobalVisualPos = this.getVisualPositionAtTime(this.currentTime);
     this.isReverse = false;
     this.reverseBlend = 0;
-    this.playTime =
-      this.currentTime +
-      (typeof this.noteStartDelay === "number" ? this.noteStartDelay : 0) +
-      1.0;
+    // Spawn lead is based on travel time to judgment line so notes enter naturally.
+    const spawnLeadSec =
+      Number.isFinite(Number(this.noteSpawnLeadSec)) && Number(this.noteSpawnLeadSec) > 0
+        ? Number(this.noteSpawnLeadSec)
+        : this.getNoteSpawnLeadSec();
+    this.playTime = this.currentTime + spawnLeadSec;
   }
 
   async startSong() {
-    const preservedAudioPath = this.audioPath;
-    this.resetPlaying();
-    this.audioPath = preservedAudioPath;
+    clearInterval(this.intervalPlay);
+    this.timeArrIdx = 0;
+    this.dropTrackArr.forEach((track) => (track.noteArr = []));
     this.vm.started = true;
     this.songEndedNotified = false;
+    this.currentHowlId = null;
 
     // Lock the session speed at song start to prevent runtime changes
     const storeSpeed =
@@ -564,29 +576,79 @@ export default class GameInstance {
       storeSpeed !== undefined ? storeSpeed : this.vm.noteSpeed || 1.0;
 
     this.reposition();
-    if (this.audioPath) {
+    if (this.audioPath && !this.howl) {
       try {
-        this.loadAudio(this.audioPath).catch((err) => {
+        await this.loadAudio(this.audioPath).catch((err) => {
           console.error("Audio load failed:", err);
         });
       } catch (err) {
         console.error("Audio load failed:", err);
       }
     }
+    this.noteSpawnLeadSec = this.getNoteSpawnLeadSec();
+
+    // When starting from a non-zero chart offset, skip notes that are too old to be visible.
+    const startTimeSec = Math.max(0, Number(this.startSongAt) || 0);
+    const visibleWindowStart = Math.max(0, startTimeSec - this.noteSpawnLeadSec);
+    const foundStartIdx = Array.isArray(this.timeArr)
+      ? this.timeArr.findIndex((noteObj) => {
+          if (!noteObj || typeof noteObj !== "object") return false;
+          const start = Number(noteObj.startTime ?? noteObj.t ?? 0);
+          const endFromObj = noteObj.endTime;
+          const len = Number(noteObj.l ?? 0);
+          const end =
+            endFromObj !== undefined
+              ? Number(endFromObj)
+              : Number.isFinite(start) && Number.isFinite(len)
+              ? start + len
+              : start;
+          if (!Number.isFinite(start)) return false;
+          // Include notes whose head enters soon, and long notes whose tail can still be visible.
+          return start >= visibleWindowStart || (Number.isFinite(end) && end >= visibleWindowStart);
+        })
+      : -1;
+    const startIdx = foundStartIdx !== -1 ? foundStartIdx : this.timeArr.length;
+    this.timeArrIdx = startIdx;
+
+    // Pre-create notes once at run start so objects stay stable while falling.
+    this.prepareTrackNotesForRun(startIdx);
+
     this.resumeGame(true);
-    // 노트 스폰 딜레이 (음악 시작 후 1초 뒤에 노트 등장)
-    this.noteStartDelay = 1.0;
-    this.intervalPlay = setInterval(this.gameTimingLoop.bind(this), 20);
+  }
+
+  resolvePlayableKey(noteObj) {
+    const fallbackKeys = ["d", "f", "j", "k"];
+    let k = noteObj?.k;
+    if (k === undefined && noteObj?.key !== undefined) {
+      k = fallbackKeys[noteObj.key];
+    }
+    return typeof k === "string" ? k.toLowerCase() : null;
+  }
+
+  prepareTrackNotesForRun(startIdx = 0) {
+    if (!Array.isArray(this.timeArr) || !Array.isArray(this.dropTrackArr)) {
+      return;
+    }
+
+    for (let i = Math.max(0, startIdx); i < this.timeArr.length; i += 1) {
+      const noteObj = this.timeArr[i];
+      if (!noteObj || typeof noteObj !== "object") continue;
+
+      const noteStartTime = Number(noteObj.startTime ?? noteObj.t);
+      if (!Number.isFinite(noteStartTime)) continue;
+
+      const key = this.resolvePlayableKey(noteObj);
+      if (!key) continue;
+
+      this.dropTrackArr.forEach((track) => track.dropNote(key, noteObj));
+    }
+
+    // Runtime spawn loop is disabled after pre-creation.
+    this.timeArrIdx = this.timeArr.length;
   }
 
   async gameTimingLoop() {
     if (this.paused) return;
-
-    // 노트 딜레이 적용: 음악 시작 후 1초 동안은 노트를 스폰하지 않음
-    // (배속 변경 영향을 받지 않도록 절대 시간 기준으로 확인)
-    if (this.noteStartDelay && this.currentTime < this.noteStartDelay) {
-      return;
-    }
 
     while (this.timeArr && this.timeArrIdx < this.timeArr.length) {
       const noteObj = this.timeArr[this.timeArrIdx];
@@ -598,11 +660,7 @@ export default class GameInstance {
 
       if (noteStartTime > this.playTime) break;
 
-      const fallbackKeys = ["d", "f", "j", "k"];
-      let k = noteObj.k;
-      if (k === undefined && noteObj.key !== undefined) {
-        k = fallbackKeys[noteObj.key];
-      }
+      const k = this.resolvePlayableKey(noteObj);
 
       if (k) {
         this.dropTrackArr.forEach((track) => track.dropNote(k, noteObj));
@@ -696,14 +754,14 @@ export default class GameInstance {
     }
 
     let effectiveGimmicks = Array.isArray(song?.gimmicks) ? [...song.gimmicks] : [];
-    if (this.usingFallbackNotes && this.enableRandomGimmicks) {
+    if (this.enableRandomGimmicks) {
       const randomBundle = this._generateRandomFallbackGimmicksAndShifts(
         parsedNotes,
         song,
         this.randomGimmickMode
       );
       parsedNotes = randomBundle.notes;
-      effectiveGimmicks = randomBundle.gimmicks;
+      effectiveGimmicks = [...effectiveGimmicks, ...randomBundle.gimmicks];
       song.gimmicks = effectiveGimmicks;
     }
 
@@ -1051,7 +1109,7 @@ export default class GameInstance {
       const ratio = 0.1 + Math.random() * 0.05;
       const shiftCount = Math.min(
         singleCandidates.length,
-        Math.max(0, Math.floor(singleCandidates.length * ratio))
+        Math.max(1, Math.floor(singleCandidates.length * ratio))
       );
 
       if (shiftCount > 0) {

@@ -104,6 +104,70 @@ export const localCatalog = {
       previewStartSec: 77,
       previewEndSec: 122,
     }),
+    theEmpErroR: createSongTemplate({
+      id: "theEmpErroR",
+      title: "the EmpErroR",
+      artist: "sasakure.UK",
+      subtitle: "sasakure.UK",
+      customCoverUrl: "/assets/covers/the-EmpErroR.jpg",
+      audioPath: "songs/the-EmpErroR.mp3",
+      bgaPath: "videos/the-EmpErroR.mp4",
+      tags: ["local", "theEmpErroR", "bga"],
+      keys: [4],
+      searchTags: ["theEmpErroR", "local"],
+      bpm: 240,
+      length: "2:08",
+      previewStartSec: 81,
+      previewEndSec: 126,
+    }),
+    Mammal: createSongTemplate({
+      id: "Mammal",
+      title: "Mammal",
+      artist: "Teikyou",
+      subtitle: "Teikyou",
+      customCoverUrl: "/assets/covers/mammal.jpg",
+      audioPath: "songs/Mammal.mp3",
+      bgaPath: "videos/Mammal.mp4",
+      tags: ["local", "Mammal", "bga"],
+      keys: [4],
+      searchTags: ["Mammal", "local"],
+      bpm: 190,
+      length: "2:33",
+      previewStartSec: 89,
+      previewEndSec: 134,
+    }),
+    Doit: createSongTemplate({
+      id: "Doit",
+      title: "Do it",
+      artist: "HOUSERULEZ",
+      subtitle: "HOUSERULEZ",
+      customCoverUrl: "/assets/covers/Doit.jpg",
+      audioPath: "songs/Doit.mp3",
+      bgaPath: "videos/Doit.mp4",
+      tags: ["local", "Doit", "bga"],
+      keys: [4],
+      searchTags: ["Doit", "local"],
+      bpm: 129,
+      length: "2:21",
+      previewStartSec: 105,
+      previewEndSec: 150,
+    }),
+    Apollo: createSongTemplate({
+      id: "Apollo",
+      title: "Apollo",
+      artist: "TJ.hangneil",
+      subtitle: "TJ.hangneil",
+      customCoverUrl: "/assets/covers/Apollo.png",
+      audioPath: "songs/Apollo.mp3",
+      bgaPath: "videos/Apollo.mp4",
+      tags: ["local", "Apollo", "bga"],
+      keys: [4],
+      searchTags: ["Apollo", "local"],
+      bpm: 339,
+      length: "2:37",
+      previewStartSec: 105,
+      previewEndSec: 150,
+    }),
   },
   charts: {
     "kamui-sheet-1": createChartTemplate({
@@ -132,6 +196,58 @@ export const localCatalog = {
         { t: 4.4, key: 3 },
       ]),
     }),
+    "theEmpErroR-sheet-1": createChartTemplate({
+      id: "theEmpErroR-sheet-1",
+      songId: "theEmpErroR",
+      title: "sasakure.UK",
+      difficulty: 4,
+      tags: ["theEmpErroR", "local", "bga"],
+      sheet: JSON.stringify([
+        { startTime: 1.0, endTime: 1.6, key: 0 },
+        { t: 2.4, key: 1 },
+        { t: 3.2, key: 2, l: 0.5 },
+        { t: 4.4, key: 3 },
+      ]),
+      }),
+    "Mammal-sheet-1": createChartTemplate({
+      id: "Mammal-sheet-1",
+      songId: "Mammal",
+      title: "Teikyou",
+      difficulty: 4,
+      tags: ["Mammal", "local", "bga"],
+      sheet: JSON.stringify([
+        { startTime: 1.0, endTime: 1.6, key: 0 },
+        { t: 2.4, key: 1 },
+        { t: 3.2, key: 2, l: 0.5 },
+        { t: 4.4, key: 3 },
+      ]),
+    }),
+    "Doit-sheet-1": createChartTemplate({
+      id: "Doit-sheet-1",
+      songId: "Doit",
+      title: "Do it",
+      difficulty: 4,
+      tags: ["Doit", "local", "bga"],
+      sheet: JSON.stringify([
+        { startTime: 1.0, endTime: 1.6, key: 0 },
+        { t: 2.4, key: 1 },
+        { t: 3.2, key: 2, l: 0.5 },
+        { t: 4.4, key: 3 },
+      ]),
+    }),
+    "Apollo-sheet-1": createChartTemplate({
+      id: "Apollo-sheet-1",
+      songId: "Apollo",
+      title: "Apollo",
+      difficulty: 15,
+      tags: ["Apollo", "local", "bga"],
+      sheet: JSON.stringify([
+        { startTime: 1.0, endTime: 1.6, key: 0 },
+        { t: 2.4, key: 1 },
+        { t: 3.2, key: 2, l: 0.5 },
+        { t: 4.4, key: 3 },
+      ]),
+    }),
   },
 };
 
@@ -140,7 +256,14 @@ export function getSongListCatalog() {
 }
 
 export function getSongById(songId) {
-  return localCatalog.songs[songId] ?? null;
+  if (!songId) return null;
+
+  const byKey = localCatalog.songs[songId];
+  if (byKey) return byKey;
+
+  return (
+    Object.values(localCatalog.songs).find((song) => song.id === songId) ?? null
+  );
 }
 
 export function getChartById(chartId) {
