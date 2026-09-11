@@ -1,19 +1,8 @@
 import Note from "./note";
 
-// 가짜 jQuery 폴리필 (카운트다운 에러 방지)
-if (typeof window.$ === "undefined") {
-  window.$ = function () {
-    return {
-      circleProgress: function () {},
-      on: function () {},
-      off: function () {},
-    };
-  };
+if (typeof window.$ !== "undefined" && !window.$.isArray) {
+  window.$.isArray = Array.isArray;
 }
-window.$.isArray = Array.isArray;
-window.$.type = function (obj) {
-  return Object.prototype.toString.call(obj).slice(8, -1).toLowerCase();
-};
 
 const MISS_HEALTH_PENALTY = 9;
 
@@ -91,10 +80,11 @@ export default class DropTrack {
     if (activeNoteIdx === -1) return;
 
     const note = this.noteArr[activeNoteIdx];
-    const noteBottomY = note.y + note.singleNoteHeight;
-    const diffPx = Math.abs(this.game.checkHitLineY - noteBottomY);
+    const judgeBaseY = Number.isFinite(Number(note.judgeY)) ? note.judgeY : note.y;
+    const judgeReferenceY = judgeBaseY + note.singleNoteHeight;
+    const diffPx = Math.abs(this.game.checkHitLineY - judgeReferenceY);
     const diffMs = (diffPx / this.game.noteSpeedPxPerSec) * 1000;
-    const isEarly = noteBottomY < this.game.checkHitLineY;
+    const isEarly = judgeReferenceY < this.game.checkHitLineY;
 
     const HIT_WINDOW = 175;
     const EARLY_MISS_WINDOW = 300;
@@ -292,8 +282,10 @@ export default class DropTrack {
         continue;
       }
 
-      const noteBottomY = note.y + (note.height || 15);
-      const passedPx = noteBottomY - this.game.checkHitLineY;
+      const singleHeight = note.singleNoteHeight || note.height || 15;
+      const judgeBaseY = Number.isFinite(Number(note.judgeY)) ? note.judgeY : note.y;
+      const judgeReferenceY = judgeBaseY + singleHeight;
+      const passedPx = judgeReferenceY - this.game.checkHitLineY;
       const passedMs = (passedPx / speed) * 1000;
 
       // 판정 범위를 지나쳐서 떨어지면 완벽하게 놓친 것으로 처리 (Miss)
@@ -313,11 +305,7 @@ export default class DropTrack {
 
 export class HitEffect {
   constructor(vm, game) {
-    this.particles = [];
     this.rings = [];
-    this.flares = [];
-    this.cores = [];
-    this.shards = [];
     this.game = game;
   }
 
@@ -327,23 +315,6 @@ export class HitEffect {
     const color = this.getColor(judge);
     const accent = judge === "MAX 100%" ? "#7af4ff" : "#ffffff";
 
-    this.cores.push({ x, y, radius: 8, alpha: 1, color: accent });
-    this.flares.push({
-      x: mX - 5,
-      y: mY,
-      width: mWidth + 6,
-      color,
-      alpha: 0.9,
-      type: "vertical",
-    });
-    this.flares.push({
-      x: x,
-      y: y,
-      color,
-      alpha: 1,
-      scale: 0.28,
-      type: "horizontal",
-    });
     this.rings.push({
       x,
       y,
@@ -363,24 +334,6 @@ export class HitEffect {
       speed: 14,
     });
 
-    for (let i = 0; i < 24; i++) {
-      const angle = ((Math.PI * 2) / 24) * i + Math.random() * 0.1;
-      const speed = Math.random() * 10 + 8;
-      this.particles.push(new ExplodingParticle(x, y, color, angle, speed));
-    }
-
-    for (let i = 0; i < 6; i++) {
-      const angle = ((Math.PI * 2) / 6) * i + Math.PI / 12;
-      this.shards.push({
-        x,
-        y,
-        angle,
-        speed: 2.5 + i * 0.35,
-        alpha: 1,
-        length: 14 + i * 1.5,
-        color,
-      });
-    }
   }
 
   // HitEffect 클래스 내부
@@ -403,56 +356,6 @@ export class HitEffect {
 
     ctx.globalCompositeOperation = "lighter";
 
-    for (let i = this.cores.length - 1; i >= 0; i--) {
-      let c = this.cores[i];
-      ctx.globalAlpha = c.alpha;
-      ctx.beginPath();
-      ctx.fillStyle = c.color;
-      ctx.shadowBlur = 18;
-      ctx.shadowColor = c.color;
-      ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      c.radius += 4;
-      c.alpha -= 0.1;
-      if (c.alpha <= 0) this.cores.splice(i, 1);
-    }
-
-    for (let i = this.flares.length - 1; i >= 0; i--) {
-      let f = this.flares[i];
-      ctx.globalAlpha = f.alpha;
-
-      if (f.type === "vertical") {
-        const grad = ctx.createLinearGradient(0, f.y, 0, 0);
-        grad.addColorStop(0, f.color);
-        grad.addColorStop(0.4, "rgba(0,0,0,0.08)");
-        grad.addColorStop(1, "transparent");
-        ctx.fillStyle = grad;
-        ctx.fillRect(f.x, 0, f.width, f.y);
-        f.alpha -= 0.14;
-      } else if (f.type === "horizontal") {
-        const width = Math.max(120, f.scale * 170);
-        const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, width);
-        grad.addColorStop(0, "rgba(255,255,255,0.85)");
-        grad.addColorStop(0.24, f.color);
-        grad.addColorStop(0.6, "rgba(255,255,255,0.06)");
-        grad.addColorStop(1, "transparent");
-        ctx.fillStyle = grad;
-
-        ctx.save();
-        ctx.translate(f.x, f.y);
-        ctx.scale(1, 0.12);
-        ctx.beginPath();
-        ctx.arc(0, 0, width, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        f.scale += 1.2;
-        f.alpha -= 0.15;
-      }
-      if (f.alpha <= 0) this.flares.splice(i, 1);
-    }
-
     for (let i = this.rings.length - 1; i >= 0; i--) {
       let r = this.rings[i];
       ctx.globalAlpha = r.alpha;
@@ -471,67 +374,6 @@ export class HitEffect {
       if (r.alpha <= 0) this.rings.splice(i, 1);
     }
 
-    for (let i = this.shards.length - 1; i >= 0; i--) {
-      const s = this.shards[i];
-      ctx.globalAlpha = s.alpha;
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = 3;
-      ctx.shadowBlur = 16;
-      ctx.shadowColor = s.color;
-      ctx.beginPath();
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(
-        s.x + Math.cos(s.angle) * s.length,
-        s.y + Math.sin(s.angle) * s.length
-      );
-      ctx.stroke();
-
-      s.x += Math.cos(s.angle) * s.speed;
-      s.y += Math.sin(s.angle) * s.speed;
-      s.alpha -= 0.04;
-      s.length *= 0.96;
-      if (s.alpha <= 0) this.shards.splice(i, 1);
-    }
-
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      this.particles[i].draw(ctx);
-      if (this.particles[i].alpha <= 0) this.particles.splice(i, 1);
-    }
-
     ctx.restore();
-  }
-}
-
-class ExplodingParticle {
-  constructor(x, y, color, angle, speed) {
-    this.x = x;
-    this.y = y;
-    this.color = color;
-    this.speedX = Math.cos(angle) * speed;
-    this.speedY = Math.sin(angle) * speed;
-    this.alpha = 1;
-    this.decay = Math.random() * 0.05 + 0.03;
-  }
-
-  draw(ctx) {
-    ctx.globalAlpha = this.alpha;
-    ctx.strokeStyle = this.color;
-    ctx.lineWidth = 4;
-    ctx.lineCap = "round";
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = this.color;
-
-    ctx.beginPath();
-    ctx.moveTo(this.x, this.y);
-    ctx.lineTo(this.x - this.speedX * 2.5, this.y - this.speedY * 2.5);
-    ctx.stroke();
-
-    this.x += this.speedX;
-    this.y += this.speedY;
-
-    this.speedX *= 0.88;
-    this.speedY *= 0.88;
-
-    this.alpha -= this.decay;
   }
 }
