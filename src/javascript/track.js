@@ -1,5 +1,7 @@
 import Note from "./note";
 
+//바꿈
+
 if (typeof window.$ !== "undefined" && !window.$.isArray) {
   window.$.isArray = Array.isArray;
 }
