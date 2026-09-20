@@ -3,6 +3,24 @@ const RELEASE_BREAK_EARLY_MS = 175;
 const RELEASE_MAX_ONE_EARLY_MS = 150;
 const RELEASE_MAX_ONE_LATE_MS = 250;
 const SHIFT_SPEED_MULTIPLIER = 1.8;
+const NOTE_INSET_PX = 4;
+
+// Outer lanes ice-white, inner lanes cyan, gimmick (shift) notes amber.
+const NOTE_PALETTES = {
+  outer: { main: "#dcefff", light: "#ffffff", dark: "#6f93b0" },
+  inner: { main: "#19d3ff", light: "#c4f5ff", dark: "#0a7fa6" },
+  shift: { main: "#ffb400", light: "#ffe6a0", dark: "#9a6400" },
+  missed: {
+    main: "rgba(200, 205, 212, 0.5)",
+    light: "rgba(232, 236, 240, 0.6)",
+    dark: "rgba(150, 156, 164, 0.45)",
+  },
+  failedSingle: {
+    main: "rgba(100, 100, 100, 0.3)",
+    light: "rgba(120, 120, 120, 0.3)",
+    dark: "rgba(80, 80, 80, 0.3)",
+  },
+};
 
 export default class Note {
   constructor(vm, game, keyObj, key, x, y = 0, width) {
@@ -25,7 +43,12 @@ export default class Note {
     this.judgeY = y;
     this.width = width;
     this.ctx = vm.ctx;
+    // noteFailed only means "done, remove me from the track's array" — it is set
+    // both on a real miss and on a normal long-note release. `missed` is the
+    // actual pass/fail signal; check that, not noteFailed, to tell if this note
+    // was actually missed.
     this.noteFailed = false;
+    this.missed = false;
     this.singleNoteHeight = 30; // 큼직한 노트 크기 유지
     this.isLong = false;
     this.startTime = 0;
@@ -74,22 +97,16 @@ export default class Note {
     this.isLong = this.type === "long";
   }
 
-  getHitErrorMs() {
-    return Math.abs((this.game.currentTime - this.startTime) * 1000);
-  }
-
-  judge() {
-    const errorMs = this.getHitErrorMs();
-    if (errorMs <= 50) return "MAX 100%";
-    if (errorMs <= 100) return "MAX 90%";
-    if (errorMs <= 150) return "MAX 50%";
-    return "Miss";
-  }
-
   // 🚨 노트를 안 치고 일정 시간 안에 판정선을 지나면 자동으로 실행되는 미스 처리
   missNote() {
-    if (this.noteFailed) return;
-    this.noteFailed = true;
+    if (this.noteFailed || this.missed) return;
+    // Long notes stay on screen (grey) and scroll off; single notes are removed.
+    if (this.isLong) {
+      this.holdCompleted = true;
+    } else {
+      this.noteFailed = true;
+    }
+    this.missed = true;
     this.vm.result.marks.miss += 1;
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(0);
@@ -139,15 +156,6 @@ export default class Note {
     this.noteFailed = true;
   }
 
-  _getBaseJudgePercent(errorMs) {
-    if (errorMs <= 41.67) return 100;
-    if (errorMs <= 75.0) return 99 - ((errorMs - 41.67) / 33.33) * 9;
-    if (errorMs <= 108.33) return 89 - ((errorMs - 75.0) / 33.33) * 19;
-    if (errorMs <= 141.67) return 69 - ((errorMs - 108.33) / 33.33) * 59;
-    if (errorMs <= 175.0) return 9 - ((errorMs - 141.67) / 33.33) * 8;
-    return 0;
-  }
-
   _applyLongReleaseJudge(judgeText, judgePercent) {
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(judgePercent);
@@ -158,7 +166,7 @@ export default class Note {
 
     if (judgeText === "MAX 100%") {
       this.vm.result.marks.perfect += 1;
-      this.vm.health = Math.min(100, this.vm.health + 5);
+      this.vm.health = Math.min(100, this.vm.health + 3);
       const multiplier = this.vm.result.feverMultiplier || 1;
       this.vm.result.combo += multiplier;
       this.vm.result.maxCombo = Math.max(
@@ -174,6 +182,7 @@ export default class Note {
         this.vm.result.maxCombo || 0
       );
     } else {
+      this.missed = true;
       this.vm.result.marks.miss += 1;
       this.vm.result.combo = 0;
       this.vm.result.feverMultiplier = 1;
@@ -205,7 +214,9 @@ export default class Note {
     // 너무 빨리 떼면 BREAK
     if (releaseDeltaMs < -RELEASE_BREAK_EARLY_MS) {
       this._applyLongReleaseJudge("BREAK", 0);
-      this.completeLongHold();
+      // Keep the note alive (grey) so it scrolls off instead of vanishing.
+      this.holding = false;
+      this.holdCompleted = true;
       return;
     }
 
@@ -263,6 +274,42 @@ export default class Note {
         this._applyHoldTick();
       }
     }
+  }
+
+  _getPalette(isShiftNote, isFailed) {
+    if (this.missed) return NOTE_PALETTES.missed;
+    if (isFailed) return NOTE_PALETTES.failedSingle;
+    if (isShiftNote) return NOTE_PALETTES.shift;
+    const outer = this.key === "d" || this.key === "k";
+    return outer ? NOTE_PALETTES.outer : NOTE_PALETTES.inner;
+  }
+
+  _drawNoteHead(pal, yTop = this.y) {
+    const ctx = this.ctx;
+    const x = this.x + NOTE_INSET_PX;
+    const w = this.width - NOTE_INSET_PX * 2;
+    const y = yTop;
+    const h = this.singleNoteHeight;
+    ctx.fillStyle = pal.main;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = pal.light;
+    ctx.fillRect(x, y, w, 5);
+    ctx.fillRect(x, y + h - 3, w, 3);
+    ctx.fillStyle = pal.dark;
+    ctx.fillRect(x, y + 5, 2, h - 8);
+    ctx.fillRect(x + w - 2, y + 5, 2, h - 8);
+  }
+
+  _drawLongBody(pal, bodyTop, bodyHeight) {
+    const ctx = this.ctx;
+    const x = this.x + NOTE_INSET_PX;
+    const w = this.width - NOTE_INSET_PX * 2;
+    ctx.fillStyle = pal.main;
+    ctx.globalAlpha = 0.4;
+    ctx.fillRect(x, bodyTop, w, bodyHeight);
+    ctx.globalAlpha = 1;
+    ctx.fillRect(x, bodyTop, 3, bodyHeight);
+    ctx.fillRect(x + w - 3, bodyTop, 3, bodyHeight);
   }
 
   update() {
@@ -355,26 +402,21 @@ export default class Note {
       const bodyHeight = Math.max(0, this.duration * speed);
       const bodyTop = this.y - bodyHeight;
       const canvasHeight = this.game.canvas.height;
+      if (this.missed && this.holdCompleted && bodyTop > canvasHeight + 150) {
+        this.noteFailed = true;
+      }
       const isVisible = bodyTop <= canvasHeight + 150 && this.y >= -150;
       if (isVisible) {
-        const color = this.noteFailed
-          ? "rgba(100, 100, 100, 0.3)"
-          : isShiftNote
-          ? "#3ad5ff"
-          : "#ffaa00";
-        this.ctx.fillStyle = color;
-        this.ctx.fillRect(this.x, bodyTop, this.width, bodyHeight);
-        this.ctx.fillRect(this.x, this.y, this.width, this.singleNoteHeight);
+        const pal = this._getPalette(isShiftNote, false);
+        this._drawLongBody(pal, bodyTop, bodyHeight);
+        // Release marker: a second note block at the tail. Its bottom edge reaches
+        // the judgment line exactly at endTime, i.e. when the key should be let go.
+        this._drawNoteHead(pal, bodyTop);
+        this._drawNoteHead(pal);
       }
     } else {
       if (this.y >= -150 && this.y <= this.game.canvas.height + 150) {
-        const color = this.noteFailed
-          ? "rgba(100, 100, 100, 0.3)"
-          : isShiftNote
-          ? "#58e6ff"
-          : "#ffcc00";
-        this.ctx.fillStyle = color;
-        this.ctx.fillRect(this.x, this.y, this.width, this.singleNoteHeight);
+        this._drawNoteHead(this._getPalette(isShiftNote, this.noteFailed));
       }
     }
   }

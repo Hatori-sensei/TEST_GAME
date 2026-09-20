@@ -211,9 +211,6 @@ export const store = new Vuex.Store({
       const allowed = ["off", "speed", "lane", "both"];
       state.randomGimmickMode = allowed.includes(mode) ? mode : "off";
     },
-    setRandomGimmicksEnabled(state, val) {
-      state.randomGimmickMode = Boolean(val) ? "both" : "off";
-    },
     async toggleFullscreen(state) {
       state.isFullscreen = document.fullscreen;
       if (state.isFullscreen) {

@@ -158,9 +158,6 @@ export default {
       const avg = this.result.totalPercentage / totalCount;
       return this._truncateDown(avg, 6);
     },
-    getDisplayedAccuracy() {
-      return this._truncateDown(this.getTotalAccuracySixDecimals(), 2);
-    },
     setTotalNoteCount(totalCount) {
       const safeCount = Math.max(1, Number(totalCount) || 1);
       this.totalNoteCount = safeCount;

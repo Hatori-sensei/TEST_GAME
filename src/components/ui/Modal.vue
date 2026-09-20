@@ -140,15 +140,22 @@ export default {
 .modal-header {
   color: #ffffff;
   justify-content: space-between;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .modal-footer {
-  background: rgba(114, 114, 114, 0.4);
+  background: transparent;
+  border-top: 1px solid var(--dm-cyan-dim);
   justify-content: flex-end;
 }
 
 .modal-darker {
-  background: rgba(114, 114, 114, 0.4);
+  background: rgba(25, 211, 255, 0.07);
+  border-bottom: 1px solid var(--dm-cyan-dim);
 }
 
 .modal-body {

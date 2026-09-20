@@ -21,13 +21,15 @@
       <div style="font-size: 0.5em;" v-if="vm.fps && vm.instance.fps">
         {{ vm.instance.fps }} FPS
       </div>
-      <div style="font-size: 0.5em;">
+      <div class="score-acc">
         <ICountUp
           :endVal="vm.percentage"
           :options="{ decimalPlaces: 2, duration: 1 }"
         />%
       </div>
+      <div class="score-label">SCORE</div>
       <ICountUp
+        class="score-num"
         :endVal="vm.result.score"
         :options="{ decimalPlaces: 0, duration: 1 }"
       />
@@ -72,14 +74,37 @@ export default {
 <style scoped>
 .score {
   position: fixed;
-  bottom: 10px;
-  left: 15px;
-  font-size: 3.5em;
-  opacity: 0.5;
-  text-shadow: 0 0 3px rgba(0, 0, 0, 0.315);
-  font-family: "Dosis", sans-serif;
+  bottom: 24px;
+  left: 28px;
+  padding: 6px 26px 8px 16px;
+  border-left: 4px solid var(--dm-cyan);
+  background: linear-gradient(90deg, rgba(4, 8, 16, 0.85), rgba(4, 8, 16, 0));
+  font-family: var(--dm-font-display);
+  font-style: italic;
   display: flex;
   flex-direction: column;
+}
+
+.score-acc {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--dm-cyan);
+  letter-spacing: 0.04em;
+}
+
+.score-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  color: var(--dm-muted);
+  margin-top: 4px;
+}
+
+.score-num {
+  font-size: 3.2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
 }
 
 .performanceWarning {

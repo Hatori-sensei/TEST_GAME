@@ -1,123 +1,118 @@
 <template>
-  <div>
-    <v-bar class="fullPage">
-      <div v-if="sheet">
-        <PageBackground
-          songSrc="https://assets.rhythm-plus.com/bgm/result.mp3"
-          :imageSrc="sheet.image"
-          :showNav="false"
-        ></PageBackground>
-        <div class="blurFilter">
-          <div class="center_logo darker flex_hori">
-            <div class="scoreCircle" ref="resultDiv">
-              <VueCircle
-                :progress="result.result.percentage"
-                :size="windowWidth > 1000 ? 260 : 180"
-                :fill="{ gradient }"
-                empty-fill="rgba(100, 100, 100, .5)"
-                :thickness="10"
-                :start-angle="(-1 / 2) * Math.PI"
-                insert-mode="append"
-                :show-percent="false"
-              >
-                <div class="circleBg"></div>
-                <div class="score" :style="scoreShadow">{{ result.rank }}</div>
-                <div style="margin-top: -20px; transform: translateZ(20px);">
-                  <ICountUp
-                    :endVal="result.result.percentage"
-                    :options="{ decimalPlaces: 2 }"
-                  />%
-                </div>
-              </VueCircle>
-            </div>
+  <div class="result-page">
+    <div class="rs-bg" :style="bgStyle"></div>
+    <div class="rs-lines"></div>
+    <div class="rs-shade"></div>
 
-            <div class="rightScore">
-              <div>
-                Score
-                <div
-                  class="markChip acheivementChip highScoreChip"
-                  v-if="newRecord"
-                >
-                  New Record
-                </div>
+    <header class="rs-top">
+      <span class="slashes">///</span>
+      <span>RESULT</span>
+    </header>
+
+    <div class="rs-layout" v-if="sheet && result">
+      <section class="rs-left">
+        <div class="rs-jacket-frame">
+          <div class="rs-jacket">
+            <img v-if="cover" :src="cover" class="rs-art" />
+            <div v-else class="rs-art rs-art-empty"></div>
+          </div>
+        </div>
+
+        <div class="rs-title-block">
+          <h1 class="rs-title">{{ sheet.song.title }}</h1>
+          <p class="rs-artist">{{ sheet.song.artist }}</p>
+        </div>
+
+        <div class="rs-chips" v-if="chips.length">
+          <span class="rs-chip" v-for="chip in chips" :key="chip.label">
+            <small>{{ chip.label }}</small>{{ chip.value }}
+          </span>
+        </div>
+      </section>
+
+      <section class="rs-right">
+        <div class="rs-main">
+          <div class="rs-rank" :style="{ color: rankColor, textShadow: rankGlow }">
+            {{ result.rank }}
+          </div>
+          <div class="rs-figures">
+            <div class="rs-figure">
+              <span class="rs-figure-label">ACCURACY</span>
+              <span class="rs-figure-value acc">
                 <ICountUp
-                  style="font-size: 2.7em; display: block;"
+                  :endVal="result.result.percentage"
+                  :options="{ decimalPlaces: 2 }"
+                />%
+              </span>
+            </div>
+            <div class="rs-figure">
+              <span class="rs-figure-label">
+                SCORE
+                <span class="rs-tag rs-tag-record" v-if="newRecord">NEW RECORD</span>
+              </span>
+              <span class="rs-figure-value score">
+                <ICountUp
                   :endVal="result.result.score"
                   :options="{ decimalPlaces: 0 }"
                 />
-              </div>
-              <div>
-                Max Combo -
+              </span>
+            </div>
+            <div class="rs-figure">
+              <span class="rs-figure-label">
+                MAX COMBO
+                <span class="rs-tag rs-tag-combo" v-if="result.isFullCombo">FULL COMBO</span>
+              </span>
+              <span class="rs-figure-value combo">
                 <ICountUp
                   :endVal="result.result.maxCombo"
                   :options="{ decimalPlaces: 0 }"
                 />
-                <div
-                  class="markChip acheivementChip comboChip"
-                  v-if="result.isFullCombo"
-                >
-                  Full Combo
-                </div>
-              </div>
+              </span>
             </div>
-
-            <div class="rightScore judgePanel" style="text-align: left;">
-              <div class="judgeColumn">
-                <div class="judgeHeader">Summary</div>
-                <div v-for="entry in summaryJudgeEntries" :key="entry.label">
-                  <div class="markChip" :class="entry.className">{{ entry.label }}</div>
-                  <ICountUp :endVal="entry.value" :options="{ decimalPlaces: 0 }" />
-                </div>
-              </div>
-              <div class="judgeColumn judgeDetailColumn">
-                <div class="judgeHeader">Detailed</div>
-                <div v-for="entry in detailedJudgeEntries" :key="entry.label">
-                  <div class="markChip" :class="entry.className">{{ entry.label }}</div>
-                  <ICountUp :endVal="entry.value" :options="{ decimalPlaces: 0 }" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- song section -->
-          <div class="song_item_sec">
-            <div class="detail">
-              <div class="title">{{ sheet.song.title }}</div>
-              <div>{{ sheet.song.artist }}</div>
-            </div>
-            <SheetDetailLine :sheet="sheet" :compact="true"></SheetDetailLine>
-          </div>
-
-          <!-- profile section -->
-          <div class="user_sec">
-            <UserProfileCard
-              v-if="
-                $store.state.currentUser &&
-                result.uid === $store.state.currentUser.uid
-              "
-              :extend="true"
-              :oldProfile="oldProfileInfo"
-            />
-            <UserProfileCard
-              v-else-if="overrideProfile"
-              :extend="true"
-              :overrideProfile="overrideProfile"
-            />
           </div>
         </div>
+
+        <div class="rs-judges">
+          <div class="rs-judge-col">
+            <div class="rs-judge-head">SUMMARY</div>
+            <div
+              class="rs-row"
+              :class="entry.className"
+              v-for="entry in summaryJudgeEntries"
+              :key="entry.label"
+            >
+              <span class="rs-row-label">{{ entry.label }}</span>
+              <ICountUp :endVal="entry.value" :options="{ decimalPlaces: 0 }" />
+            </div>
+          </div>
+          <div class="rs-judge-col rs-judge-detail">
+            <div class="rs-judge-head">DETAILED</div>
+            <div
+              class="rs-row small"
+              :class="entry.className"
+              v-for="entry in detailedJudgeEntries"
+              :key="entry.label"
+            >
+              <span class="rs-row-label">{{ entry.label }}</span>
+              <ICountUp :endVal="entry.value" :options="{ decimalPlaces: 0 }" />
+            </div>
+          </div>
+        </div>
+
         <div class="btn_sec">
-          <div class="btn-action btn-dark" @click="replay">
+          <div class="btn-action btn-dark rs-btn rs-btn-main" @click="replay">
             <v-icon name="redo" />
             <span>Replay</span>
           </div>
-          <div class="btn-action btn-dark" @click="toMenu">
+          <div class="btn-action btn-dark rs-btn" @click="toMenu">
             <v-icon name="arrow-right" />
             <span>Continue</span>
           </div>
         </div>
-      </div>
-      <Loading :show="!sheet || !result">Syncing Results...</Loading>
-    </v-bar>
+      </section>
+    </div>
+
+    <Loading :show="!sheet || !result">Syncing Results...</Loading>
 
     <!-- level up modal -->
     <Modal
@@ -149,9 +144,6 @@
 </template>
 
 <script>
-import PageBackground from "../components/common/PageBackground.vue";
-import UserProfileCard from "../components/common/UserProfileCard.vue";
-import SheetDetailLine from "../components/menus/SheetDetailLine.vue";
 import Loading from "../components/ui/Loading.vue";
 import Modal from "../components/ui/Modal.vue";
 import {
@@ -161,19 +153,13 @@ import {
   getUserProfile,
 } from "../javascript/db";
 import ICountUp from "vue-countup-v2";
-import VueCircle from "vue2-circle-progress/src/index.vue";
-import VanillaTilt from "vanilla-tilt";
 
 export default {
   name: "Result",
   components: {
-    PageBackground,
     ICountUp,
-    VueCircle,
     Loading,
-    UserProfileCard,
     Modal,
-    SheetDetailLine,
   },
   data() {
     return {
@@ -236,33 +222,36 @@ export default {
             : "good",
       }));
     },
-    gradient() {
-      switch (this.result.rank) {
-        case "S":
-          return ["#ff9c5f", "yellow"];
-        case "A":
-          return ["#12c2e9", "#c471ed", "#f64f59"];
-        case "B":
-          return ["#00b09b", "#96c93d"];
-        case "C":
-          return ["#8360c3", "#2ebf91"];
-        case "D":
-          return ["darkorange", "#ffab2d"];
-        case "F":
-          return ["#EB5757", "#000000"];
-        default:
-          return ["#00b09b", "#96c93d"];
-      }
+    // song info lives in chart.song
+    cover() {
+      return (this.sheet && this.sheet.song && this.sheet.song.customCoverUrl) || "";
     },
-    scoreShadow() {
-      const g = this.gradient;
-      return {
-        color: "#ffffff",
-        "text-shadow": `${g[0]} 0px 0px 20px, ${g[1]} 0px 0px 30px, ${
-          g[2] ?? g[1]
-        } 0px 0px 40px,
-    ${g[0]} 0px 0px 50px, ${g[1]} 0px 0px 75px`,
+    bgStyle() {
+      return this.cover ? { backgroundImage: `url(${this.cover})` } : {};
+    },
+    chips() {
+      const s = this.sheet;
+      if (!s) return [];
+      const out = [];
+      const keys = String(Array.isArray(s.keys) ? s.keys[0] : s.keys ?? "").replace(/\D/g, "");
+      if (keys) out.push({ label: "MODE", value: `${keys}B` });
+      if (s.difficulty) out.push({ label: "LV", value: s.difficulty });
+      if (s.song && s.song.bpm) out.push({ label: "BPM", value: s.song.bpm });
+      return out;
+    },
+    rankColor() {
+      const colors = {
+        S: "#ffb400",
+        A: "#19d3ff",
+        B: "#7ee8b0",
+        C: "#c4f5ff",
+        D: "#ff7a2f",
+        F: "#ff3b5c",
       };
+      return colors[this.result && this.result.rank] || "#ffffff";
+    },
+    rankGlow() {
+      return `0 0 40px ${this.rankColor}66`;
     },
   },
   watch: {},
@@ -286,19 +275,6 @@ export default {
     window.onresize = () => {
       this.windowWidth = window.innerWidth;
     };
-
-    if (
-      navigator.userAgent.indexOf("Safari") === -1 ||
-      navigator.userAgent.indexOf("Chrome") !== -1
-    ) {
-      // add tilt effect on non-safari browsers
-      this.$nextTick(() => {
-        VanillaTilt.init(this.$refs.resultDiv, {
-          max: 20,
-          scale: 1.1,
-        });
-      });
-    }
 
     if (this.result.uid !== this.$store.state.currentUser.uid) {
       this.overrideProfile = await getUserProfile(this.result.uid);
@@ -343,257 +319,390 @@ export default {
 </script>
 
 <style scoped>
-.flex_hori {
-  justify-content: space-evenly;
+.result-page {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--dm-bg);
+  color: var(--dm-text);
+  font-family: var(--dm-font-body);
 }
-.center_logo {
-  background: rgba(0, 0, 0, 0.4);
-  height: 20vh;
-  width: 100vw;
-  animation: none;
+
+.rs-bg {
+  position: absolute;
+  top: -8%;
+  left: -8%;
+  width: 116%;
+  height: 116%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(30px) brightness(0.26) saturate(0.85);
 }
-.blurFilter {
-  z-index: 0;
+
+.rs-lines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    115deg,
+    rgba(25, 211, 255, 0.05) 0,
+    rgba(25, 211, 255, 0.05) 1px,
+    transparent 1px,
+    transparent 16px
+  );
 }
-.darker {
-  backdrop-filter: blur(50px);
-  -webkit-backdrop-filter: blur(50px);
+
+.rs-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(4, 6, 12, 0.9), rgba(4, 6, 12, 0.4) 55%, rgba(4, 6, 12, 0.85));
 }
-.scoreCircle {
-  transform-style: preserve-3d;
-}
-.score {
-  font-size: 10em;
-  margin-top: -20px;
-  transform: translateZ(40px);
-}
-.rightScore {
-  text-align: left;
-  font-size: 1.2em;
-  width: 25%;
-}
-.judgePanel {
-  display: flex;
-  gap: 18px;
-  align-items: flex-start;
-}
-.judgeColumn {
-  min-width: 160px;
-}
-.judgeDetailColumn {
-  max-height: 320px;
-  overflow-y: auto;
-  padding-right: 6px;
-}
-.judgeHeader {
-  font-size: 0.95em;
-  opacity: 0.7;
-  margin: 0 0 8px 6px;
-}
-.circleBg {
+
+/* ---------- top bar ---------- */
+.rs-top {
   position: absolute;
   top: 0;
   left: 0;
-  height: 260px;
-  width: 260px;
-  background-color: rgb(41, 41, 41);
-  border-radius: 50%;
-  display: inline-block;
-  z-index: -1;
+  right: 0;
+  height: 60px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 48px;
+  border-bottom: 1px solid var(--dm-cyan-dim);
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.9), rgba(4, 6, 12, 0.4));
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: 0.08em;
 }
-.markChip {
-  background: #ffab2d;
-  display: inline-block;
-  padding: 0px 10px;
-  color: rgba(255, 255, 255, 0.8);
-  border-radius: 50px;
-  width: 96px;
+
+.rs-top .slashes {
+  color: var(--dm-cyan);
+  letter-spacing: -0.05em;
+}
+
+/* ---------- layout ---------- */
+.rs-layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  padding: 96px 56px 40px;
+  gap: 64px;
+  box-sizing: border-box;
+}
+
+.rs-left {
+  flex: 0 0 min(34%, 480px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rs-right {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+/* ---------- jacket / title ---------- */
+.rs-jacket-frame {
+  width: min(100%, 38vh);
+  aspect-ratio: 1 / 1;
+  padding: 2px;
+  background: linear-gradient(135deg, var(--dm-cyan) 0%, rgba(25, 211, 255, 0.15) 45%, var(--dm-cyan) 100%);
+  clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 30px 100%, 0 calc(100% - 30px));
+}
+
+.rs-jacket {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  clip-path: polygon(0 0, calc(100% - 29px) 0, 100% 29px, 100% 100%, 29px 100%, 0 calc(100% - 29px));
+}
+
+.rs-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rs-art-empty {
+  background: linear-gradient(135deg, #0b1a2c, #04060c);
+}
+
+.rs-title-block {
+  border-left: 5px solid var(--dm-cyan);
+  padding-left: 16px;
+}
+
+.rs-title {
+  margin: 0;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: clamp(34px, 5.4vh, 58px);
+  line-height: 0.98;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.rs-artist {
+  margin: 8px 0 0;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dm-cyan);
+}
+
+.rs-chips {
+  display: flex;
+  gap: 10px;
+}
+
+.rs-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 18px 4px 14px;
+  background: rgba(8, 16, 30, 0.85);
+  border-left: 3px solid var(--dm-cyan);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 26px;
+}
+
+.rs-chip small {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--dm-muted);
+}
+
+/* ---------- rank + figures ---------- */
+.rs-main {
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--dm-cyan-dim);
+}
+
+.rs-rank {
+  flex: 0 0 auto;
+  min-width: 190px;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: clamp(150px, 27vh, 260px);
+  line-height: 0.85;
   text-align: center;
+}
+
+.rs-figures {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rs-figure {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 2px 0 2px 18px;
+  border-left: 4px solid var(--dm-cyan);
+  background: linear-gradient(90deg, rgba(8, 16, 30, 0.85), transparent);
+}
+
+.rs-figure-label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--dm-font-display);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.26em;
+  color: var(--dm-muted);
+}
+
+.rs-figure-value {
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.rs-figure-value.score {
+  font-size: 64px;
+}
+
+.rs-figure-value.acc {
+  font-size: 44px;
+  color: var(--dm-cyan);
+}
+
+.rs-figure-value.combo {
+  font-size: 44px;
+}
+
+.rs-tag {
+  padding: 2px 12px;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  color: #04121c;
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+.rs-tag-record {
+  background: var(--dm-amber);
+}
+
+.rs-tag-combo {
+  background: var(--dm-cyan);
+}
+
+/* ---------- judgement tables ---------- */
+.rs-judges {
+  display: flex;
+  gap: 48px;
+  min-height: 0;
+}
+
+.rs-judge-col {
+  flex: 0 0 300px;
+}
+
+.rs-judge-detail {
+  flex: 1;
+  max-width: 520px;
+}
+
+.rs-judge-head {
+  margin-bottom: 8px;
+  font-family: var(--dm-font-display);
+  font-weight: 700;
   font-size: 15px;
-  line-height: 20px;
-  margin: 5px;
-}
-.perfect {
-  background: rgba(0, 146, 172, 0.8);
-}
-.good {
-  background: rgba(11, 131, 0, 0.8);
-}
-.offbeat {
-  background: rgba(190, 92, 0, 0.8);
-}
-.miss {
-  background: rgba(112, 0, 0, 0.8);
+  letter-spacing: 0.3em;
+  color: var(--dm-muted);
 }
 
-.acheivementChip {
-  margin-top: 10px;
-  width: fit-content;
+.rs-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 4px 14px 4px 14px;
+  background: rgba(8, 16, 30, 0.8);
+  border-left: 4px solid var(--dm-cyan);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 24px;
 }
 
-.highScoreChip {
-  box-shadow: #ffab2d 0px 0px 20px;
-  background: #ff8b2d;
+.rs-row.small {
+  font-size: 17px;
+  line-height: 1.15;
+  padding: 1px 14px;
+  margin-bottom: 3px;
 }
 
-.comboChip {
-  box-shadow: #68ff2d 0px 0px 20px;
-  background: #00b609;
+.rs-row-label {
+  letter-spacing: 0.08em;
+  color: var(--dm-muted);
 }
 
-.song_item_sec {
-  position: fixed;
-  top: 10vh;
-  left: 8%;
-  opacity: 0.3;
+.rs-row.perfect {
+  border-left-color: #ffffff;
 }
 
-.song_item_sec .detail {
-  line-height: 1.8em;
-  font-size: 1.8em;
+.rs-row.good {
+  border-left-color: var(--dm-cyan);
 }
 
-.song_item_sec .title {
-  font-size: 2em;
-  font-weight: bold;
+.rs-row.offbeat {
+  border-left-color: var(--dm-amber);
 }
 
-.user_sec {
-  position: fixed;
-  bottom: 12vh;
-  left: 8%;
-  opacity: 0.8;
+.rs-row.miss {
+  border-left-color: var(--dm-red);
 }
 
-.btn-dark {
-  background: rgba(78, 78, 78, 0.575);
-  display: inline-block;
-  line-height: 30px;
-  width: 150px;
-  margin: 0 10px;
-  font-size: 1.2em;
+.rs-row.perfect .rs-row-label {
+  color: #ffffff;
 }
 
-.btn-dark:hover {
-  background: white;
-}
-
+/* ---------- buttons ---------- */
 .btn_sec {
-  position: fixed;
-  bottom: 15vh;
-  right: 8%;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 16px;
 }
 
-.fa-icon {
-  vertical-align: middle;
-  margin-right: 5px;
+.rs-btn {
+  min-width: 200px;
+  margin: 0;
+  font-size: 1.4em;
+}
+
+.rs-btn-main {
+  color: #04121c;
+  background: var(--dm-cyan);
+}
+
+.rs-btn-main .fa-icon {
+  color: #04121c;
 }
 
 .level {
   font-size: 5em;
 }
 
-@media only screen and (max-width: 1000px) {
-  /* mobile */
-  .flex_hori {
-    flex-direction: column;
-  }
-
-  .blurFilter {
-    position: relative;
-    min-height: calc(100vh + 50px);
-  }
-  .center_logo {
-    position: relative;
-    transform: none;
-    height: auto;
-    top: 0;
-    left: 0;
-    margin-top: 150px;
-  }
-
-  .rightScore {
-    text-align: center;
-    width: auto;
-    padding: 30px;
-  }
-  .rightScore + .rightScore {
-    padding-top: 0;
-  }
-
-  .circleBg {
-    width: 180px;
-    height: 180px;
-  }
-  .scoreCircle {
-    margin-top: -90px;
-  }
-  .score {
-    font-size: 6em;
-  }
-
-  .acheivementChip {
-    display: block;
-    margin: auto;
-    margin-top: 10px;
-  }
-
-  .song_item_sec {
-    background: rgba(0, 0, 0, 0.4);
-    position: relative;
-    top: auto;
-    left: auto;
-    text-align: center;
-    font-size: 1em;
-    line-height: 1.5em;
-    margin: 10px auto;
-    padding: 20px;
-    opacity: 1;
-  }
-  .song_item_sec .detail {
-    font-size: 1em;
-    border-bottom: 1px solid rgba(121, 121, 121, 0.5);
-    padding-bottom: 5px;
-    margin-bottom: 8px;
-  }
-
-  .song_item_sec .title {
-    font-size: 1.4em;
-    font-weight: bold;
-  }
-  .user_sec {
-    background: rgba(0, 0, 0, 0.4);
-    position: relative;
-    top: 0;
-    left: auto;
-    opacity: 1;
-  }
-  .user_sec .extend {
-    margin: 10px auto;
-    width: fit-content;
-  }
-  .btn_sec {
-    position: fixed;
-    right: auto;
-    bottom: 0;
-    margin: 0;
-    width: 100%;
-    padding: 20px;
-    z-index: 9000;
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-    background: rgba(0, 0, 0, 0.3);
-    display: flex;
-    box-sizing: border-box;
-    justify-content: space-around;
-  }
-  .btn-dark {
-    flex: 1;
-  }
-}
-
 .flex_row {
   flex-direction: row;
   padding: 30px 0;
+}
+
+@media only screen and (max-width: 1000px) {
+  .rs-layout {
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 28px;
+  }
+
+  .rs-left {
+    flex: none;
+  }
+
+  .rs-main {
+    flex-direction: column;
+  }
+
+  .rs-judges {
+    flex-direction: column;
+  }
+
+  .btn_sec {
+    position: static;
+  }
 }
 </style>

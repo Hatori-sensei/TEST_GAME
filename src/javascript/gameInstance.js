@@ -3,6 +3,8 @@ import FeverEffect from "./FeverEffect";
 import { Howl, Howler } from "howler";
 import { resolveMediaUrl } from "../utils/pathResolver";
 
+const LEAD_IN_SEC = 2;
+const SHOW_FPS = true;
 const KeyCode = { KEY_LEFT: 37, KEY_RIGHT: 39, ESC: 27, P: 80, SPACE: 32 };
 
 export default class GameInstance {
@@ -48,15 +50,7 @@ export default class GameInstance {
   }
 
   resolveRuntimeMediaUrl(rawPath) {
-    const resolved = resolveMediaUrl(rawPath);
-    if (!resolved) return resolved;
-
-    if (/^media:\/\//i.test(resolved)) {
-      const stripped = resolved.replace(/^media:\/\//i, "");
-      return `http://localhost:3000/${stripped.replace(/^\/+/, "")}`;
-    }
-
-    return resolved;
+    return resolveMediaUrl(rawPath);
   }
 
   getConfiguredBgmVolume() {
@@ -107,8 +101,13 @@ export default class GameInstance {
   }
 
   async reposition() {
-    this.canvas.width = this.vm.wrapper?.clientWidth || window.innerWidth;
-    this.canvas.height = this.vm.wrapper?.clientHeight || window.innerHeight;
+    // Match the bitmap to the element's real rendered size. The CSS judgment
+    // line is positioned inside this container, so using window.innerHeight
+    // (which can differ during F11/zoom) would stretch the canvas and shift
+    // the notes relative to the drawn judgment line.
+    const wrapper = this.vm.wrapper || this.canvas.parentElement;
+    this.canvas.width = wrapper?.clientWidth || window.innerWidth;
+    this.canvas.height = wrapper?.clientHeight || window.innerHeight;
     this.effectCanvas.width = this.canvas.width;
     this.effectCanvas.height = this.canvas.height;
 
@@ -153,8 +152,13 @@ export default class GameInstance {
     this.noteDelay = this.checkHitLineY / this.noteSpeedPxPerSec;
     this.noteSpawnLeadSec = this.getNoteSpawnLeadSec();
 
-    const foundIdx = this.timeArr.findIndex((e) => e.t > this.currentTime);
-    this.timeArrIdx = foundIdx !== -1 ? foundIdx : 0;
+    // Only re-derive the spawn cursor before a song starts. Once running,
+    // timeArrIdx tracks which notes have already been spawned — recomputing
+    // it here (e.g. on a mid-song resize) would re-spawn or skip notes.
+    if (!this.vm || !this.vm.started) {
+      const foundIdx = this.timeArr.findIndex((e) => e.t > this.currentTime);
+      this.timeArrIdx = foundIdx !== -1 ? foundIdx : 0;
+    }
   }
 
   loadAudio(audioPath) {
@@ -290,6 +294,12 @@ export default class GameInstance {
         }
       },
     });
+    // A cached buffer (e.g. on restart) makes Howler emit "load" inside the
+    // constructor, before any listener can be attached — resolve right away.
+    if (this.howl.state() === "loaded") {
+      this.applyConfiguredBgmVolume();
+      return Promise.resolve(this.howl);
+    }
     return new Promise((resolve, reject) => {
       this.howl.once("load", () => {
         this.applyConfiguredBgmVolume();
@@ -373,9 +383,15 @@ export default class GameInstance {
     };
     this.keyupEvent = (event) => this.onKeyUp(this.getKeyName(event));
     this.resizeHandler = () => {
-      // Avoid timing/judgment-axis jumps while a song is running.
-      if (this.vm && this.vm.started) return;
+      // reposition() keeps noteSpeedPxPerSec locked via sessionSpeedMultiplier
+      // once a song has started, so it's safe to run on every resize — this
+      // keeps the judge line and track x-positions aligned with the canvas
+      // even if the window/zoom changes mid-song.
       this.reposition();
+      // F11/zoom fire several resize events while the layout is still
+      // settling — re-measure once it has.
+      clearTimeout(this.resizeSettleTimer);
+      this.resizeSettleTimer = setTimeout(() => this.reposition(), 200);
     };
     window.addEventListener("resize", this.resizeHandler);
     document.addEventListener("keydown", this.keydownEvent);
@@ -410,6 +426,7 @@ export default class GameInstance {
       if (this.resizeHandler) {
         window.removeEventListener("resize", this.resizeHandler);
       }
+      clearTimeout(this.resizeSettleTimer);
     } catch (e) {
       // ignore
     }
@@ -460,11 +477,19 @@ export default class GameInstance {
   update(_time) {
     if (this.destoryed) return;
     requestAnimationFrame(this.update.bind(this));
+    this.sampleFps(typeof _time === "number" ? _time : performance.now());
 
-    if (!this.paused) this.updateCurrentTime();
+    if (!this.paused) {
+      if (this.leadInRemaining > 0) this.updateLeadIn();
+      else this.updateCurrentTime();
+      this.gameTimingLoop();
+    }
 
     if (typeof this.onTick === "function") {
-      this.onTick({ audioTime: this.currentTime, paused: this.paused });
+      this.onTick({
+        audioTime: Math.max(0, this.currentTime),
+        paused: this.paused,
+      });
     }
 
     if (
@@ -473,9 +498,16 @@ export default class GameInstance {
       typeof this.videoElement.currentTime === "number"
     ) {
       const drift = Math.abs(this.videoElement.currentTime - this.currentTime);
-      if (drift >= 0.05) {
+      // Only correct noticeable desync, and not more often than every 500ms —
+      // seeking every frame on small (~50ms) drift causes visible video stutter.
+      const now = performance.now();
+      if (
+        drift >= 0.2 &&
+        (!this.lastVideoSyncAt || now - this.lastVideoSyncAt >= 500)
+      ) {
         try {
           this.videoElement.currentTime = this.currentTime;
+          this.lastVideoSyncAt = now;
         } catch (e) {
           // ignore invalid seek while video is not ready
         }
@@ -493,6 +525,42 @@ export default class GameInstance {
     this.drawDecoration();
     this.dropTrackArr.forEach((track) => track.update());
     this.drawUI();
+    this.drawFps();
+  }
+
+  sampleFps(now) {
+    if (this.fpsWindowStart === undefined) {
+      this.fpsWindowStart = now;
+      this.fpsLastFrame = now;
+      this.fpsFrames = 0;
+      this.fpsWorstMs = 0;
+      return;
+    }
+    this.fpsFrames += 1;
+    this.fpsWorstMs = Math.max(this.fpsWorstMs, now - this.fpsLastFrame);
+    this.fpsLastFrame = now;
+    const elapsed = now - this.fpsWindowStart;
+    if (elapsed >= 500) {
+      this.fpsValue = (this.fpsFrames * 1000) / elapsed;
+      this.fpsShownWorstMs = this.fpsWorstMs;
+      this.fpsWindowStart = now;
+      this.fpsFrames = 0;
+      this.fpsWorstMs = 0;
+    }
+  }
+
+  drawFps() {
+    if (!SHOW_FPS || this.fpsValue === undefined) return;
+    this.ctx.save();
+    this.ctx.textAlign = "left";
+    this.ctx.font = '600 16px "Barlow Condensed", monospace';
+    this.ctx.fillStyle = this.fpsValue < 50 ? "#ff5a5a" : "#7dff9a";
+    this.ctx.fillText(
+      `FPS ${this.fpsValue.toFixed(0)}  (worst ${this.fpsShownWorstMs.toFixed(1)}ms)`,
+      64,
+      36
+    );
+    this.ctx.restore();
   }
 
   drawUI() {
@@ -501,30 +569,19 @@ export default class GameInstance {
         ? this.sessionSpeedMultiplier
         : this.vm.noteSpeed || 1.0
     ).toFixed(1);
-    this.ctx.textAlign = "center";
-    this.ctx.fillStyle = "white";
-    this.ctx.font = "20px Arial";
-    this.ctx.fillText(
-      `SPEED x${currentSpeed}`,
-      (this.startX + this.endX) / 2,
-      40
-    );
-
-    const currentCombo = this.vm.result?.combo ?? 0;
-    if (currentCombo > 0) {
-      this.ctx.fillText(
-        `COMBO ${currentCombo}`,
-        (this.startX + this.endX) / 2,
-        70
-      );
-    }
+    this.ctx.save();
+    this.ctx.textAlign = "right";
+    this.ctx.fillStyle = "#7f95ab";
+    this.ctx.font = 'italic 700 18px "Barlow Condensed", sans-serif';
+    this.ctx.fillText(`SPEED x${currentSpeed}`, this.endX - 12, 28);
+    this.ctx.restore();
   }
 
   drawDecoration() {
     // 배경 (블랙)
 
     // 🚨 노트보다 먼저 도화지에 그려지는 반투명 기어 배경
-    this.ctx.fillStyle = "rgba(0, 0, 0, 0.4)"; // 투명도는 여기서 0.3~0.5 등 입맛대로 조절!
+    this.ctx.fillStyle = "rgba(3, 7, 14, 0.8)";
     this.ctx.fillRect(
       this.startX,
       0,
@@ -552,6 +609,34 @@ export default class GameInstance {
     // Spawn lead is based on travel time to judgment line so notes enter naturally.
     const spawnLeadSec =
       Number.isFinite(Number(this.noteSpawnLeadSec)) && Number(this.noteSpawnLeadSec) > 0
+        ? Number(this.noteSpawnLeadSec)
+        : this.getNoteSpawnLeadSec();
+    this.playTime = this.currentTime + spawnLeadSec;
+  }
+
+  // Before the audio starts, run a virtual clock into negative time so the
+  // first notes scroll in from above instead of popping up mid-screen.
+  updateLeadIn() {
+    const now = performance.now();
+    const dt = this.leadInLastTick === null ? 0 : (now - this.leadInLastTick) / 1000;
+    this.leadInLastTick = now;
+    this.leadInRemaining -= dt;
+
+    if (this.leadInRemaining <= 0) {
+      this.leadInRemaining = 0;
+      this.leadInLastTick = null;
+      this.playMedia();
+      this.updateCurrentTime();
+      return;
+    }
+
+    this.currentTime = (Number(this.startSongAt) || 0) - this.leadInRemaining;
+    this.currentGlobalVisualPos = this.getVisualPositionAtTime(this.currentTime);
+    this.isReverse = false;
+    this.reverseBlend = 0;
+    const spawnLeadSec =
+      Number.isFinite(Number(this.noteSpawnLeadSec)) &&
+      Number(this.noteSpawnLeadSec) > 0
         ? Number(this.noteSpawnLeadSec)
         : this.getNoteSpawnLeadSec();
     this.playTime = this.currentTime + spawnLeadSec;
@@ -610,9 +695,10 @@ export default class GameInstance {
     const startIdx = foundStartIdx !== -1 ? foundStartIdx : this.timeArr.length;
     this.timeArrIdx = startIdx;
 
-    // Pre-create notes once at run start so objects stay stable while falling.
-    this.prepareTrackNotesForRun(startIdx);
-
+    // Notes are spawned incrementally as they come due (see gameTimingLoop(),
+    // called every frame from update()) rather than all at once here — a long
+    // chart would otherwise create thousands of off-screen Note instances that
+    // all still run update() every frame.
     this.resumeGame(true);
   }
 
@@ -625,30 +711,16 @@ export default class GameInstance {
     return typeof k === "string" ? k.toLowerCase() : null;
   }
 
-  prepareTrackNotesForRun(startIdx = 0) {
-    if (!Array.isArray(this.timeArr) || !Array.isArray(this.dropTrackArr)) {
-      return;
-    }
-
-    for (let i = Math.max(0, startIdx); i < this.timeArr.length; i += 1) {
-      const noteObj = this.timeArr[i];
-      if (!noteObj || typeof noteObj !== "object") continue;
-
-      const noteStartTime = Number(noteObj.startTime ?? noteObj.t);
-      if (!Number.isFinite(noteStartTime)) continue;
-
-      const key = this.resolvePlayableKey(noteObj);
-      if (!key) continue;
-
-      this.dropTrackArr.forEach((track) => track.dropNote(key, noteObj));
-    }
-
-    // Runtime spawn loop is disabled after pre-creation.
-    this.timeArrIdx = this.timeArr.length;
-  }
-
+  // Spawns notes once they are within a screen's height above the judge line.
+  // Uses visual (gimmick-aware) distance, not time, so speed-ups never let a
+  // note pop into view already on screen. visualPos is monotonic non-decreasing.
+  // Shared by the per-frame game loop and the sheet editor's seek/scrub preview.
   async gameTimingLoop() {
     if (this.paused) return;
+
+    const speed = Math.max(1e-6, Number(this.noteSpeedPxPerSec) || 1);
+    const spawnDistancePx = (Number(this.checkHitLineY) || 0) + 250;
+    const globalPos = Number(this.currentGlobalVisualPos) || 0;
 
     while (this.timeArr && this.timeArrIdx < this.timeArr.length) {
       const noteObj = this.timeArr[this.timeArrIdx];
@@ -658,7 +730,11 @@ export default class GameInstance {
         continue;
       }
 
-      if (noteStartTime > this.playTime) break;
+      const visualPos = Number(noteObj.visualPos);
+      const isDue = Number.isFinite(visualPos)
+        ? (visualPos - globalPos) * speed <= spawnDistancePx
+        : noteStartTime <= this.playTime;
+      if (!isDue) break;
 
       const k = this.resolvePlayableKey(noteObj);
 
@@ -679,6 +755,8 @@ export default class GameInstance {
     }
     this.howl = null;
     this.audioPath = null;
+    this.leadInRemaining = 0;
+    this.leadInLastTick = null;
     this.loading = false;
     this.songDurationSeconds = 0;
     this.usingFallbackNotes = false;
@@ -939,6 +1017,8 @@ export default class GameInstance {
   }
 
   getVisualPositionAtTime(timeSec) {
+    // Lead-in (negative time) scrolls at the base rate.
+    if (Number(timeSec) < 0) return Number(timeSec);
     const t = Math.max(0, Number(timeSec) || 0);
     if (!this.visualTimeline || this.visualTimeline.length === 0) {
       return t;
@@ -960,14 +1040,6 @@ export default class GameInstance {
       last.cumulativeAtStart + (last.end - last.start) * last.rate;
     const tailRate = this.getVisualRateAtTime(t);
     return cumulativeAtLastEnd + (t - last.end) * tailRate;
-  }
-
-  getReverseStateAtTime(timeSec) {
-    return false;
-  }
-
-  getReverseBlendAtTime(timeSec) {
-    return 0;
   }
 
   bakeVisualPositions(notes, gimmicks = []) {
@@ -1242,6 +1314,7 @@ export default class GameInstance {
 
   pauseGame() {
     this.paused = true;
+    this.leadInLastTick = null;
     if (this.howl && typeof this.howl.pause === "function") {
       this.howl.pause(this.currentHowlId || undefined);
     }
@@ -1250,7 +1323,12 @@ export default class GameInstance {
 
   async resumeGame(firstPlay = false) {
     this.paused = false;
-    if (firstPlay) this.seekTo(this.startSongAt);
+    if (firstPlay) {
+      this.seekTo(this.startSongAt);
+      this.leadInRemaining =
+        !this.vm || this.vm.playMode !== false ? LEAD_IN_SEC : 0;
+      this.leadInLastTick = null;
+    }
     this.applyConfiguredBgmVolume();
 
     if (Howler.ctx && Howler.ctx.state === "suspended") {
@@ -1261,6 +1339,11 @@ export default class GameInstance {
       }
     }
 
+    if (this.leadInRemaining > 0) return;
+    this.playMedia();
+  }
+
+  playMedia() {
     if (this.howl && typeof this.howl.play === "function") {
       if (this.currentHowlId !== null && this.currentHowlId !== undefined) {
         this.currentHowlId = this.howl.play(this.currentHowlId);

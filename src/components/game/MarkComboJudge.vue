@@ -32,11 +32,20 @@ export default {
     };
   },
   methods: {
+    judgeClassFor(mark) {
+      if (mark === "BREAK") return "judge-break";
+      const pct = parseInt(String(mark).replace(/[^0-9]/g, ""), 10);
+      if (!Number.isFinite(pct)) return "judge-break";
+      if (pct >= 100) return "judge-max";
+      if (pct >= 70) return "judge-high";
+      if (pct >= 40) return "judge-mid";
+      return "judge-low";
+    },
     judge(mark, combo) {
       this.markJudge = mark;
       this.combo = combo;
       this.display = false;
-      this.judgeType = { ["judge" + this.markJudge]: true };
+      this.judgeType = { [this.judgeClassFor(mark)]: true };
       
       // 콤보에 따른 진화 클래스 설정
       if (combo >= 100) {
@@ -79,23 +88,31 @@ export default {
   margin-left: -200px;
   z-index: 100;
   font-size: 1.5em;
-  color: #00ffff;
+  color: var(--dm-cyan);
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
 }
 
 .comboNum {
-  font-family: "Anton", Impact, "Raleway", "Arial Narrow Bold", sans-serif;
-  margin-top: -10px;
-  font-size: 4em;
-  font-weight: bold;
-  color: #00ffff;
-  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  margin-top: -14px;
+  font-size: 5em;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 0 14px rgba(25, 211, 255, 0.85), 0 0 34px rgba(25, 211, 255, 0.4);
   transition: all 0.3s ease;
 }
 
 .center_judge {
-  font-family: "Raleway";
+  font-family: var(--dm-font-display);
+  font-style: italic;
   position: absolute;
-  font-size: 5em;
+  font-size: 4.2em;
   line-height: 80px;
   width: 400px;
   height: 80px;
@@ -137,28 +154,29 @@ export default {
 .judgeTypeAnimation {
   animation-name: perfectAni;
   animation-duration: 0.5s;
-  letter-spacing: 2px;
-  font-weight: 900;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+  text-transform: uppercase;
 }
-
-.judgePerfect {
-  --judge-text-color: #15ff00;
-  --judge-shadow-color: #15ff00;
+.judge-max {
+  --judge-text-color: #ffffff;
+  --judge-shadow-color: #19d3ff;
 }
-
-.judgeGood {
-  --judge-text-color: #00ffea;
-  --judge-shadow-color: #00ffea;
+.judge-high {
+  --judge-text-color: #19d3ff;
+  --judge-shadow-color: #19d3ff;
 }
-
-.judgeOffbeat {
-  --judge-text-color: rgb(255, 115, 0);
-  --judge-shadow-color: rgb(255, 115, 0);
+.judge-mid {
+  --judge-text-color: #ffb400;
+  --judge-shadow-color: #ffb400;
 }
-
-.judgeMiss {
-  --judge-text-color: rgb(255, 50, 50);
-  --judge-shadow-color: rgb(139, 0, 0);
+.judge-low {
+  --judge-text-color: #ff7a2f;
+  --judge-shadow-color: #ff7a2f;
+}
+.judge-break {
+  --judge-text-color: #ff3b5c;
+  --judge-shadow-color: #b3001f;
 }
 
 @keyframes comboAni {

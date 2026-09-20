@@ -1,7 +1,7 @@
 {
   "name": "rhythm-plus-exe",
   "version": "1.0.0",
-  "description": "My DJMAX style rhythm game",
+  "description": "Rhythm game for the school festival (Electron build)",
   "author": "YourName",
   "main": "background.js",
   "scripts": {
@@ -10,38 +10,64 @@
     "start": "cross-env NODE_ENV=development webpack serve --mode development --progress --history-api-fallback",
     "build:dev": "cross-env NODE_ENV=development webpack --mode development",
     "build": "cross-env NODE_ENV=production webpack --mode production",
-    "electron:build": "npm run build && electron-builder",
+    "electron:build": "npm run clean && npm run build && electron-builder --win",
     "clean": "rimraf ./dist",
     "serve": "npm run build && serve .",
     "update": "npm version patch -m 'Upgrade to %s' && git push && git push --tags",
     "deploy": "git push && yarn build && firebase deploy",
-    "test": "echo \"no test specified yet\" && exit 0"
+    "test": "echo \"no test specified yet\" && exit 0",
+    "electron:dev": "electron .",
+    "electron:prod": "npm run build && cross-env RP_PROD=1 electron . --windowed --rp-debug",
+    "electron:pack": "npm run clean && npm run build && electron-builder --win --dir"
   },
   "build": {
+    "appId": "com.school.rhythmplus",
     "productName": "RhythmPlus",
     "directories": {
-      "output": "build_exe"
+      "output": "build_exe",
+      "buildResources": "build"
     },
+    "files": [
+      "dist/**/*",
+      "!dist/songs/**",
+      "!dist/videos/**",
+      "!dist/**/*.map",
+      "background.js",
+      "package.json",
+      "!**/node_modules/**"
+    ],
+    "extraResources": [
+      {
+        "from": "public/songs",
+        "to": "public/songs"
+      },
+      {
+        "from": "public/videos",
+        "to": "public/videos"
+      }
+    ],
     "win": {
       "target": [
+        "nsis",
         "portable"
-      ]
+      ],
+      "icon": "public/android-chrome-512x512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "preCompressedFileExtensions": []
     }
   },
   "dependencies": {
-    "@sentry/tracing": "^6.15.0",
-    "@sentry/vue": "^6.15.0",
     "animate.css": "^4.1.0",
-    "axios": "^0.21.0",
     "countup.js": "^2.0.5",
-    "express": "^5.2.1",
     "firebase": "^8.2.1",
     "firebaseui": "^4.7.1",
-    "hammerjs": "^2.0.8",
     "howler": "^2.2.0",
     "js-md5": "^0.7.3",
     "jsonschema": "^1.2.6",
-    "register-service-worker": "^1.7.1",
     "semver": "^7.3.5",
     "shifty": "^2.12.0",
     "vanilla-tilt": "^1.7.0",
@@ -54,11 +80,9 @@
     "vue-router": "^3.3.4",
     "vue-select": "^3.10.7",
     "vue-slider-component": "^3.1.5",
-    "vue-smooth-reflow": "^0.1.12",
     "vue-spinner": "^1.0.3",
     "vue-virtual-scroll-list": "^2.3.0",
     "vue-youtube": "^1.4.0",
-    "vue2-circle-progress": "^1.2.3",
     "vuescroll": "^4.17.3",
     "vuex": "^3.5.1"
   },

@@ -23,5 +23,7 @@ export function resolveMediaUrl(rawPath) {
     return `http://localhost:${port}/${cleanPath}`;
   }
 
-  return `./${cleanPath}`;
+  // Absolute, not "./": relative paths resolve against the current route
+  // (e.g. /game/abc/songs/x.mp3) and 404 under history-mode routing.
+  return `/${cleanPath}`;
 }

@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -36,18 +35,9 @@
     <!-- style -->
     <link rel="stylesheet" type="text/css" href="/style.css" />
     <script src="/js/logger.min.js"></script>
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=UA-113940817-5"
-    ></script>
+    <!-- Offline build: analytics.js still calls window.gtag, so keep a no-op stub. -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-      gtag("config", "UA-113940817-5");
+      window.gtag = function () {};
     </script>
   </head>
   <body>

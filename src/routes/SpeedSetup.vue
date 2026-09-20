@@ -122,99 +122,164 @@ export default {
 
 <style scoped>
 .speed-setup {
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  height:100vh;
-  background: linear-gradient(180deg,#07111a,#071a1f);
-  color:#e8f8ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: repeating-linear-gradient(
+      115deg,
+      rgba(25, 211, 255, 0.05) 0,
+      rgba(25, 211, 255, 0.05) 1px,
+      transparent 1px,
+      transparent 16px
+    ),
+    radial-gradient(ellipse at 50% 40%, #0b1a2c 0%, var(--dm-bg) 70%);
+  color: var(--dm-text);
+  font-family: var(--dm-font-body);
 }
 
-/* container holds left panel and right preview side-by-side */
 .container {
-  display:flex;
-  gap:28px; /* explicit gap between panel and preview */
-  align-items:flex-start;
+  display: flex;
+  gap: 36px;
+  align-items: stretch;
 }
 
-.panel{
-  width:420px; /* slightly narrower to make room for preview */
-  background: rgba(0,0,0,0.6);
-  padding:24px;
-  border-radius:8px;
-  box-shadow:0 8px 30px rgba(0,0,0,0.6);
-  display:flex;
-  flex-direction:column;
-  gap:12px; /* ensure clean vertical spacing */
+.panel {
+  width: 460px;
+  padding: 28px 32px 32px;
+  background: var(--dm-panel);
+  border-top: 3px solid var(--dm-cyan);
+  border-bottom: 1px solid var(--dm-cyan-dim);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 26px), calc(100% - 26px) 100%, 0 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.subtitle{opacity:0.85;margin:0}
-
-.center{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:12px; /* space between elements to avoid overlap */
-  margin-top:6px;
+.panel h2 {
+  margin: 0;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 34px;
+  letter-spacing: 0.08em;
+  border-left: 5px solid var(--dm-cyan);
+  padding-left: 14px;
 }
 
-.speed-value{
-  font-size:26px;
-  margin-top:4px;
-  font-weight:600;
+.subtitle {
+  margin: 4px 0 0;
+  line-height: 1.5;
+  color: var(--dm-muted);
 }
 
-.actions{
-  margin-top:8px;
-  display:flex;
-  gap:12px; /* use gap for consistent spacing */
-}
-.actions button{
-  padding:10px 18px;
-  border-radius:6px;
-  background:#00d4ff;
-  border:none;
-  color:#002;
-  cursor:pointer;
+.center {
+  /* the global .center pins elements to the screen center — keep this one in the panel flow */
+  position: static;
+  transform: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
 }
 
-.hint{
-  margin-top:6px;
-  font-size:12px;
-  color:rgba(232,248,255,0.6);
+.speed-value {
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 96px;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 0 18px rgba(25, 211, 255, 0.55);
 }
 
-/* Preview area */
-.preview{
-  width:140px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+.actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 14px;
 }
 
-.lane{
-  width:72px;
-  height:420px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-  border:1px solid rgba(255,255,255,0.04);
-  border-radius:6px;
-  position:relative;
-  overflow:hidden;
-  box-shadow: inset 0 0 12px rgba(0,0,0,0.6);
+.actions button {
+  min-width: 150px;
+  padding: 12px 26px;
+  border: 1px solid var(--dm-cyan-dim);
+  color: var(--dm-text);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  transition: filter 0.15s, background 0.15s;
 }
 
-/* Note appearance: small pill that falls from top to bottom */
-.note{
-  position:absolute;
-  width:18px;
-  height:18px;
-  background: linear-gradient(180deg,#00d4ff,#00a6cc);
-  border-radius:4px;
+.actions button:hover {
+  background: var(--dm-cyan-faint);
+}
+
+.actions button:first-child {
+  color: #04121c;
+  background: var(--dm-cyan);
+  border-color: var(--dm-cyan);
+}
+
+.actions button:first-child:hover {
+  filter: brightness(1.18);
+}
+
+.hint {
+  margin-top: 4px;
+  font-family: var(--dm-font-display);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  color: var(--dm-muted);
+}
+
+/* ---------- preview lane ---------- */
+.preview {
+  width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lane {
+  width: 84px;
+  height: 100%;
+  min-height: 380px;
+  background: linear-gradient(180deg, rgba(4, 8, 16, 0.85), rgba(25, 211, 255, 0.1));
+  border-left: 2px solid var(--dm-cyan);
+  border-right: 2px solid var(--dm-cyan);
+  box-shadow: 0 0 16px rgba(25, 211, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.lane::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12%;
+  height: 3px;
+  background: #ffffff;
+  box-shadow: 0 0 10px var(--dm-cyan);
+}
+
+.note {
+  position: absolute;
+  width: 68px;
+  height: 14px;
+  background: var(--dm-cyan);
+  box-shadow: inset 0 3px 0 #c4f5ff, inset 0 -2px 0 #ffffff;
   transform: translateX(-50%);
-  top:-10%;
-  left:50%;
-  /* animation duration scales with speed: baseTime / speed */
-  /* baseTime chosen as 2.8s for pleasant preview; larger speed => shorter duration */
+  top: -10%;
+  left: 50%;
   animation-name: fall;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
@@ -222,11 +287,9 @@ export default {
 }
 
 @keyframes fall {
-  0% { top: -12%; opacity: 0; transform: translateX(-50%) scale(0.9); }
+  0% { top: -12%; opacity: 0; }
   6% { opacity: 1; }
-  80% { top: 88%; opacity: 1; transform: translateX(-50%) scale(1); }
-  100% { top: 110%; opacity: 0; transform: translateX(-50%) scale(0.95); }
+  80% { top: 88%; opacity: 1; }
+  100% { top: 110%; opacity: 0; }
 }
-
-/* Keep design aligned to minimal dark theme */
 </style>

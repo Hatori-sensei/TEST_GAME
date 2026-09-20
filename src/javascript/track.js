@@ -1,9 +1,5 @@
 import Note from "./note";
 
-if (typeof window.$ !== "undefined" && !window.$.isArray) {
-  window.$.isArray = Array.isArray;
-}
-
 const MISS_HEALTH_PENALTY = 9;
 
 export default class DropTrack {
@@ -22,11 +18,7 @@ export default class DropTrack {
     this.game.checkHitLineY = this.game.canvas.height - 320;
 
     this.particleEffect = new HitEffect(vm, game);
-
-    // ... 나머지 코드 유지
   }
-  // ... 나머지 코드 동일
-  // ... 나머지 코드 동일
 
   resizeTrack(x, width) {
     this.x = x;
@@ -76,7 +68,9 @@ export default class DropTrack {
     if (!this.keyBind.includes(key.toLowerCase())) return;
 
     this.isKeyDown = true;
-    const activeNoteIdx = this.noteArr.findIndex((n) => !n.noteFailed);
+    const activeNoteIdx = this.noteArr.findIndex(
+      (n) => !n.noteFailed && !n.holdCompleted
+    );
     if (activeNoteIdx === -1) return;
 
     const note = this.noteArr[activeNoteIdx];
@@ -115,12 +109,12 @@ export default class DropTrack {
 
         if (displayPercent === 100) {
           this.vm.result.marks.perfect += 1;
-          this.vm.health = Math.min(100, this.vm.health + 10);
+          this.vm.health = Math.min(100, this.vm.health + 4);
         } else if (displayPercent === 1) {
           this.vm.result.marks.offbeat += 1;
         } else {
           this.vm.result.marks.good += 1;
-          this.vm.health = Math.min(100, this.vm.health + 5);
+          this.vm.health = Math.min(100, this.vm.health + 3);
         }
 
         if (this.vm.$refs.judgeDisplay) {
@@ -159,7 +153,9 @@ export default class DropTrack {
             this.game.pauseGame();
           }
         }
-        this.noteArr.splice(activeNoteIdx, 1);
+        // Pressed too early: keep the long note as a grey, already-judged note.
+        note.missed = true;
+        note.holdCompleted = true;
       }
 
       return;
@@ -189,12 +185,12 @@ export default class DropTrack {
 
       if (displayPercent === 100) {
         this.vm.result.marks.perfect += 1;
-        this.vm.health = Math.min(100, this.vm.health + 10);
+        this.vm.health = Math.min(100, this.vm.health + 3);
       } else if (displayPercent === 1) {
         this.vm.result.marks.offbeat += 1;
       } else {
         this.vm.result.marks.good += 1;
-        this.vm.health = Math.min(100, this.vm.health + 5);
+        this.vm.health = Math.min(100, this.vm.health + 2);
       }
 
       if (this.vm.$refs.judgeDisplay) {

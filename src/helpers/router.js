@@ -1,7 +1,6 @@
 import VueRouter from "vue-router";
 import Home from "../routes/Home.vue";
 import Game from "../routes/Game.vue";
-import DemoGame from "../routes/DemoGame.vue";
 import Auth from "../routes/Auth.vue";
 import Result from "../routes/Result.vue";
 import Rankings from "../routes/Rankings.vue";
@@ -75,12 +74,6 @@ const router = new VueRouter({
       ],
     },
     {
-      name: "demo",
-      path: "/demo",
-      component: DemoGame,
-      meta: { requireBg: false, requireSignin: false, title: "Demo" },
-    },
-    {
       name: "tutorial",
       path: "/tutorial",
       component: Game,
@@ -134,7 +127,9 @@ const router = new VueRouter({
         title: "Account and Settings",
       },
     },
-    { path: "*", redirect: { path: "/?notfound=true" } },
+    // The query must be a separate field: "path: '/?x'" is matched as a literal
+    // pathname, falls through to this route again and recurses forever.
+    { path: "*", redirect: { path: "/", query: { notfound: "true" } } },
   ],
 });
 

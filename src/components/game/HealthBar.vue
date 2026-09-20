@@ -1,9 +1,7 @@
 <template>
-  <div class="health-bar-container">
-    <div class="health-bar-background">
-      <div class="health-bar-fill" :style="healthStyle"></div>
-    </div>
-    <div class="health-text">{{ Math.ceil(health) }}%</div>
+  <div class="health-bar">
+    <div class="health-bar-fill" :style="healthStyle"></div>
+    <div class="health-bar-segments"></div>
   </div>
 </template>
 
@@ -21,17 +19,18 @@ export default {
   computed: {
     healthStyle() {
       const percentage = Math.max(0, Math.min(100, this.health));
-      let color = "#00ff00"; // 초록색 (좋음)
+      let color = "#19d3ff";
       if (percentage <= 50) {
-        color = "#ffff00"; // 노랑색 (위험)
+        color = "#ffb400";
       }
       if (percentage <= 25) {
-        color = "#ff0000"; // 빨강색 (매우 위험)
+        color = "#ff3b5c";
       }
       return {
-        width: `${percentage}%`,
+        height: `${percentage}%`,
         backgroundColor: color,
-        transition: "width 0.3s ease-out, background-color 0.3s ease-out"
+        boxShadow: `0 0 12px ${color}`,
+        transition: "height 0.3s ease-out, background-color 0.3s ease-out"
       };
     }
   }
@@ -39,55 +38,39 @@ export default {
 </script>
 
 <style scoped>
-.health-bar-container {
+/* Vertical bar glued to the right side of the gear (gear = 500px + 2px rails, centered). */
+.health-bar {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  left: calc(50% + 252px + 6px);
+  top: 140px;
+  bottom: 320px;
+  width: 16px;
   z-index: 999;
   display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.health-bar-background {
-  width: 200px;
-  height: 30px;
-  background-color: #333;
-  border: 2px solid #666;
-  border-radius: 5px;
+  align-items: flex-end;
+  background-color: rgba(3, 7, 14, 0.85);
+  border: 1px solid var(--dm-cyan-dim);
+  border-left: 3px solid var(--dm-cyan);
+  box-sizing: border-box;
   overflow: hidden;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .health-bar-fill {
-  height: 100%;
   width: 100%;
-  background-color: #00ff00;
-  transition: width 0.3s ease-out, background-color 0.3s ease-out;
-  box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3);
+  height: 100%;
 }
 
-.health-text {
-  color: white;
-  font-weight: bold;
-  font-size: 18px;
-  text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
-  min-width: 50px;
-}
-
-@media only screen and (max-width: 1000px) {
-  .health-bar-container {
-    top: 10px;
-    right: 10px;
-  }
-
-  .health-bar-background {
-    width: 150px;
-    height: 25px;
-  }
-
-  .health-text {
-    font-size: 14px;
-  }
+/* cuts the bar into horizontal segments */
+.health-bar-segments {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent 14px,
+    rgba(3, 7, 14, 0.9) 14px,
+    rgba(3, 7, 14, 0.9) 16px
+  );
+  pointer-events: none;
 }
 </style>

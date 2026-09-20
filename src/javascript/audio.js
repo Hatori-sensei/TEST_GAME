@@ -1,5 +1,6 @@
 const assetsBaseUrl = "https://assets.rhythm-plus.com/bgm/";
-const mediaBaseUrl = "http://localhost:3000";
+// Same-origin: works on the dev server (localhost) and inside the Electron app://.
+const mediaBaseUrl = "";
 
 export default class Audio {
   constructor() {
@@ -313,10 +314,6 @@ export default class Audio {
 
   fadeIn(duration = 300, targetVolume = this.maxVolume, onDone = null) {
     this.fadeTo(targetVolume, duration, onDone);
-  }
-
-  getCurrentTime() {
-    return this.player ? this.player.currentTime : 0;
   }
 
   seek(sec) {

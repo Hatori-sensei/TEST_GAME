@@ -64,13 +64,6 @@
       ></canvas>
 
       <div class="gear-overlay">
-        <div class="gear-display">
-          <div class="display-item stats-display">
-            <span class="stat perfect">P: {{ result.marks.perfect }}</span>
-            <span class="stat good">G: {{ result.marks.good }}</span>
-            <span class="stat miss">M: {{ result.marks.miss }}</span>
-          </div>
-        </div>
         <div class="judgment-line"></div>
       </div>
       <div class="arcade-buttons">
@@ -103,7 +96,7 @@
 
     <ScorePanel></ScorePanel>
 
-    <HealthBar v-show="!isGameEnded" :health="health"></HealthBar>
+    <HealthBar v-show="!isGameEnded && !loadingScreen" :health="health"></HealthBar>
     <div v-if="srcMode === 'youtube' && !isGameEnded" v-show="initialized">
       <Youtube
         :class="{ 'allow-events': srcMode === 'youtube' }"
@@ -169,11 +162,7 @@
       </div>
     </transition>
 
-    <Loading
-      style="z-index: 200"
-      :show="instance && instance.loading && !youtubeBuffering"
-      >Song Loading...</Loading
-    >
+    <GameLoadingScreen :show="loadingScreen" :song="currentSong"></GameLoadingScreen>
     <Loading
       style="z-index: 200"
       :show="youtubeBuffering"
@@ -206,13 +195,6 @@
             <div class="btn-action btn-dark" @click="restartGame">
               <v-icon name="redo" />
               <span>Restart</span>
-            </div>
-            <div
-              class="btn-action btn-dark"
-              @click="advancedMenuOptions = true"
-            >
-              <v-icon name="cog" />
-              <span>Advanced</span>
             </div>
             <div class="btn-action btn-dark" @click="exitGame">
               <v-icon name="sign-out-alt" />
@@ -264,6 +246,7 @@
 import PlayControl from "../components/common/PlayControl.vue";
 import Visualizer from "../components/common/Visualizer.vue";
 import Loading from "../components/ui/Loading.vue";
+import GameLoadingScreen from "../components/game/GameLoadingScreen.vue";
 import Modal from "../components/ui/Modal.vue";
 import ZoomText from "../components/game/ZoomText.vue";
 import Navbar from "../components/ui/Navbar.vue";
@@ -291,6 +274,7 @@ import "vue-awesome/icons/cog";
 import "vue-awesome/icons/info-circle";
 const isDev = process.env.NODE_ENV === "development";
 const GAME_START_DELAY_MS = 4000;
+const LOADING_SCREEN_MIN_MS = 1800;
 const SONG_END_FADE_DELAY_MS = 2200;
 
 export default {
@@ -300,6 +284,7 @@ export default {
     Visualizer,
     Youtube,
     Loading,
+    GameLoadingScreen,
     Modal,
     ZoomText,
     Navbar,
@@ -324,6 +309,9 @@ export default {
       tvOff: false,
       songFadeOut: false,
       isEndingSong: false,
+      // full-screen loading screen, shown from the moment the game screen opens
+      loadingScreen: true,
+      loadingScreenSince: Date.now(),
     };
   },
   computed: {
@@ -428,6 +416,7 @@ export default {
         this.$store.commit("setPendingGameOptions", null);
         document.title = song.title + " - Rhythm+ Music Game";
       } catch (err) {
+        this.loadingScreen = false;
         this.$store.state.gModal.show({
           bodyText: "Sorry, this song does not exist or is unavaliable.",
           isError: true,
@@ -439,6 +428,16 @@ export default {
     },
     handleHover() {
       this.$store.state.audio.playHoverEffect("ui/ta");
+    },
+    afterLoadingScreen(callback) {
+      const wait = Math.max(
+        0,
+        LOADING_SCREEN_MIN_MS - (Date.now() - this.loadingScreenSince)
+      );
+      setTimeout(() => {
+        this.loadingScreen = false;
+        if (callback) callback();
+      }, wait);
     },
     handleCountdownFinished() {
       if (this.instance) {
@@ -470,7 +469,7 @@ export default {
         if (this.srcMode !== "youtube") {
           // 비YouTube 모드: 바로 시작
           this.showStartButton = false;
-          this.startGameDirect();
+          this.afterLoadingScreen(() => this.startGameDirect());
           return;
         }
         // YouTube 모드
@@ -489,11 +488,12 @@ export default {
       this.youtubeBuffering = false;
       if (!this.started && this.srcMode !== "youtube") {
         this.showStartButton = false;
-        this.startGameDirect();
+        this.afterLoadingScreen(() => this.startGameDirect());
       }
     },
     handleAudioLoadError(error, audioPath) {
       Logger.error("audio load error", audioPath, error);
+      this.loadingScreen = false;
       this.instance.loading = false;
       this.youtubeBuffering = false;
       this.$store.state.gModal.show({
@@ -638,7 +638,11 @@ export default {
       this.clearResult();
       this.health = 100; // 체력 초기화
       this.instance.paused = false;
+      // resetPlaying() clears audioPath, and startSong() only reloads audio
+      // when audioPath is set — keep it so a restart doesn't come back silent.
+      const audioPath = this.instance.audioPath;
       this.instance.resetPlaying();
+      this.instance.audioPath = audioPath;
       this.instance.startSong();
     },
     exitGame(e, reason) {
@@ -1032,92 +1036,25 @@ export default {
   transform: translateX(-50%);
   width: 500px;
   height: 100%;
+  /* 4 lanes x 125px: thin lane dividers + a soft cyan wash toward the judgment line */
   background: repeating-linear-gradient(
       90deg,
-      transparent,
-      transparent 20px,
-      rgba(0, 240, 255, 0.03) 20px,
-      rgba(0, 240, 255, 0.03) 21px
+      transparent 0,
+      transparent 124px,
+      rgba(25, 211, 255, 0.16) 124px,
+      rgba(25, 211, 255, 0.16) 125px
     ),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 40px,
-      rgba(0, 240, 255, 0.02) 40px,
-      rgba(0, 240, 255, 0.02) 41px
+    linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 60%,
+      rgba(25, 211, 255, 0.1) 100%
     );
-  border-left: 2px solid rgba(255, 255, 255, 0.15);
-  border-right: 2px solid rgba(255, 255, 255, 0.15);
+  border-left: 2px solid var(--dm-cyan);
+  border-right: 2px solid var(--dm-cyan);
+  box-shadow: 0 0 18px rgba(25, 211, 255, 0.35), inset 0 0 40px rgba(25, 211, 255, 0.06);
   pointer-events: none;
   z-index: 10;
-}
-
-/* 기어 상단 미니 디스플레이 */
-.gear-display {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 240, 255, 0.1) 0%,
-    transparent 100%
-  );
-  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 0 20px;
-  box-sizing: border-box;
-  z-index: 15;
-  pointer-events: none;
-}
-
-.display-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  font-size: 0.75rem;
-}
-
-.display-item .label {
-  color: rgba(0, 240, 255, 0.6);
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.display-item .value {
-  color: #00ffff;
-  font-weight: 900;
-  font-size: 1rem;
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
-  font-family: "Anton", monospace;
-}
-
-.stats-display {
-  display: flex;
-  gap: 12px;
-}
-
-.stat {
-  font-weight: bold;
-  font-size: 0.8rem;
-  text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
-}
-
-.stat.perfect {
-  color: #15ff00;
-}
-
-.stat.good {
-  color: #00ffea;
-}
-
-.stat.miss {
-  color: #ff3232;
 }
 
 /* =======================================================
@@ -1130,7 +1067,17 @@ export default {
   transform: translateX(-50%);
   width: 500px;
   height: 260px; /* 기존 높이 유지 */
-  background-color: #161616; /* 버튼 밑 공간을 채우는 베젤 */
+  background: repeating-linear-gradient(
+      135deg,
+      rgba(25, 211, 255, 0.05) 0,
+      rgba(25, 211, 255, 0.05) 2px,
+      transparent 2px,
+      transparent 14px
+    ),
+    linear-gradient(180deg, #0a1220 0%, #04070d 100%);
+  border-left: 2px solid var(--dm-cyan);
+  border-right: 2px solid var(--dm-cyan);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   z-index: 20;
@@ -1153,9 +1100,15 @@ export default {
   left: 0;
   width: 100%;
   height: 18px;
-  background-color: #ffffff;
+  /* soft cyan band that ends in a crisp 4px white edge on the box's bottom side */
+  background: linear-gradient(
+    180deg,
+    rgba(25, 211, 255, 0) 0%,
+    rgba(25, 211, 255, 0.35) 100%
+  );
   z-index: 50;
-  box-shadow: 0px 0px 15px #ffffff, 0px 0px 30px #00f0ff;
+  box-shadow: inset 0 -4px 0 #ffffff, 0 0 14px rgba(25, 211, 255, 0.9),
+    0 0 34px rgba(25, 211, 255, 0.45);
 }
 
 /* =======================================================
@@ -1164,10 +1117,34 @@ export default {
 .arcade-btn {
   flex: 1;
   height: 100%;
-  background: linear-gradient(180deg, #222 0%, #000 100%);
-  border-top: 3px solid #444; /* 기어와 확실히 구분되는 경계선 */
+  background: linear-gradient(180deg, #0f1c2f 0%, #050a12 100%);
+  border-top: 3px solid #2b415c;
   position: relative;
   transition: all 0.05s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 34px;
+  color: #35506d;
+}
+
+.arcade-btn.d-key::after { content: "D"; }
+.arcade-btn.f-key::after { content: "F"; }
+.arcade-btn.j-key::after { content: "J"; }
+.arcade-btn.k-key::after { content: "K"; }
+
+/* outer lanes: ice white / inner lanes: cyan (same colors as the notes) */
+.arcade-btn.d-key,
+.arcade-btn.k-key {
+  border-top-color: #b9d6ee;
+}
+
+.arcade-btn.f-key,
+.arcade-btn.j-key {
+  border-top-color: var(--dm-cyan);
 }
 
 /* 물리적으로 눌리는 느낌 (4px 하강) */
@@ -1176,17 +1153,19 @@ export default {
   border-top: none;
 }
 
-/* D, K 키 (시안색 계열) */
+/* D, K (outer lanes): ice white */
 .arcade-btn.d-key.is-pressed,
 .arcade-btn.k-key.is-pressed {
-  background: linear-gradient(180deg, rgba(0, 240, 255, 0.4) 0%, #000 100%);
-  box-shadow: inset 0px 0px 20px rgba(0, 240, 255, 0.6);
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(220, 240, 255, 0.55) 0%, #050a12 100%);
+  box-shadow: inset 0px 0px 22px rgba(220, 240, 255, 0.55);
 }
 
-/* F, J 키 (마젠타색 계열) */
+/* F, J (inner lanes): cyan */
 .arcade-btn.f-key.is-pressed,
 .arcade-btn.j-key.is-pressed {
-  background: linear-gradient(180deg, rgba(255, 0, 160, 0.4) 0%, #000 100%);
-  box-shadow: inset 0px 0px 20px rgba(255, 0, 160, 0.6);
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(25, 211, 255, 0.55) 0%, #050a12 100%);
+  box-shadow: inset 0px 0px 22px rgba(25, 211, 255, 0.6);
 }
 </style>

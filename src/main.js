@@ -9,12 +9,9 @@ import router from "./helpers/router";
 import { store } from "./helpers/store";
 import { auth, remoteConfig } from "./helpers/firebaseConfig";
 import Icon from "vue-awesome/components/Icon";
-import * as Sentry from "@sentry/vue";
-import { Integrations } from "@sentry/tracing";
 import { logEvent, logError } from "./helpers/analytics";
 
 import "animate.css";
-import "./registerServiceWorker";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -42,27 +39,11 @@ Vue.use(vuescroll, {
 
 Vue.component("v-icon", Icon);
 
-if (!isDev) {
-  Sentry.init({
-    Vue,
-    dsn: "https://7c0cf5f165ab4854994380c0a0d9711e@o424134.ingest.sentry.io/5355558",
-    integrations: [
-      new Integrations.BrowserTracing({
-        routingInstrumentation: Sentry.vueRouterInstrumentation(router),
-      }),
-    ],
-    tracesSampleRate: 1.0,
-    logErrors: true,
-    trackComponents: true,
-  });
-}
-
 const consoleHandler = Logger.createDefaultHandler();
 Logger.setHandler((messages, context) => {
   consoleHandler(messages, context);
   if (context.level.value > Logger.WARN.value) {
     // ERROR level
-    Sentry.captureException(messages[0]);
     logError(messages[0]);
   }
 });
