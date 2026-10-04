@@ -44,6 +44,10 @@
       {
         "from": "public/videos",
         "to": "public/videos"
+      },
+      {
+        "from": "public/charts",
+        "to": "public/charts"
       }
     ],
     "win": {

@@ -25,10 +25,17 @@ const DIST_DIR = path.join(app.getAppPath(), "dist");
 const MEDIA_DIR = app.isPackaged
   ? path.join(process.resourcesPath, "public")
   : path.join(app.getAppPath(), "public");
-const MEDIA_PREFIXES = ["/songs/", "/videos/"];
+// /charts/ is served from here too so chart JSON can be swapped in an
+// installed copy without rebuilding the app.
+const MEDIA_PREFIXES = ["/songs/", "/videos/", "/charts/"];
 
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 app.commandLine.appendSwitch("ignore-gpu-blocklist");
+// Some Windows setups (AV/EDR sandbox restrictions) block Chromium's audio
+// service utility process from spawning, which silently drops all sound
+// (no WASAPI session ever opens, so the app doesn't even show up in the
+// Windows volume mixer). Running the audio service unsandboxed avoids that.
+app.commandLine.appendSwitch("disable-features", "AudioServiceSandbox");
 
 protocol.registerSchemesAsPrivileged([
   {

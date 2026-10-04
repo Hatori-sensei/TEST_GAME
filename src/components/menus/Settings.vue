@@ -202,6 +202,8 @@ export default {
         perspective: false,
         blur: false,
         fps: false,
+        keyBeamEnabled: true,
+        noteEffectEnabled: true,
       },
       loading: false,
       changed: false,

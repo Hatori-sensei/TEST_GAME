@@ -83,7 +83,6 @@ export default class GameInstance {
   createTracks(trackNum) {
     this.dropTrackArr = [];
     this.trackNum = trackNum;
-    this.trackKeyBind = ["d", "f", "j", "k"];
     this.setUserKeyBind();
     for (const keyBind of this.trackKeyBind) {
       this.dropTrackArr.push(new DropTrack(this.vm, this, 0, 150, keyBind));
@@ -92,6 +91,16 @@ export default class GameInstance {
   }
 
   setUserKeyBind() {
+    // 4키 기본 배치(d,f,j,k)에 곡 선택 화면에서 저장한 keyMap을 적용.
+    // 매핑이 없거나 비어있으면 기본 키로 폴백.
+    const defaultBind = ["d", "f", "j", "k"];
+    const keyMap = this.vm && this.vm.keyMap;
+    this.trackKeyBind = defaultBind.map((defKey) => {
+      const mapped = keyMap && keyMap[defKey];
+      return typeof mapped === "string" && mapped
+        ? mapped.toLowerCase()
+        : defKey;
+    });
     this.userKeyBind = this.trackKeyBind;
     this.reverseKeyMap = {};
   }
@@ -703,7 +712,12 @@ export default class GameInstance {
   }
 
   resolvePlayableKey(noteObj) {
-    const fallbackKeys = ["d", "f", "j", "k"];
+    // 노트의 key(0~3) 인덱스를 실제 트랙 키 배치(trackKeyBind)로 변환.
+    // 예전엔 항상 "d/f/j/k" 고정값을 썼는데, 그러면 키 배치를 바꿔도
+    // 노트 스폰은 여전히 원래 키로 라우팅돼서 엉뚱한 레인으로 가거나
+    // (바뀐 키가 기본 d/f/j/k와 겹치지 않으면) 아예 매칭되는 트랙이 없어
+    // 노트가 내려오지 않는 버그가 있었음.
+    const fallbackKeys = this.trackKeyBind || ["d", "f", "j", "k"];
     let k = noteObj?.k;
     if (k === undefined && noteObj?.key !== undefined) {
       k = fallbackKeys[noteObj.key];

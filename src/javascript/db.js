@@ -14,6 +14,7 @@ import { Validator } from "jsonschema";
 import {
   localCatalog,
   createLocalCatalogData,
+  fetchChartFile,
   getChartById,
   getChartForSong,
   getSongById,
@@ -85,6 +86,20 @@ export async function getGameSheet(sheetId) {
   resultSheet.length = resultSheet.length ?? song.length;
   resultSheet.sheet = JSON.parse(resultSheet.sheet);
   resultSheet.sheetId = resultSheet.id;
+
+  if (sheet.sheetFile) {
+    try {
+      const chart = await fetchChartFile(sheet.sheetFile);
+      resultSheet.sheet = chart.notes;
+      resultSheet.gimmicks = chart.gimmicks;
+    } catch (error) {
+      console.error(
+        `[chart] ${sheet.sheetFile} 를 읽을 수 없어 랜덤 채보로 대체합니다.`,
+        error
+      );
+    }
+  }
+
   return resultSheet;
 }
 

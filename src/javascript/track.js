@@ -120,7 +120,7 @@ export default class DropTrack {
         if (this.vm.$refs.judgeDisplay) {
           this.vm.$refs.judgeDisplay.judge(judgeString, this.vm.result.combo);
         }
-        if (this.particleEffect) {
+        if (this.particleEffect && this.vm.noteEffectEnabled !== false) {
           this.particleEffect.create(
             this.x,
             this.game.checkHitLineY,
@@ -196,7 +196,7 @@ export default class DropTrack {
       if (this.vm.$refs.judgeDisplay) {
         this.vm.$refs.judgeDisplay.judge(judgeString, this.vm.result.combo);
       }
-      if (this.particleEffect) {
+      if (this.particleEffect && this.vm.noteEffectEnabled !== false) {
         this.particleEffect.create(
           this.x,
           this.game.checkHitLineY,
@@ -243,7 +243,7 @@ export default class DropTrack {
   }
 
   update() {
-    if (this.isKeyDown) {
+    if (this.isKeyDown && this.vm.keyBeamEnabled !== false) {
       let grad = this.game.ctx.createLinearGradient(
         0,
         this.game.checkHitLineY,

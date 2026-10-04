@@ -135,6 +135,24 @@
               </div>
               <strong>{{ randomGimmickModeText(quickGameSt.randomGimmickMode) }}</strong>
             </div>
+            <div class="settings-row">
+              <label></label>
+              <Checkbox
+                label="키 빔"
+                :model="quickGameSt"
+                modelKey="keyBeamEnabled"
+                cbStyle="form"
+              ></Checkbox>
+            </div>
+            <div class="settings-row">
+              <label></label>
+              <Checkbox
+                label="노트 타격 이펙트"
+                :model="quickGameSt"
+                modelKey="noteEffectEnabled"
+                cbStyle="form"
+              ></Checkbox>
+            </div>
             <KeyMappings v-model="quickPreference.keyMap"></KeyMappings>
           </div>
 
@@ -185,6 +203,7 @@
 <script>
 import Loading from "../components/ui/Loading.vue";
 import KeyMappings from "../components/menus/KeyMappings.vue";
+import Checkbox from "../components/ui/Checkbox.vue";
 import VueSlider from "vue-slider-component";
 import { getSheetList, getSongListCached, updateUserProfile } from "../javascript/db";
 import { logEvent } from "../helpers/analytics";
@@ -204,7 +223,7 @@ const DEFAULT_KEY_MAP = {
 
 export default {
   name: "SongSelect",
-  components: { Loading, KeyMappings, VueSlider },
+  components: { Loading, KeyMappings, VueSlider, Checkbox },
   data() {
     return {
       artRatio: 1,
@@ -220,6 +239,8 @@ export default {
       quickGameSt: {
         noteSpeed: 1,
         randomGimmickMode: "off",
+        keyBeamEnabled: true,
+        noteEffectEnabled: true,
       },
       quickPreference: {
         keyMap: { ...DEFAULT_KEY_MAP },
@@ -303,6 +324,8 @@ export default {
       this.quickGameSt.randomGimmickMode = this.normalizeRandomGimmickMode(
         this.$store.state.randomGimmickMode
       );
+      this.quickGameSt.keyBeamEnabled = gameSt.keyBeamEnabled ?? true;
+      this.quickGameSt.noteEffectEnabled = gameSt.noteEffectEnabled ?? true;
       this.quickPreference.keyMap = {
         ...DEFAULT_KEY_MAP,
         ...(preference.keyMap || {}),
@@ -369,6 +392,8 @@ export default {
       const gameSt = {
         ...(profile.gameSt || {}),
         noteSpeed: this.quickGameSt.noteSpeed,
+        keyBeamEnabled: this.quickGameSt.keyBeamEnabled,
+        noteEffectEnabled: this.quickGameSt.noteEffectEnabled,
       };
       const preference = {
         ...(profile.preference || {}),

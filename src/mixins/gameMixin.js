@@ -65,6 +65,8 @@ export default {
       initialized: false,
       blur: false,
       keyMap: null,
+      keyBeamEnabled: true,
+      noteEffectEnabled: true,
       totalNoteCount: 0,
       scorePerJudge: 0,
       scoreAccRaw: 0,
@@ -124,6 +126,8 @@ export default {
       this.noFail = gameSettings.noFail;
       this.vibrate = gameSettings.vibrate;
       this.fps = gameSettings.fps;
+      this.keyBeamEnabled = gameSettings.keyBeamEnabled ?? true;
+      this.noteEffectEnabled = gameSettings.noteEffectEnabled ?? true;
     }
     const preference = this.$store.state?.userProfile?.preference;
     if (preference) {

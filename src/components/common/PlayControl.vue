@@ -78,6 +78,24 @@
         :cbStyle="cbStyle"
       ></Checkbox>
     </p>
+    <p>
+      <label></label>
+      <Checkbox
+        label="Key Beam"
+        :model="playData"
+        modelKey="keyBeamEnabled"
+        :cbStyle="cbStyle"
+      ></Checkbox>
+    </p>
+    <p>
+      <label></label>
+      <Checkbox
+        label="Note Hit Effect"
+        :model="playData"
+        modelKey="noteEffectEnabled"
+        :cbStyle="cbStyle"
+      ></Checkbox>
+    </p>
 
     <!-- create mode only -->
     <div v-if="playData.inEditor">

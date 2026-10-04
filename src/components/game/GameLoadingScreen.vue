@@ -25,10 +25,10 @@
           </div>
 
           <div class="ls-keys">
-            <span class="key outer">D</span>
-            <span class="key inner">F</span>
-            <span class="key inner">J</span>
-            <span class="key outer">K</span>
+            <span class="key outer">{{ displayKeys[0] }}</span>
+            <span class="key inner">{{ displayKeys[1] }}</span>
+            <span class="key inner">{{ displayKeys[2] }}</span>
+            <span class="key outer">{{ displayKeys[3] }}</span>
           </div>
         </div>
       </div>
@@ -73,6 +73,15 @@ export default {
       if (s.difficulty) out.push({ label: "LV", value: s.difficulty });
       if (this.base.bpm) out.push({ label: "BPM", value: this.base.bpm });
       return out;
+    },
+    displayKeys() {
+      const defaultBind = ["d", "f", "j", "k"];
+      const keyMap = this.$store.state?.userProfile?.preference?.keyMap;
+      return defaultBind.map((defKey) => {
+        const mapped = keyMap && keyMap[defKey];
+        const key = typeof mapped === "string" && mapped ? mapped : defKey;
+        return key.toUpperCase();
+      });
     },
   },
 };

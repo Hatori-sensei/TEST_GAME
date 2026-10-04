@@ -1,3 +1,5 @@
+import { resolveMediaUrl } from "../utils/pathResolver";
+
 function createDateStub() {
   return {
     toDate: () => new Date(),
@@ -53,7 +55,25 @@ export function createChartTemplate(overrides = {}) {
     dateUpdated: createDateStub(),
     createdBy: "local-admin",
     sheet: JSON.stringify([]),
+    sheetFile: "",
     ...overrides,
+  };
+}
+
+export async function fetchChartFile(sheetFile) {
+  const url = resolveMediaUrl(`charts/${sheetFile}`);
+  const response = await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error(`HTTP ${response.status} (${url})`);
+
+  const parsed = await response.json();
+  const notes = Array.isArray(parsed) ? parsed : parsed?.notes;
+  if (!Array.isArray(notes)) {
+    throw new Error("notes 배열이 없습니다");
+  }
+
+  return {
+    notes,
+    gimmicks: Array.isArray(parsed?.gimmicks) ? parsed.gimmicks : [],
   };
 }
 
@@ -94,8 +114,8 @@ export const localCatalog = {
       artist: "BEATMARIO,MARON",
       subtitle: "BEATMARIO,MARON",
       customCoverUrl: "/assets/covers/knight-of-nights.jpg",
-      audioPath: "songs/knight-of-nights.mp3",
-      bgaPath: "videos/knight-of-nights.mp4",
+      audioPath: "songs/Knight-of-nights.mp3",
+      bgaPath: "videos/Knight-of-nights.mp4",
       tags: ["local", "knight-of-nights", "bga"],
       keys: [4],
       searchTags: ["knight-of-nights", "local"],
@@ -125,7 +145,7 @@ export const localCatalog = {
       title: "Mammal",
       artist: "Teikyou",
       subtitle: "Teikyou",
-      customCoverUrl: "/assets/covers/mammal.jpg",
+      customCoverUrl: "/assets/covers/Mammal.jpg",
       audioPath: "songs/Mammal.mp3",
       bgaPath: "videos/Mammal.mp4",
       tags: ["local", "Mammal", "bga"],
@@ -174,14 +194,9 @@ export const localCatalog = {
       id: "kamui-sheet-1",
       songId: "kamui",
       title: "KAMUI Test Chart",
-      difficulty: 4,
+      difficulty: 13,
       tags: ["kamui", "local", "bga"],
-      sheet: JSON.stringify([
-        { startTime: 1.0, endTime: 1.6, key: 0 },
-        { t: 2.4, key: 1 },
-        { t: 3.2, key: 2, l: 0.5 },
-        { t: 4.4, key: 3 },
-      ]),
+      sheetFile: "kamui.json",
     }),
     "knight-of-nights-sheet-1": createChartTemplate({
       id: "knight-of-nights-sheet-1",
@@ -189,12 +204,7 @@ export const localCatalog = {
       title: "초 나이트 오브 나이츠 Test Chart",
       difficulty: 4,
       tags: ["knight-of-nights", "local", "bga"],
-      sheet: JSON.stringify([
-        { startTime: 1.0, endTime: 1.6, key: 0 },
-        { t: 2.4, key: 1 },
-        { t: 3.2, key: 2, l: 0.5 },
-        { t: 4.4, key: 3 },
-      ]),
+      sheetFile: "knight-of-nights.json",
     }),
     "theEmpErroR-sheet-1": createChartTemplate({
       id: "theEmpErroR-sheet-1",
@@ -202,25 +212,15 @@ export const localCatalog = {
       title: "sasakure.UK",
       difficulty: 4,
       tags: ["theEmpErroR", "local", "bga"],
-      sheet: JSON.stringify([
-        { startTime: 1.0, endTime: 1.6, key: 0 },
-        { t: 2.4, key: 1 },
-        { t: 3.2, key: 2, l: 0.5 },
-        { t: 4.4, key: 3 },
-      ]),
-      }),
+      sheetFile: "the-EmpErroR.json",
+    }),
     "Mammal-sheet-1": createChartTemplate({
       id: "Mammal-sheet-1",
       songId: "Mammal",
       title: "Teikyou",
       difficulty: 4,
       tags: ["Mammal", "local", "bga"],
-      sheet: JSON.stringify([
-        { startTime: 1.0, endTime: 1.6, key: 0 },
-        { t: 2.4, key: 1 },
-        { t: 3.2, key: 2, l: 0.5 },
-        { t: 4.4, key: 3 },
-      ]),
+      sheetFile: "Mammal.json",
     }),
     "Doit-sheet-1": createChartTemplate({
       id: "Doit-sheet-1",
@@ -228,12 +228,7 @@ export const localCatalog = {
       title: "Do it",
       difficulty: 4,
       tags: ["Doit", "local", "bga"],
-      sheet: JSON.stringify([
-        { startTime: 1.0, endTime: 1.6, key: 0 },
-        { t: 2.4, key: 1 },
-        { t: 3.2, key: 2, l: 0.5 },
-        { t: 4.4, key: 3 },
-      ]),
+      sheetFile: "Doit.json",
     }),
     "Apollo-sheet-1": createChartTemplate({
       id: "Apollo-sheet-1",
@@ -241,12 +236,7 @@ export const localCatalog = {
       title: "Apollo",
       difficulty: 15,
       tags: ["Apollo", "local", "bga"],
-      sheet: JSON.stringify([
-        { startTime: 1.0, endTime: 1.6, key: 0 },
-        { t: 2.4, key: 1 },
-        { t: 3.2, key: 2, l: 0.5 },
-        { t: 4.4, key: 3 },
-      ]),
+      sheetFile: "Apollo.json",
     }),
   },
 };
@@ -254,7 +244,6 @@ export const localCatalog = {
 export function getSongListCatalog() {
   return Object.values(localCatalog.songs);
 }
-
 export function getSongById(songId) {
   if (!songId) return null;
 

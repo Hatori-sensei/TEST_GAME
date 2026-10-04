@@ -88,7 +88,12 @@ const router = new VueRouter({
           name: "result",
           path: ":resultId",
           component: Result,
-          meta: { title: "Result" },
+          meta: {
+            requireBg: true,
+            showNav: false,
+            backgroundOnly: true,
+            title: "Result",
+          },
         },
       ],
     },

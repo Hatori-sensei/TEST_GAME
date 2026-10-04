@@ -741,19 +741,25 @@ export default {
       }
     },
     // 🚨 4버튼 UI 전용 키보드 이벤트 핸들러
+    // 키 배치를 바꿔도 눌림 표시가 맞게 뜨도록 instance.trackKeyBind(실제 배치)를 기준으로 확인
+    getUiKeyBind() {
+      return (this.instance && this.instance.trackKeyBind) || ["d", "f", "j", "k"];
+    },
     handleUIKeyDown(e) {
       const key = e.key.toLowerCase();
-      if (key === "d") this.keyState.key1 = true;
-      if (key === "f") this.keyState.key2 = true;
-      if (key === "j") this.keyState.key3 = true;
-      if (key === "k") this.keyState.key4 = true;
+      const bind = this.getUiKeyBind();
+      if (key === bind[0]) this.keyState.key1 = true;
+      if (key === bind[1]) this.keyState.key2 = true;
+      if (key === bind[2]) this.keyState.key3 = true;
+      if (key === bind[3]) this.keyState.key4 = true;
     },
     handleUIKeyUp(e) {
       const key = e.key.toLowerCase();
-      if (key === "d") this.keyState.key1 = false;
-      if (key === "f") this.keyState.key2 = false;
-      if (key === "j") this.keyState.key3 = false;
-      if (key === "k") this.keyState.key4 = false;
+      const bind = this.getUiKeyBind();
+      if (key === bind[0]) this.keyState.key1 = false;
+      if (key === bind[1]) this.keyState.key2 = false;
+      if (key === bind[2]) this.keyState.key3 = false;
+      if (key === bind[3]) this.keyState.key4 = false;
     },
   },
 };
