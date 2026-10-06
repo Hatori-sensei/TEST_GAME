@@ -87,7 +87,8 @@ export default class DropTrack {
 
     const note = this.noteArr[activeNoteIdx];
     const judgeBaseY = Number.isFinite(Number(note.judgeY)) ? note.judgeY : note.y;
-    const judgeReferenceY = judgeBaseY + note.singleNoteHeight;
+    // [판정 기준 변경] 노트 아래 끝(+30px) → 채보 시간 기준점(judgeY). 판정 범위 수치는 그대로
+    const judgeReferenceY = judgeBaseY;
     const diffPx = Math.abs(this.game.checkHitLineY - judgeReferenceY);
     const diffMs = (diffPx / this.game.noteSpeedPxPerSec) * 1000;
     const isEarly = judgeReferenceY < this.game.checkHitLineY;
@@ -302,9 +303,9 @@ export default class DropTrack {
         continue;
       }
 
-      const singleHeight = note.singleNoteHeight || note.height || 15;
       const judgeBaseY = Number.isFinite(Number(note.judgeY)) ? note.judgeY : note.y;
-      const judgeReferenceY = judgeBaseY + singleHeight;
+      // [판정 기준 변경] 미스 판정도 같은 채보 시간 기준점 사용
+      const judgeReferenceY = judgeBaseY;
       const passedPx = judgeReferenceY - this.game.checkHitLineY;
       const passedMs = (passedPx / speed) * 1000;
 

@@ -1042,7 +1042,7 @@ export default class GameInstance {
       for (let n = 0; n < 4; n += 1) {
         const note = track.noteArr.find((x) => !x.noteFailed && !x.holdCompleted);
         if (!note || note.hitRegistered) break;
-        if (note.judgeY + note.singleNoteHeight < this.checkHitLineY) break;
+        if (note.judgeY < this.checkHitLineY) break; // [판정 기준 변경] 채보 시간에 누름
         this.onKeyDown(key); // onKeyDown/keyDown은 동기적으로 판정까지 끝남
         if (track.holdingNote) break; // 롱노트는 끝날 때까지 누르고 있음
         this.onKeyUp(key);

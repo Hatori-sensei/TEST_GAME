@@ -327,14 +327,20 @@ export default class Note {
     const speed = this.game.noteSpeedPxPerSec || 1;
     const distance = this.visualPos - (this.game.currentGlobalVisualPos || 0);
     const baseY = this.game.checkHitLineY - distance * speed;
+    // [판정 기준 변경] judgeY = 채보 시간 기준점. 채보 시간에 정확히 판정선(checkHitLineY)에 옴.
+    // 예전엔 노트 위 끝이 이 점이고 판정은 "아래 끝"(+30px) 기준이라, MAX 100% 타이밍이
+    // 채보 시간보다 30px/속도(1.0배속 75ms, 3.0배속 25ms)만큼 빨라 배속마다 달랐음.
     this.judgeY = baseY;
+    // 그림은 노트 높이만큼 위로 그려서 "아래 끝이 판정선에 닿는 순간 = 채보 시간 = 정타"가 되게 함
+    // (화면상 정타 모양은 예전과 같고, 판정 타이밍만 음악과 일치)
+    const drawBaseY = baseY - this.singleNoteHeight;
 
     const reverseBlend = Number(this.game.reverseBlend) || 0;
     if (reverseBlend > 0) {
-      const mirroredY = this.game.canvas.height - baseY;
-      this.y = baseY + (mirroredY - baseY) * reverseBlend;
+      const mirroredY = this.game.canvas.height - drawBaseY;
+      this.y = drawBaseY + (mirroredY - drawBaseY) * reverseBlend;
     } else {
-      this.y = baseY;
+      this.y = drawBaseY;
     }
 
     const shift = !this.isLong && this.keyObj && this.keyObj.shift;
@@ -400,7 +406,7 @@ export default class Note {
         }
       }
     } else {
-      const judgeReferenceY = this.judgeY + this.singleNoteHeight;
+      const judgeReferenceY = this.judgeY; // [판정 기준 변경] 채보 시간 기준점
       const passedPx = judgeReferenceY - this.game.checkHitLineY;
       const passedMs = (passedPx / speed) * 1000;
 
