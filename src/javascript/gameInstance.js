@@ -1326,8 +1326,21 @@ export default class GameInstance {
     }
   }
 
+  // [버그수정] 일시정지(창 포커스 이탈 포함) 시 눌려 있던 키를 모두 뗀 것으로 처리.
+  // 포커스를 잃으면 keyup이 오지 않아 keyHoldingStatus가 true로 남아
+  // 재개 후 그 키의 첫 입력이 무시(입력 씹힘)되고, 키 빔이 켜진 채로 남았음.
+  // 잡고 있던 롱노트도 "홀드 중"으로 남아 키를 안 눌러도 콤보가 오르며 끝까지 진행됐으므로
+  // 이 시점에 손을 뗀 것으로 판정한다(일반 릴리즈 판정과 동일 규칙).
+  releaseHeldKeys() {
+    this.keyHoldingStatus = {};
+    this.dropTrackArr.forEach((track) => {
+      if (track.isKeyDown || track.holdingNote) track.keyUp(track.keyBind[0]);
+    });
+  }
+
   pauseGame() {
     this.paused = true;
+    this.releaseHeldKeys();
     this.leadInLastTick = null;
     if (this.howl && typeof this.howl.pause === "function") {
       this.howl.pause(this.currentHowlId || undefined);

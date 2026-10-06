@@ -615,6 +615,8 @@ export default {
       }, stepTime);
     },
     pauseGame() {
+      // [버그수정] 포커스 이탈 시 keyup이 오지 않아 하단 버튼 눌림 표시가 남던 문제 → 해제
+      this.keyState = { key1: false, key2: false, key3: false, key4: false };
       // [버그수정] 곡 종료 페이드아웃(isEndingSong) 중에 창이 포커스를 잃으면
       // 일시정지 메뉴가 떠서 결과 화면 이동과 겹쳤음 → 이때도 무시.
       if (!this.started || this.isGameEnded || this.isEndingSong) return;
