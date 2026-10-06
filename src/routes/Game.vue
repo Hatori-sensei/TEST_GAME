@@ -652,7 +652,11 @@ export default {
       this.hideMenu();
       this.clearResult();
       this.health = 100; // 체력 초기화
-      this.instance.paused = false;
+      // [버그수정] 예전엔 여기서 instance.paused = false로 바꿨는데, 재시작 시 오디오를
+      // 다시 디코딩하는 동안(수백 ms) 게임 루프가 currentTime 0 기준으로 첫 노트들을 미리
+      // 생성했고, 로딩이 끝난 뒤 startSong()이 같은 노트를 한 번 더 생성해 중복 노트
+      // (한쪽은 무조건 BREAK)가 생겼음. 재개는 startSong() → resumeGame(true)가 담당하므로
+      // 일시정지 상태를 유지한다.
       // resetPlaying() clears audioPath, and startSong() only reloads audio
       // when audioPath is set — keep it so a restart doesn't come back silent.
       const audioPath = this.instance.audioPath;
