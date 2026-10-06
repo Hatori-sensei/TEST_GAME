@@ -440,6 +440,9 @@ export default {
       }, wait);
     },
     handleCountdownFinished() {
+      // [버그수정] 카운트다운이 끝났을 때 이미 곡이 끝났거나(페이드아웃/결과 이동 중)
+      // 아직 시작 전이면 재개하지 않음. 그대로 두면 끝난 곡이 처음부터 다시 재생됨.
+      if (!this.started || this.isGameEnded || this.isEndingSong) return;
       if (this.instance) {
         this.instance.resumeGame(false);
       }
@@ -612,7 +615,9 @@ export default {
       }, stepTime);
     },
     pauseGame() {
-      if (!this.started || this.isGameEnded) return;
+      // [버그수정] 곡 종료 페이드아웃(isEndingSong) 중에 창이 포커스를 잃으면
+      // 일시정지 메뉴가 떠서 결과 화면 이동과 겹쳤음 → 이때도 무시.
+      if (!this.started || this.isGameEnded || this.isEndingSong) return;
       this.instance.pauseGame();
       this.$refs.menu.show();
     },
@@ -625,6 +630,11 @@ export default {
       this.$refs.info.show();
     },
     resumeGame(fromMenu) {
+      // [버그수정] 로딩/"Get Ready" 중(시작 전)이나 곡 종료 페이드아웃 중에 ESC를 누르면
+      // 여기로 들어와 카운트다운 → instance.resumeGame()이 실행되어, 시작 전에 음악이
+      // 먼저 재생되거나(이후 startSong에서 한 번 더 재생 → 이중 재생/싱크 어긋남)
+      // 끝난 곡이 다시 재생됐음. pauseGame()과 같은 조건으로 막는다.
+      if (!this.started || this.isGameEnded || this.isEndingSong) return;
       this.hideMenu(true);
       if (!fromMenu) {
         this.$refs.countdown.clear(false);
