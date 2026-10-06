@@ -618,6 +618,9 @@ export default {
       // [버그수정] 곡 종료 페이드아웃(isEndingSong) 중에 창이 포커스를 잃으면
       // 일시정지 메뉴가 떠서 결과 화면 이동과 겹쳤음 → 이때도 무시.
       if (!this.started || this.isGameEnded || this.isEndingSong) return;
+      // [버그수정] 재개 카운트다운 도중 창이 포커스를 잃으면(blur) 일시정지 메뉴가 떠도
+      // 카운트다운은 계속 돌아 3초 뒤 메뉴가 열린 채로 게임이 재개됐음 → 카운트다운 취소.
+      this.$refs.countdown?.clear(false);
       this.instance.pauseGame();
       this.$refs.menu.show();
     },
