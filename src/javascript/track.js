@@ -55,6 +55,12 @@ export default class DropTrack {
     return Math.floor(percent / 10) * 10;
   }
 
+  // [설정/UI] FAST/SLOW 표시값. MAX 100%가 아닐 때만 빠름/느림을 알려줌(판정 계산과 무관, 표시만).
+  _fastSlow(displayPercent, isEarly) {
+    if (this.vm.showFastSlow !== true || displayPercent >= 100) return null;
+    return isEarly ? "fast" : "slow";
+  }
+
   _recordJudgement(percent, judgeText) {
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(percent);
@@ -118,7 +124,11 @@ export default class DropTrack {
         }
 
         if (this.vm.$refs.judgeDisplay) {
-          this.vm.$refs.judgeDisplay.judge(judgeString, this.vm.result.combo);
+          this.vm.$refs.judgeDisplay.judge(
+            judgeString,
+            this.vm.result.combo,
+            this._fastSlow(displayPercent, isEarly)
+          );
         }
         if (this.particleEffect && this.vm.noteEffectEnabled !== false) {
           this.particleEffect.create(
@@ -194,7 +204,11 @@ export default class DropTrack {
       }
 
       if (this.vm.$refs.judgeDisplay) {
-        this.vm.$refs.judgeDisplay.judge(judgeString, this.vm.result.combo);
+        this.vm.$refs.judgeDisplay.judge(
+          judgeString,
+          this.vm.result.combo,
+          this._fastSlow(displayPercent, isEarly)
+        );
       }
       if (this.particleEffect && this.vm.noteEffectEnabled !== false) {
         this.particleEffect.create(

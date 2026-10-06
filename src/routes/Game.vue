@@ -55,7 +55,11 @@
         preload="auto"
         @error="(e) => { e.target.style.display = 'none'; }"
       ></video>
-      <div v-if="currentSong?.bgaPath" class="bga-overlay"></div>
+      <div
+        v-if="currentSong?.bgaPath"
+        class="bga-overlay"
+        :style="{ background: `rgba(0, 0, 0, ${bgaDim})` }"
+      ></div>
       <canvas ref="effectCanvas" id="effectCanvas"></canvas>
       <canvas
         ref="mainCanvas"
@@ -578,6 +582,8 @@ export default {
       );
     },
     triggerGameOverImmediate() {
+      // [설정] No Fail: 체력이 0이 돼도 게임오버 없이 끝까지 진행
+      if (this.noFail) return;
       if (this.tvOff) return;
       this.fadeOutMusic();
       this.tvOff = true;

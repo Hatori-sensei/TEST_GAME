@@ -10,6 +10,8 @@
         </div>
       </transition>
       <div class="center_judge judgeAnimation" v-if="display">
+        <!-- [UI] FAST/SLOW: beatmania IIDX/EZ2ON 방식. 판정 글자 위에 작게(노트 진행 방향을 덜 가리게) -->
+        <div v-if="timing" class="fast-slow" :class="'fs-' + timing">{{ timing }}</div>
         <div class="judgeTypeAnimation" :class="judgeType">{{ markJudge }}</div>
       </div>
     </div>
@@ -29,6 +31,7 @@ export default {
       judgeType: {},
       timeout: null,
       comboEvolutionClass: "",
+      timing: null, // "fast" | "slow" | null
     };
   },
   methods: {
@@ -41,7 +44,8 @@ export default {
       if (pct >= 40) return "judge-mid";
       return "judge-low";
     },
-    judge(mark, combo) {
+    judge(mark, combo, timing = null) {
+      this.timing = timing;
       this.markJudge = mark;
       this.combo = combo;
       this.display = false;
@@ -157,6 +161,25 @@ export default {
   letter-spacing: 0.06em;
   font-weight: 800;
   text-transform: uppercase;
+}
+.fast-slow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -26px;
+  font-size: 22px;
+  line-height: 22px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.fs-fast {
+  color: #19d3ff;
+  text-shadow: 0 0 8px rgba(25, 211, 255, 0.8);
+}
+.fs-slow {
+  color: #ff5a7a;
+  text-shadow: 0 0 8px rgba(255, 90, 122, 0.8);
 }
 .judge-max {
   --judge-text-color: #ffffff;

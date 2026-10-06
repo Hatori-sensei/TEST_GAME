@@ -67,6 +67,13 @@ export default {
       keyMap: null,
       keyBeamEnabled: true,
       noteEffectEnabled: true,
+      // [설정] 새 설정 항목(기본값 = 기존 동작)
+      audioOffsetMs: 0,
+      laneCover: 0,
+      bgaDim: 0.35,
+      mirror: false,
+      autoPlay: false,
+      showFastSlow: false,
       totalNoteCount: 0,
       scorePerJudge: 0,
       scoreAccRaw: 0,
@@ -128,7 +135,16 @@ export default {
       this.fps = gameSettings.fps;
       this.keyBeamEnabled = gameSettings.keyBeamEnabled ?? true;
       this.noteEffectEnabled = gameSettings.noteEffectEnabled ?? true;
+      // [설정] 값이 없으면 기본값(기존 동작) 유지
+      this.audioOffsetMs = Number(gameSettings.audioOffsetMs) || 0;
+      this.laneCover = Number(gameSettings.laneCover) || 0;
+      const dim = Number(gameSettings.bgaDim ?? 0.35);
+      this.bgaDim = Number.isFinite(dim) ? dim : 0.35;
+      this.mirror = gameSettings.mirror === true;
+      this.showFastSlow = gameSettings.showFastSlow === true;
     }
+    // 오토플레이는 저장하지 않는 이번 실행 한정 설정(store)
+    this.autoPlay = this.$store.state.autoPlay === true;
     const preference = this.$store.state?.userProfile?.preference;
     if (preference) {
       this.keyMap = preference.keyMap;

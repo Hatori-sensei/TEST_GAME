@@ -156,6 +156,75 @@
             <KeyMappings v-model="quickPreference.keyMap"></KeyMappings>
           </div>
 
+          <!-- [설정] 플레이 설정(새 항목). 기본값은 전부 기존 동작과 동일 -->
+          <div class="quick-settings-section">
+            <h3>플레이 설정</h3>
+            <div class="settings-row">
+              <label>오디오 오프셋</label>
+              <div class="slider-wrap">
+                <vue-slider
+                  :value="quickGameSt.audioOffsetMs"
+                  :interval="1"
+                  :min="-200"
+                  :max="200"
+                  :contained="true"
+                  :tooltip-formatter="(val) => formatOffset(val)"
+                  @change="(v) => (quickGameSt.audioOffsetMs = Number(v))"
+                ></vue-slider>
+              </div>
+              <strong>{{ formatOffset(quickGameSt.audioOffsetMs) }}</strong>
+            </div>
+            <div class="settings-row">
+              <label></label>
+              <div class="calib-box">
+                <template v-if="calib.state === 'running'">
+                  <span class="calib-live">삑 소리에 맞춰 아무 키나 누르세요 ({{ calib.taps.length }})</span>
+                </template>
+                <template v-else>
+                  <button class="settings-btn calib-btn" @click="startCalibration">자동 측정</button>
+                  <span class="calib-msg">{{ calib.message || "소리가 늦게 들리면 + (노트가 늦게 내려옴)" }}</span>
+                </template>
+              </div>
+              <span></span>
+            </div>
+            <div class="settings-row">
+              <label>레인 커버</label>
+              <div class="slider-wrap">
+                <vue-slider
+                  :value="quickGameSt.laneCover"
+                  :interval="0.01"
+                  :min="0"
+                  :max="0.6"
+                  :contained="true"
+                  :tooltip-formatter="(val) => `${Math.round(Number(val) * 100)}%`"
+                  @change="(v) => (quickGameSt.laneCover = Number(v))"
+                ></vue-slider>
+              </div>
+              <strong>{{ Math.round(quickGameSt.laneCover * 100) }}%</strong>
+            </div>
+            <div class="settings-row">
+              <label>배경 어둡게</label>
+              <div class="slider-wrap">
+                <vue-slider
+                  :value="quickGameSt.bgaDim"
+                  :interval="0.01"
+                  :min="0"
+                  :max="0.95"
+                  :contained="true"
+                  :tooltip-formatter="(val) => `${Math.round(Number(val) * 100)}%`"
+                  @change="(v) => (quickGameSt.bgaDim = Number(v))"
+                ></vue-slider>
+              </div>
+              <strong>{{ Math.round(quickGameSt.bgaDim * 100) }}%</strong>
+            </div>
+            <div class="settings-grid">
+              <Checkbox label="FAST/SLOW 표시" :model="quickGameSt" modelKey="showFastSlow" cbStyle="form"></Checkbox>
+              <Checkbox label="미러 (좌우 반전)" :model="quickGameSt" modelKey="mirror" cbStyle="form"></Checkbox>
+              <Checkbox label="No Fail (게임오버 없음)" :model="quickGameSt" modelKey="noFail" cbStyle="form"></Checkbox>
+              <Checkbox label="오토플레이 (이번 실행만)" :model="quickGameSt" modelKey="autoPlay" cbStyle="form"></Checkbox>
+            </div>
+          </div>
+
           <div class="quick-settings-section">
             <h3>사운드 설정</h3>
             <div class="settings-row">
@@ -208,6 +277,12 @@ import VueSlider from "vue-slider-component";
 import { getSheetList, getSongListCached, updateUserProfile } from "../javascript/db";
 import { logEvent } from "../helpers/analytics";
 import { resolveSongPreviewRange } from "../javascript/localCatalog";
+import { saveSettings, DEFAULT_SETTINGS } from "../helpers/settings";
+
+// [설정] 오프셋 자동 측정: 메트로놈 간격/횟수
+const CALIB_INTERVAL_SEC = 0.6;
+const CALIB_BEATS = 12;
+const CALIB_LEAD_SEC = 1.0;
 
 const DEFAULT_KEY_MAP = {
   a: "a",
@@ -241,7 +316,17 @@ export default {
         randomGimmickMode: "off",
         keyBeamEnabled: true,
         noteEffectEnabled: true,
+        // [설정] 새 항목(기본값 = 기존 동작)
+        audioOffsetMs: DEFAULT_SETTINGS.audioOffsetMs,
+        laneCover: DEFAULT_SETTINGS.laneCover,
+        bgaDim: DEFAULT_SETTINGS.bgaDim,
+        mirror: DEFAULT_SETTINGS.mirror,
+        noFail: DEFAULT_SETTINGS.noFail,
+        showFastSlow: DEFAULT_SETTINGS.showFastSlow,
+        autoPlay: false,
       },
+      // [설정] 오프셋 자동 측정 상태
+      calib: { state: "idle", taps: [], beats: [], message: "" },
       quickPreference: {
         keyMap: { ...DEFAULT_KEY_MAP },
       },
@@ -306,6 +391,7 @@ export default {
     window.addEventListener('keydown', this.handleKeydown);
   },
   beforeDestroy() {
+    this.stopCalibration();
     this.clearPreviewTimer();
     window.removeEventListener('keydown', this.handleKeydown);
   },
@@ -326,6 +412,13 @@ export default {
       );
       this.quickGameSt.keyBeamEnabled = gameSt.keyBeamEnabled ?? true;
       this.quickGameSt.noteEffectEnabled = gameSt.noteEffectEnabled ?? true;
+      this.quickGameSt.audioOffsetMs = this.clamp(gameSt.audioOffsetMs, -200, 200, 0);
+      this.quickGameSt.laneCover = this.clamp(gameSt.laneCover, 0, 0.6, 0);
+      this.quickGameSt.bgaDim = this.clamp(gameSt.bgaDim, 0, 0.95, DEFAULT_SETTINGS.bgaDim);
+      this.quickGameSt.mirror = gameSt.mirror === true;
+      this.quickGameSt.noFail = gameSt.noFail === true;
+      this.quickGameSt.showFastSlow = gameSt.showFastSlow === true;
+      this.quickGameSt.autoPlay = this.$store.state.autoPlay === true;
       this.quickPreference.keyMap = {
         ...DEFAULT_KEY_MAP,
         ...(preference.keyMap || {}),
@@ -347,6 +440,7 @@ export default {
       this.$store.state.audio.playEffect("ui/pop");
     },
     closeQuickSettings() {
+      this.stopCalibration();
       this.showQuickSettings = false;
       this.$store.state.audio.playEffect("ui/loose");
     },
@@ -378,6 +472,7 @@ export default {
       if (!audio) return;
       audio.maxVolume = next;
       audio.setVolume(next);
+      saveSettings({ bgmVolume: next }); // [설정 저장] 볼륨은 즉시 적용되므로 즉시 저장
     },
     onEffectVolumeChange(value) {
       const next = this.clamp(value, 0, 1, 0.5);
@@ -386,6 +481,7 @@ export default {
       if (!audio) return;
       audio.effectVolume = next;
       audio.playEffect("ui/click2");
+      saveSettings({ effectVolume: next }); // [설정 저장]
     },
     async saveQuickSettings() {
       const profile = this.$store.state.userProfile || {};
@@ -394,6 +490,12 @@ export default {
         noteSpeed: this.quickGameSt.noteSpeed,
         keyBeamEnabled: this.quickGameSt.keyBeamEnabled,
         noteEffectEnabled: this.quickGameSt.noteEffectEnabled,
+        audioOffsetMs: this.quickGameSt.audioOffsetMs,
+        laneCover: this.quickGameSt.laneCover,
+        bgaDim: this.quickGameSt.bgaDim,
+        mirror: this.quickGameSt.mirror,
+        noFail: this.quickGameSt.noFail,
+        showFastSlow: this.quickGameSt.showFastSlow,
       };
       const preference = {
         ...(profile.preference || {}),
@@ -410,6 +512,15 @@ export default {
         gameSt,
         preference,
       });
+      this.$store.commit("setAutoPlay", this.quickGameSt.autoPlay);
+
+      // [설정 저장] 재시작 후에도 유지되도록 로컬에 저장(오토플레이/랜덤 기믹 테스트는 저장 안 함)
+      saveSettings({
+        ...gameSt,
+        keyMap: preference.keyMap,
+        bgmVolume: this.quickSound.bgmVolume,
+        effectVolume: this.quickSound.effectVolume,
+      });
 
       try {
         await updateUserProfile({ gameSt, preference });
@@ -419,6 +530,81 @@ export default {
 
       this.$store.state.audio.playEffect("ui/slide2");
       this.showQuickSettings = false;
+    },
+    formatOffset(val) {
+      const n = Math.round(Number(val) || 0);
+      return `${n > 0 ? "+" : ""}${n}ms`;
+    },
+    // [설정] 오프셋 자동 측정: 일정 간격 클릭음에 맞춰 키를 누르게 하고,
+    // (누른 시각 - 소리 예정 시각)의 중앙값을 오프셋으로 제안한다.
+    // 소리 출력 지연 + 입력 지연이 합쳐서 측정되므로 게임 오프셋과 같은 의미.
+    startCalibration() {
+      this.stopCalibration();
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) {
+        this.calib.message = "이 환경에서는 측정할 수 없습니다";
+        return;
+      }
+      const ctx = new Ctx();
+      this.calibCtx = ctx;
+      const audio = this.$store.state.audio;
+      if (audio) audio.pause(); // 프리뷰 음악 정지(측정 방해 방지)
+      ctx.resume().catch(() => {});
+      const baseCtx = ctx.currentTime;
+      const basePerf = performance.now();
+      const beats = [];
+      for (let i = 0; i < CALIB_BEATS; i += 1) {
+        const when = baseCtx + CALIB_LEAD_SEC + i * CALIB_INTERVAL_SEC;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = i % 4 === 0 ? 1500 : 1000;
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(0.5, when + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.06);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(when);
+        osc.stop(when + 0.08);
+        beats.push(basePerf + (when - baseCtx) * 1000);
+      }
+      this.calib = { state: "running", taps: [], beats, message: "" };
+      this.calibTimer = setTimeout(
+        () => this.finishCalibration(),
+        (CALIB_LEAD_SEC + CALIB_BEATS * CALIB_INTERVAL_SEC + 0.4) * 1000
+      );
+    },
+    onCalibrationTap(e) {
+      this.calib.taps.push(e.timeStamp || performance.now());
+    },
+    finishCalibration() {
+      const { taps, beats } = this.calib;
+      const diffs = [];
+      taps.forEach((t) => {
+        let best = null;
+        beats.forEach((b, idx) => {
+          if (idx < 2) return; // 처음 두 박은 박자 잡는 용도라 제외
+          const d = t - b;
+          if (best === null || Math.abs(d) < Math.abs(best)) best = d;
+        });
+        if (best !== null && Math.abs(best) <= 250) diffs.push(best);
+      });
+      this.stopCalibration();
+      if (diffs.length < 4) {
+        this.calib.message = "입력이 부족합니다. 다시 측정해 주세요";
+        return;
+      }
+      diffs.sort((a, b) => a - b);
+      const median = diffs[Math.floor(diffs.length / 2)];
+      const value = Math.round(Math.min(200, Math.max(-200, median)));
+      this.quickGameSt.audioOffsetMs = value;
+      this.calib.message = `측정 결과 ${this.formatOffset(value)} (입력 ${diffs.length}회). Apply를 눌러 저장`;
+    },
+    stopCalibration() {
+      clearTimeout(this.calibTimer);
+      if (this.calibCtx) {
+        this.calibCtx.close().catch(() => {});
+        this.calibCtx = null;
+      }
+      this.calib.state = "idle";
     },
     clearPreviewTimer() {
       if (this.previewStopTimer) {
@@ -504,6 +690,18 @@ export default {
       }
     },
     handleKeydown(e) {
+      // [설정] 오프셋 측정 중엔 모든 키를 탭 입력으로 사용(ESC는 측정 취소)
+      if (this.calib.state === "running") {
+        e.preventDefault();
+        if (e.key === "Escape") {
+          this.stopCalibration();
+          this.calib.message = "측정을 취소했습니다";
+        } else if (!e.repeat) {
+          this.onCalibrationTap(e);
+        }
+        return;
+      }
+
       if (e.key === "Escape") {
         e.preventDefault();
         if (this.showQuickSettings) {
@@ -1133,6 +1331,43 @@ export default {
   min-width: 0;
 }
 
+/* [설정] 체크박스 2열 배치(모바일에선 1열) */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.calib-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.calib-btn {
+  padding: 6px 14px;
+}
+
+.calib-msg {
+  color: var(--dm-muted);
+  font-size: 13px;
+}
+
+.calib-live {
+  color: var(--dm-cyan);
+  font-weight: 700;
+  animation: calib-blink 0.6s steps(2) infinite;
+}
+
+@keyframes calib-blink {
+  50% {
+    opacity: 0.5;
+  }
+}
+
 .slider-wrap select {
   width: 100%;
   padding: 8px 10px;
@@ -1188,6 +1423,24 @@ export default {
 
   .top-hint {
     display: none;
+  }
+
+  /* [UI] 모바일 폭에서 설정 패널이 찌그러지지 않게(라벨/값 칸 축소, 체크박스 1열) */
+  .quick-settings-panel {
+    padding: 20px 16px;
+  }
+
+  .settings-row {
+    grid-template-columns: 84px 1fr 64px;
+    gap: 10px;
+  }
+
+  .settings-row strong {
+    font-size: 18px;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
