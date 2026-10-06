@@ -313,7 +313,10 @@ export default class Note {
   }
 
   update() {
-    if (this.game.paused) return;
+    // [개선] 예전엔 일시정지 중 여기서 바로 return해서 노트가 그려지지 않았음 → 일시정지/재개
+    // 카운트다운 동안 노트가 전부 사라졌다가 재개 순간 판정선 근처에 갑자기 나타났음.
+    // 일시정지 중에도 (멈춘 위치 그대로) 그리기는 하고, 판정/미스/홀드 처리만 건너뛴다.
+    const paused = !!this.game.paused;
 
     const speed = this.game.noteSpeedPxPerSec || 1;
     const distance = this.visualPos - (this.game.currentGlobalVisualPos || 0);
@@ -368,7 +371,9 @@ export default class Note {
       this.x = this.baseX;
     }
 
-    if (this.isLong) {
+    if (paused) {
+      // 판정/미스/홀드 틱 처리 생략(위치는 currentTime이 멈춰 있으므로 그대로)
+    } else if (this.isLong) {
       if (this.holding) {
         this._processHoldTicks();
 
