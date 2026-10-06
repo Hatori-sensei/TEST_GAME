@@ -52,6 +52,7 @@ import FloatingAlert from "./components/ui/FloatingAlert.vue";
 import PageBackground from "./components/common/PageBackground.vue";
 import { logEvent } from "./helpers/analytics";
 import semver from "semver";
+import { hasSavedSettings, loadSettings } from "./helpers/settings";
 import "vue-awesome/icons/volume-up";
 import "vue-awesome/icons/volume-mute";
 import "vue-awesome/icons/expand";
@@ -72,7 +73,14 @@ export default {
     PageBackground,
   },
   mounted() {
-    this.$store.commit("setAudio", new Audio());
+    const audio = new Audio();
+    // [설정 저장] 저장된 BGM/효과음 볼륨 복원(저장값이 없으면 Audio 기본값 그대로)
+    if (hasSavedSettings()) {
+      const saved = loadSettings();
+      audio.maxVolume = saved.bgmVolume;
+      audio.effectVolume = saved.effectVolume;
+    }
+    this.$store.commit("setAudio", audio);
     this.$store.commit("setGlobalModal", this.$refs.gm);
     this.$store.commit("setFloatingAlert", this.$refs.alert);
     this.listenToUpdates();

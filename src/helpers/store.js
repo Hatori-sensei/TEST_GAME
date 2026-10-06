@@ -3,10 +3,21 @@ import Vuex from "vuex";
 import { usersCollection, auth } from "./firebaseConfig";
 import { logEvent, setUserId, setUserProps } from "./analytics";
 import md5 from "js-md5";
+import { hasSavedSettings, loadSettings, toGameSt } from "./settings";
 
 Vue.use(Vuex);
 
 const isDev = process.env.NODE_ENV === "development";
+
+// [설정 저장] 저장된 로컬 설정이 있으면 시작 시 userProfile/배속에 반영.
+// 저장된 설정이 없으면 아무것도 넣지 않아 기존 동작과 완전히 같다.
+const savedSettings = hasSavedSettings() ? loadSettings() : null;
+const initialUserProfile = savedSettings
+  ? {
+      gameSt: toGameSt(savedSettings),
+      preference: savedSettings.keyMap ? { keyMap: { ...savedSettings.keyMap } } : {},
+    }
+  : {};
 
 export const store = new Vuex.Store({
   state: {
@@ -14,7 +25,7 @@ export const store = new Vuex.Store({
     gModal: null,
     bg: null,
     currentUser: null,
-    userProfile: {},
+    userProfile: initialUserProfile,
     profilePicture: null,
     authed: false,
     verified: false,
@@ -40,10 +51,12 @@ export const store = new Vuex.Store({
     isDev,
     remoteConfig: null,
     // Game play settings
-    speedMultiplier: 1.0,
+    speedMultiplier: savedSettings?.noteSpeed ?? 1.0,
     pendingSheetId: null,
     pendingGameOptions: null,
     randomGimmickMode: "off",
+    // 오토플레이(시연용). 실수로 켜둔 채 축제 운영되지 않도록 저장하지 않고 이번 실행에만 유지.
+    autoPlay: false,
   },
   actions: {
     async fetchUserProfile() {
@@ -209,6 +222,9 @@ export const store = new Vuex.Store({
     },
     setPendingGameOptions(state, val) {
       state.pendingGameOptions = val && typeof val === "object" ? { ...val } : null;
+    },
+    setAutoPlay(state, val) {
+      state.autoPlay = !!val;
     },
     setRandomGimmickMode(state, val) {
       const mode = String(val || "off").toLowerCase();
