@@ -24,6 +24,9 @@ const createJudgeDetails = () => ({
   BREAK: 0,
 });
 
+// [UI] 결과 화면용 타이밍 통계(FAST/SLOW 개수, 평균 오차). 점수/판정 계산과는 무관.
+const createTimingStats = () => ({ fast: 0, slow: 0, sumMs: 0, count: 0 });
+
 export default {
   data() {
     return {
@@ -46,6 +49,7 @@ export default {
         marks: { perfect: 0, good: 0, offbeat: 0, miss: 0 },
         judgeSummary: createJudgeSummary(),
         judgeDetails: createJudgeDetails(),
+        timing: createTimingStats(),
       },
       fever: { value: 1, time: 0, percent: 0 },
       health: 100,
@@ -210,6 +214,17 @@ export default {
       this.scoreAccRaw += perJudge * (safePercent / 100);
       this.result.score = Math.max(0, Math.min(1000000, Math.floor(this.scoreAccRaw)));
     },
+    // [UI] 누른 타이밍 기록(+ 늦음 / - 빠름, ms). FAST/SLOW는 MAX 100% 미만만 셈(IIDX 방식)
+    registerTiming(signedMs, displayPercent) {
+      if (!Number.isFinite(signedMs)) return;
+      const t = this.result.timing || (this.result.timing = createTimingStats());
+      t.sumMs += signedMs;
+      t.count += 1;
+      if (displayPercent < 100) {
+        if (signedMs < 0) t.fast += 1;
+        else t.slow += 1;
+      }
+    },
     registerJudgeLabel(judgeText) {
       const label = String(judgeText || "BREAK");
       if (!this.result.judgeSummary) {
@@ -247,6 +262,7 @@ export default {
         marks: { perfect: 0, good: 0, offbeat: 0, miss: 0 },
         judgeSummary: createJudgeSummary(),
         judgeDetails: createJudgeDetails(),
+        timing: createTimingStats(),
       };
       this.scoreAccRaw = 0;
       this.scorePerJudge =

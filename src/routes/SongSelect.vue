@@ -1349,6 +1349,7 @@ export default {
 
 .calib-btn {
   padding: 6px 14px;
+  white-space: nowrap;
 }
 
 .calib-msg {
@@ -1431,8 +1432,17 @@ export default {
   }
 
   .settings-row {
-    grid-template-columns: 84px 1fr 64px;
+    grid-template-columns: 96px 1fr 64px;
     gap: 10px;
+  }
+
+  .settings-row label {
+    word-break: keep-all;
+  }
+
+  .calib-btn {
+    min-width: 0;
+    font-size: 15px;
   }
 
   .settings-row strong {

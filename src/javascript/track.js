@@ -61,6 +61,12 @@ export default class DropTrack {
     return isEarly ? "fast" : "slow";
   }
 
+  _recordTiming(signedMs, displayPercent) {
+    if (typeof this.vm.registerTiming === "function") {
+      this.vm.registerTiming(signedMs, displayPercent);
+    }
+  }
+
   _recordJudgement(percent, judgeText) {
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(percent);
@@ -85,6 +91,8 @@ export default class DropTrack {
     const diffPx = Math.abs(this.game.checkHitLineY - judgeReferenceY);
     const diffMs = (diffPx / this.game.noteSpeedPxPerSec) * 1000;
     const isEarly = judgeReferenceY < this.game.checkHitLineY;
+    // [UI] 결과 화면 타이밍 통계용 부호 있는 오차(ms, +면 늦음). 판정에는 사용하지 않음
+    const signedMs = isEarly ? -diffMs : diffMs;
 
     const HIT_WINDOW = 175;
     const EARLY_MISS_WINDOW = 300;
@@ -102,6 +110,7 @@ export default class DropTrack {
           this.vm.result.maxCombo || 0
         );
         this._recordJudgement(judgePercent, judgeString);
+        this._recordTiming(signedMs, displayPercent);
 
         let gaugeCharge = judgePercent === 100 ? 5 : judgePercent >= 90 ? 3 : 1;
         this.vm.result.feverGauge =
@@ -182,6 +191,7 @@ export default class DropTrack {
         this.vm.result.maxCombo || 0
       );
       this._recordJudgement(judgePercent, judgeString);
+      this._recordTiming(signedMs, displayPercent);
 
       let gaugeCharge = judgePercent === 100 ? 5 : judgePercent >= 90 ? 3 : 1;
       this.vm.result.feverGauge =

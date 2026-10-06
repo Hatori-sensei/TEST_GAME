@@ -84,6 +84,23 @@
               <span class="rs-row-label">{{ entry.label }}</span>
               <ICountUp :endVal="entry.value" :options="{ decimalPlaces: 0 }" />
             </div>
+            <!-- [UI] 타이밍 분석: IIDX의 FAST/SLOW 개수 + osu!의 평균 오차(ms) 참고 -->
+            <div class="rs-timing" v-if="timingInfo">
+              <div class="rs-judge-head">TIMING</div>
+              <div class="rs-row small">
+                <span class="rs-row-label fs-fast">FAST</span>
+                <span>{{ timingInfo.fast }}</span>
+              </div>
+              <div class="rs-row small">
+                <span class="rs-row-label fs-slow">SLOW</span>
+                <span>{{ timingInfo.slow }}</span>
+              </div>
+              <div class="rs-row small">
+                <span class="rs-row-label">AVG</span>
+                <span>{{ timingInfo.avgText }}</span>
+              </div>
+              <div class="rs-timing-hint" v-if="timingInfo.hint">{{ timingInfo.hint }}</div>
+            </div>
           </div>
           <div class="rs-judge-col rs-judge-detail">
             <div class="rs-judge-head">DETAILED</div>
@@ -221,6 +238,18 @@ export default {
             ? "offbeat"
             : "good",
       }));
+    },
+    // [UI] 타이밍 통계(기록이 없는 예전 결과면 표시 안 함)
+    timingInfo() {
+      const t = this.result?.result?.timing;
+      if (!t || !t.count) return null;
+      const avg = Math.round(t.sumMs / t.count);
+      const avgText = `${avg > 0 ? "+" : ""}${avg}ms`;
+      let hint = "";
+      // 평균이 한쪽으로 15ms 이상 치우치면 오프셋 조정 안내(설정 > 오디오 오프셋)
+      if (avg >= 15) hint = `늦게 치는 편 → 오디오 오프셋 +${avg}ms 정도 권장`;
+      else if (avg <= -15) hint = `빠르게 치는 편 → 오디오 오프셋 ${avg}ms 정도 권장`;
+      return { fast: t.fast, slow: t.slow, avgText, hint };
     },
     // song info lives in chart.song
     cover() {
@@ -615,6 +644,23 @@ export default {
   font-style: italic;
   font-weight: 700;
   font-size: 24px;
+}
+
+/* [UI] 타이밍 분석 카드 */
+.rs-timing {
+  margin-top: 14px;
+}
+.rs-row-label.fs-fast {
+  color: #19d3ff;
+}
+.rs-row-label.fs-slow {
+  color: #ff5a7a;
+}
+.rs-timing-hint {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--dm-muted);
+  word-break: keep-all;
 }
 
 .rs-row.small {
