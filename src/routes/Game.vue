@@ -393,11 +393,14 @@ export default {
     window.addEventListener("keyup", this.handleUIKeyUp);
   },
   beforeDestroy() {
-    if (this.isGameEnded) return;
-    this.reportExit("closed");
-
+    // [버그수정] 리스너 해제를 early return 앞으로 이동. 예전엔 곡을 끝까지 플레이하거나
+    // 게임오버로 나가면(isGameEnded) 해제되지 않아, 판마다 window 리스너와 함께
+    // 파괴된 Game 화면 전체(BGA video, canvas 등)가 메모리에 계속 남았음(장시간 운영 시 누적).
     window.removeEventListener("keydown", this.handleUIKeyDown);
     window.removeEventListener("keyup", this.handleUIKeyUp);
+
+    if (this.isGameEnded) return;
+    this.reportExit("closed");
   },
   methods: {
     resolveMediaUrl(path) {
