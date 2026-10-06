@@ -361,6 +361,21 @@ export class HitEffect {
   }
 
   update() {
+    if (this.rings.length === 0) {
+      // [성능] 링이 없으면 save/restore도 생략. 다음 링은 첫 프레임을 1단계로 시작
+      this.lastUpdateAt = null;
+      return;
+    }
+    // [성능] 예전엔 링이 "프레임 수" 기준으로 줄어들어(알파 -0.08/프레임) FPS가 떨어지면
+    // 링이 화면에 더 오래 남아 쌓이고 → 더 느려지는 악순환이 있었음(소프트웨어 렌더링에서
+    // 60fps → 2fps까지 측정). 60fps 기준 1프레임 = 1단계로 경과 시간에 비례해 진행시킨다.
+    // 60fps에선 기존과 같은 모양/속도, 프레임이 낮아도 같은 시간(약 0.2초) 안에 사라짐.
+    const now = performance.now();
+    const step = this.lastUpdateAt
+      ? Math.min(6, Math.max(0.25, (now - this.lastUpdateAt) / (1000 / 60)))
+      : 1;
+    this.lastUpdateAt = now;
+    const thicknessDecay = Math.pow(0.9, step);
     const ctx = this.game.ctx;
     ctx.save();
 
@@ -378,9 +393,9 @@ export class HitEffect {
       ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
       ctx.stroke();
 
-      r.radius += r.speed;
-      r.thickness *= 0.9;
-      r.alpha -= 0.08;
+      r.radius += r.speed * step;
+      r.thickness *= thicknessDecay;
+      r.alpha -= 0.08 * step;
       if (r.alpha <= 0) this.rings.splice(i, 1);
     }
 
