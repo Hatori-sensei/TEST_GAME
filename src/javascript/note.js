@@ -280,8 +280,14 @@ export default class Note {
     if (this.missed) return NOTE_PALETTES.missed;
     if (isFailed) return NOTE_PALETTES.failedSingle;
     if (isShiftNote) return NOTE_PALETTES.shift;
-    const outer = this.key === "d" || this.key === "k";
-    return outer ? NOTE_PALETTES.outer : NOTE_PALETTES.inner;
+    // [버그수정] 예전엔 키 이름("d"/"k")으로 바깥 레인을 판별해서, 키 배치를 바꾸면
+    // (예: d→s) 바깥 레인 노트도 안쪽 색(청록)으로 그려졌음 → 실제 레인 위치로 판별.
+    if (this.isOuterLane === undefined) {
+      const binds = this.game.trackKeyBind || ["d", "f", "j", "k"];
+      const lane = binds.indexOf(this.key);
+      this.isOuterLane = lane === 0 || lane === binds.length - 1;
+    }
+    return this.isOuterLane ? NOTE_PALETTES.outer : NOTE_PALETTES.inner;
   }
 
   _drawNoteHead(pal, yTop = this.y) {
