@@ -807,6 +807,12 @@ export default class GameInstance {
       parsedNotes = rawNotes;
     }
 
+    // [방어] 플레이 모드에서만 채보 JSON 정리(시간 정렬 + 잘못된 노트 제거).
+    // 에디터(playMode false)는 원본 그대로 편집해야 하므로 제외.
+    if (Array.isArray(parsedNotes) && (!this.vm || this.vm.playMode !== false)) {
+      parsedNotes = this._sanitizeChartNotes(parsedNotes);
+    }
+
     if (
       !parsedNotes ||
       !Array.isArray(parsedNotes) ||
@@ -917,6 +923,54 @@ export default class GameInstance {
         this.audioPath
       );
     }
+  }
+
+  // [방어] 채보 노트 정리. 정상 채보(현재 채보 전부)는 결과가 원본과 동일함.
+  // - 시작 시간이 숫자가 아닌 노트, 레인(key 0~3 / k 문자열)을 알 수 없는 노트는 제외
+  //   (예전엔 화면에 안 나오는데 총 판정 수에는 포함돼 100만점이 불가능했음)
+  // - 시간순 정렬(안정 정렬): 스폰 루프가 "정렬돼 있다"고 가정하고 앞 노트에서 멈추므로
+  //   순서가 섞인 채보는 노트가 늦게/갑자기 나타났음
+  // - 같은 레인·같은 시간 중복, 음수 시간, 곡 길이 초과는 고치지 않고 콘솔 경고만 남김
+  _sanitizeChartNotes(notes) {
+    const timeOf = (n) => Number(n?.startTime ?? n?.t);
+    const valid = notes.filter((n) => {
+      if (!n || typeof n !== "object" || !Number.isFinite(timeOf(n))) return false;
+      if (typeof n.k === "string" && n.k) return true;
+      const key = Number(n.key);
+      return Number.isInteger(key) && key >= 0 && key < this.trackNum;
+    });
+    const removed = notes.length - valid.length;
+    let unsorted = false;
+    for (let i = 1; i < valid.length; i += 1) {
+      if (timeOf(valid[i]) < timeOf(valid[i - 1])) {
+        unsorted = true;
+        break;
+      }
+    }
+    // 정렬된 채보는 원본 배열을 그대로 사용(불필요한 복사/순서 변경 방지)
+    const result =
+      removed === 0 && !unsorted
+        ? notes
+        : valid
+            .map((n, i) => ({ n, i }))
+            .sort((a, b) => timeOf(a.n) - timeOf(b.n) || a.i - b.i)
+            .map((e) => e.n);
+    let negative = 0;
+    let duplicated = 0;
+    const seen = new Set();
+    result.forEach((n) => {
+      const t = timeOf(n);
+      if (t < 0) negative += 1;
+      const id = `${n.k ?? n.key}@${t}`;
+      if (seen.has(id)) duplicated += 1;
+      seen.add(id);
+    });
+    if (removed || unsorted || negative || duplicated) {
+      console.warn(
+        `[chart] 채보 점검: 제외 ${removed}개, 정렬 필요 ${unsorted}, 음수 시간 ${negative}개, 같은 레인·시간 중복 ${duplicated}개`
+      );
+    }
+    return result;
   }
 
   _parseDuration(songLength) {
