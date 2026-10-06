@@ -50,6 +50,13 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 5. exe 재빌드 후 전체 플레이 확인, 저작권(곡/영상, 원작 라이선스) 확인.
 6. 남은 잡일: `.claude/launch.json`(불필요, 삭제 가능), `.husky`/`.github`/firebase.json은 손대지 않음. ESLint의 prettier 경고는 기존(줄바꿈 CRLF)이라 무시.
 
+## 2026-10 점검 (브랜치 claude/pensive-hopper-pj91pf, 상세: docs/점검보고서_2026-10.md)
+- 버그 수정: 시작 전/종료 중 ESC 이중 재생, 카운트다운 중 blur, blur 시 키/롱노트 상태 잔류, Restart 중복 노트, Game 리스너 누수, 결과 화면이 설정 초기화, 효과음 0% 무시, 키 배치 변경 시 레인 색.
+- 설정 저장: `src/helpers/settings.js` (localStorage `djon.settings`, version 1, 저장값 없으면 기존 동작 그대로). 곡 선택 ESC 설정에 오디오 오프셋(+자동 측정), 레인 커버, 배경 어둡게, 미러, No Fail, 오토플레이(저장 안 함), FAST/SLOW(기본 끔) 추가.
+- 오프셋은 `currentTime = 오디오 시간 - audioOffsetSec` (판정 범위 불변, 영상은 audioTime 기준).
+- 결과 화면 TIMING 카드(result.timing: fast/slow/sumMs/count, 메모리만).
+- 미해결 질문/수치 불일치(배속 8.0 상한, 체력 회복량 문서 불일치, 판정 기준점 30px)는 보고서 [C] 참고.
+
 ## 작업 메모
 - 파일 줄바꿈이 CRLF인 파일이 많음. 스크립트로 수정할 땐 보존할 것.
 - 개발 서버는 3000번 포트(`npm start`). 확인은 `node_modules/.bin/electron . --windowed --rp-debug --remote-debugging-port=9222` 후 CDP로 캡처했음. HMR 중에 게임이 시작되면 개발용 오류 오버레이가 뜨는데 실제 결함 아님.
