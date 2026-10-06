@@ -82,7 +82,11 @@ export const store = new Vuex.Store({
         try {
           const res = await usersCollection.doc(state.currentUser.uid).get();
           let data = res.data();
-          commit("setUserProfile", data ?? {});
+          // [버그수정] 오프라인 모드에선 서버(가짜 firestore)가 항상 빈 객체를 돌려주는데,
+          // 이걸로 userProfile을 통째로 바꿔서 결과 화면에 들어갈 때마다(이 액션 호출)
+          // 곡 선택 화면에서 적용한 키 배치/키 빔/노트 이펙트 설정이 초기화됐음.
+          // 기존 값 위에 받아온 값을 덮어쓰는 방식(merge)으로 변경.
+          commit("setUserProfile", { ...(state.userProfile || {}), ...(data || {}) });
           commit("setTheme");
           logEvent("app_initialized", null, "system");
         } catch (err) {
