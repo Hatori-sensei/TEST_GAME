@@ -8,7 +8,7 @@
 - 원작 웹 리듬게임 "Rhythm Plus"를 변형한 것. Vue 2 + webpack 5 + Howler + Electron 25 + electron-builder
 - 오프라인 축제 시연용이라 Firebase는 firebaseConfig.js에서 가짜 객체로 대체되어 있고, 곡/채보는 src/javascript/localCatalog.js, db.js에 있음. 곡 6개(kamui, 초 나이트 오브 나이츠, the EmpErroR, Mammal, Do it, Apollo).
 - 기록은 브라우저/앱 저장소(로컬)에만 남음. 결과(result)는 메모리에만 있어서 결과 화면(/result/..)에서 새로고침하면 사라짐(오류 팝업이 뜸, 정상).
-- 이번 세션의 모든 변경은 **아직 커밋하지 않음**(git status로 확인). 삭제 파일 24개 포함.
+- 위 변경은 모두 커밋됨: `c18d4ce`(축제용 엔진/디자인/배포 정리, 삭제 파일 24개 포함), `7102b64`(채보 JSON 로딩 public/charts/*.json, 키 배치 버그 수정, 결과/설정 화면 다듬기). 원격 master에 반영되어 있음.
 
 ## 절대 건드리지 말 것 (사용자 지시)
 - 판정선 위치(Game.vue `.judgment-line`: bottom 320px, height 18px)와 캔버스 판정선(checkHitLineY = canvas.height - 320)
