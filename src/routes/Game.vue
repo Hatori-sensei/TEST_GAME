@@ -312,6 +312,9 @@ export default {
       // full-screen loading screen, shown from the moment the game screen opens
       loadingScreen: true,
       loadingScreenSince: Date.now(),
+      // [성능] 진행 바용 재생 시간(0.1초 단위로만 갱신). progress가 instance.currentTime을
+      // 직접 읽으면 매 프레임 Game 화면 전체가 다시 렌더링됐음.
+      progressTime: 0,
     };
   },
   computed: {
@@ -324,7 +327,7 @@ export default {
           this.currentSong.length
       );
       const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 1;
-      const elapsed = Math.max(0, Number(this.instance.currentTime || 0) - startAt);
+      const elapsed = Math.max(0, Number(this.progressTime || 0) - startAt);
       return Math.min(1, elapsed / safeDuration);
     },
   },
@@ -353,6 +356,11 @@ export default {
 
     if (this.instance) {
       this.instance.onTick = (timeData) => {
+        // [성능] 진행 바 시간은 0.1초 이상 바뀔 때만 반영(ProgressBar도 100ms마다 샘플링함)
+        if (Math.abs(timeData.audioTime - this.progressTime) >= 0.1) {
+          this.progressTime = timeData.audioTime;
+        }
+
         if (
           this.$refs.trackComponent &&
           typeof this.$refs.trackComponent.update === "function"
