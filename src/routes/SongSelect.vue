@@ -1434,47 +1434,4 @@ export default {
   background: var(--dm-cyan);
   border-color: var(--dm-cyan);
 }
-
-@media only screen and (max-width: 1000px) {
-  .layout-container {
-    flex-direction: column;
-    overflow-y: auto;
-    gap: 28px;
-  }
-
-  .left-panel {
-    flex: none;
-  }
-
-  .top-hint {
-    display: none;
-  }
-
-  /* [UI] 모바일 폭에서 설정 패널이 찌그러지지 않게(라벨/값 칸 축소, 체크박스 1열) */
-  .quick-settings-panel {
-    padding: 20px 16px;
-  }
-
-  .settings-row {
-    grid-template-columns: 96px 1fr 64px;
-    gap: 10px;
-  }
-
-  .settings-row label {
-    word-break: keep-all;
-  }
-
-  .calib-btn {
-    min-width: 0;
-    font-size: 15px;
-  }
-
-  .settings-row strong {
-    font-size: 18px;
-  }
-
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

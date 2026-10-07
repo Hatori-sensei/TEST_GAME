@@ -727,28 +727,4 @@ export default {
   flex-direction: row;
   padding: 30px 0;
 }
-
-@media only screen and (max-width: 1000px) {
-  .rs-layout {
-    flex-direction: column;
-    overflow-y: auto;
-    gap: 28px;
-  }
-
-  .rs-left {
-    flex: none;
-  }
-
-  .rs-main {
-    flex-direction: column;
-  }
-
-  .rs-judges {
-    flex-direction: column;
-  }
-
-  .btn_sec {
-    position: static;
-  }
-}
 </style>

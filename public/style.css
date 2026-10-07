@@ -571,14 +571,3 @@ input::placeholder {
     opacity: 1;
   }
 }
-
-@media only screen and (max-width: 1000px) {
-  .ytPlayerMobileExtend {
-    width: 249vh !important;
-    transform: translateX(calc(50vw - 124.5vh));
-  }
-
-  .slide-in-leave-to {
-    margin-top: -100px;
-  }
-}

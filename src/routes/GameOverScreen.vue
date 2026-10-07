@@ -182,10 +182,4 @@ export default {
 .go-btn-main .fa-icon {
   color: #04121c;
 }
-
-@media screen and (max-width: 600px) {
-  .gameover {
-    font-size: 5.5em;
-  }
-}
 </style>
