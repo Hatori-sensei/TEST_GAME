@@ -4,6 +4,8 @@ const RELEASE_MAX_ONE_EARLY_MS = 150;
 const RELEASE_MAX_ONE_LATE_MS = 250;
 const SHIFT_SPEED_MULTIPLIER = 1.8;
 const NOTE_INSET_PX = 4;
+// 판정선(Game.vue .judgment-line) 높이. 캔버스 checkHitLineY = 판정선 아래 가장자리.
+const JUDGE_LINE_HEIGHT_PX = 18;
 
 // Outer lanes ice-white, inner lanes cyan, gimmick (shift) notes amber.
 const NOTE_PALETTES = {
@@ -333,9 +335,10 @@ export default class Note {
     // 예전엔 노트 위 끝이 이 점이고 판정은 "아래 끝"(+30px) 기준이라, MAX 100% 타이밍이
     // 채보 시간보다 30px/속도(1.0배속 75ms, 3.0배속 25ms)만큼 빨라 배속마다 달랐음.
     this.judgeY = baseY;
-    // 그림은 노트 높이만큼 위로 그려서 "아래 끝이 판정선에 닿는 순간 = 채보 시간 = 정타"가 되게 함
-    // (화면상 정타 모양은 예전과 같고, 판정 타이밍만 음악과 일치)
-    const drawBaseY = baseY - this.singleNoteHeight;
+    // 그림 위치: 채보 시간(=정타)에 "노트 중앙"이 "판정선 중앙"에 오도록 그린다.
+    // 판정선 중앙 = checkHitLineY - 9, 노트 중앙 = y + 15 → y = baseY - 9 - 15 = baseY - 24.
+    // (판정은 시간 기준이라 그림 위치만 바뀌고 판정 타이밍/범위는 그대로)
+    const drawBaseY = baseY - JUDGE_LINE_HEIGHT_PX / 2 - this.singleNoteHeight / 2;
 
     const reverseBlend = Number(this.game.reverseBlend) || 0;
     if (reverseBlend > 0) {
@@ -428,8 +431,8 @@ export default class Note {
       if (isVisible) {
         const pal = this._getPalette(isShiftNote, false);
         this._drawLongBody(pal, bodyTop, bodyHeight);
-        // Release marker: a second note block at the tail. Its bottom edge reaches
-        // the judgment line exactly at endTime, i.e. when the key should be let go.
+        // Release marker: a second note block at the tail. Its center reaches the
+        // judgment line's center exactly at endTime, i.e. when the key should be let go.
         this._drawNoteHead(pal, bodyTop);
         this._drawNoteHead(pal);
       }

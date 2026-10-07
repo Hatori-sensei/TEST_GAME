@@ -55,7 +55,7 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - 설정 저장: `src/helpers/settings.js` (localStorage `djon.settings`, version 1, 저장값 없으면 기존 동작 그대로). 곡 선택 ESC 설정에 오디오 오프셋(+자동 측정), 레인 커버, 배경 어둡게, 미러, No Fail, 오토플레이(저장 안 함), FAST/SLOW(기본 끔) 추가.
 - 오프셋은 `currentTime = 오디오 시간 - audioOffsetSec` (판정 범위 불변, 영상은 audioTime 기준).
 - 결과 화면 TIMING 카드(result.timing: fast/slow/sumMs/count, 메모리만).
-- 판정 기준: 채보 시간 기준(judgeY = 채보 시간에 판정선). 노트 그림은 `y = judgeY - 30`(아래 끝이 정타 시점에 판정선). 예전 "노트 아래 끝 기준"(배속마다 75/25ms 앞당겨짐)에서 변경.
+- 판정 기준: 채보 시간 기준(judgeY = 채보 시간에 판정선). 노트 그림은 `y = judgeY - 9 - 15`(정타 시점에 노트 중앙 = 판정선 중앙). 예전 "노트 아래 끝 기준"(배속마다 75/25ms 앞당겨짐)에서 변경.
 - 미해결 질문/수치 불일치(배속 8.0 상한, 체력 회복량 문서 불일치)는 보고서 [C] 참고.
 
 ## 테마 (2026-10)
