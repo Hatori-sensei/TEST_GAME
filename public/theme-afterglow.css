@@ -1,0 +1,576 @@
+/* =====================================================================
+   테마 2: AFTERGLOW (해 질 녘 시티팝)
+   - 테마 1(각진 청록, 이탤릭)의 반대 방향: 둥근 모서리, 알약형 버튼, 핫핑크→선셋 오렌지
+     그라디언트, 남보라 밤하늘, 정자체 + 넓은 자간.
+   - <html data-theme="2">일 때만 적용. 테마 1은 이 파일의 영향을 받지 않음.
+   - 위치/크기(판정선 bottom 320px, 기어 500px 등)는 건드리지 않고 색/선/모양/장식만 바꾼다.
+   - 판정 표시(판정 글자, 콤보, FAST/SLOW, 결과 판정 행 색, 랭크 색)는 테마 1 값으로 고정.
+   ===================================================================== */
+
+html[data-theme="2"] {
+  --dm-bg: #0d0820;
+  --dm-panel: rgba(24, 15, 50, 0.9);
+  --dm-cyan: #ff4fa3; /* 주 강조색: 핫핑크 */
+  --dm-cyan-rgb: 255, 79, 163;
+  --dm-cyan-dim: rgba(255, 79, 163, 0.32);
+  --dm-cyan-faint: rgba(255, 79, 163, 0.1);
+  --dm-amber: #ffb347; /* 보조: 선셋 오렌지 */
+  --dm-red: #ff5d6c;
+  --dm-text: #f6eefe; /* 라벤더 화이트 */
+  --dm-muted: #9a8cc0;
+  --t2-sunset: linear-gradient(90deg, #ff4fa3 0%, #ff7a7a 55%, #ffb347 100%);
+  --t2-sunset-v: linear-gradient(180deg, #ffb347 0%, #ff4fa3 100%);
+  --t2-radius: 14px;
+  /* 화면 공통 배경: 아래쪽 노을빛 + 위쪽 밤하늘 */
+  --t2-sky: radial-gradient(ellipse 80% 55% at 50% 115%, rgba(255, 122, 90, 0.28) 0%, rgba(255, 79, 163, 0.12) 45%, transparent 75%),
+    linear-gradient(180deg, #0b0619 0%, #150b30 70%, #24103c 100%);
+}
+
+/* ---------- 판정 표시는 테마 1 색 그대로 고정 ---------- */
+html[data-theme="2"] .judge,
+html[data-theme="2"] .rs-row,
+html[data-theme="2"] .rs-rank,
+html[data-theme="2"] .rs-timing {
+  --dm-cyan: #19d3ff;
+  --dm-cyan-rgb: 25, 211, 255;
+  --dm-cyan-dim: rgba(25, 211, 255, 0.3);
+  --dm-amber: #ffb400;
+  --dm-red: #ff3b5c;
+}
+
+/* ---------- 공통: 이탤릭/사선 제거 (판정 표시는 제외) ---------- */
+html[data-theme="2"] body *:not(.judge):not(.judge *) {
+  font-style: normal !important;
+  clip-path: none !important;
+}
+html[data-theme="2"] body {
+  background: var(--dm-bg);
+}
+
+/* 전역 버튼: 알약형, 호버 시 노을 그라디언트 */
+html[data-theme="2"] .btn-action {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 79, 163, 0.35);
+  background: rgba(255, 79, 163, 0.08);
+  letter-spacing: 0.16em;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+html[data-theme="2"] .btn-action:hover {
+  color: #1a0b2e;
+  background: var(--t2-sunset);
+  box-shadow: 0 0 18px rgba(255, 79, 163, 0.45);
+}
+html[data-theme="2"] .btn-action:hover .fa-icon {
+  color: #1a0b2e;
+}
+/* 주 버튼(REPLAY 등): 항상 노을 그라디언트 */
+html[data-theme="2"] .btn-action.rs-btn-main,
+html[data-theme="2"] .btn-action.go-btn-main {
+  color: #1a0b2e;
+  background: var(--t2-sunset);
+  border-color: transparent;
+}
+html[data-theme="2"] .btn-action.rs-btn-main .fa-icon,
+html[data-theme="2"] .btn-action.go-btn-main .fa-icon {
+  color: #1a0b2e;
+}
+
+/* 전역 모달(일시정지 메뉴 등): 둥근 카드 + 그라디언트 테두리 */
+html[data-theme="2"] .modal {
+  border-radius: 20px;
+  border: 1px solid transparent;
+  background: linear-gradient(rgba(24, 15, 50, 0.96), rgba(24, 15, 50, 0.96)) padding-box,
+    var(--t2-sunset) border-box;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 40px rgba(255, 79, 163, 0.18);
+}
+html[data-theme="2"] .modal .btn-dark {
+  background: rgba(40, 26, 76, 0.85);
+}
+html[data-theme="2"] .modal-backdrop {
+  background-color: rgba(10, 5, 24, 0.78);
+}
+
+/* ---------- 시작 화면: 지평선 위 레트로 태양 + 원근 격자 ---------- */
+html[data-theme="2"] .home-page {
+  background: var(--t2-sky);
+}
+html[data-theme="2"] .hero-glow {
+  /* 줄무늬가 들어간 레트로 태양(아래쪽 절반에 가로 틈) */
+  inset: auto;
+  left: 50%;
+  top: 44%;
+  width: 560px;
+  height: 560px;
+  margin-left: -280px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffd27a 0%, #ff8a5c 45%, #ff4fa3 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0 52%, transparent 52% 56%, #000 56% 63%, transparent 63% 68%, #000 68% 74%, transparent 74% 80%, #000 80% 85%, transparent 85% 91%, #000 91%);
+  mask-image: linear-gradient(180deg, #000 0 52%, transparent 52% 56%, #000 56% 63%, transparent 63% 68%, #000 68% 74%, transparent 74% 80%, #000 80% 85%, transparent 85% 91%, #000 91%);
+  opacity: 0.85;
+  filter: drop-shadow(0 0 60px rgba(255, 79, 163, 0.5));
+}
+html[data-theme="2"] .grid-lines {
+  /* 바닥 원근 격자 */
+  inset: auto;
+  left: -50%;
+  right: -50%;
+  top: 66%;
+  height: 70%;
+  background: linear-gradient(rgba(255, 79, 163, 0.55) 2px, transparent 2px) 0 0 / 100% 46px,
+    linear-gradient(90deg, rgba(255, 79, 163, 0.55) 2px, transparent 2px) 0 0 / 70px 100%,
+    linear-gradient(180deg, #24103c, #0d0820);
+  transform: perspective(380px) rotateX(62deg);
+  transform-origin: top center;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 35%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 35%);
+}
+html[data-theme="2"] .scanline {
+  /* 지평선 */
+  top: 66%;
+  height: 2px;
+  transform: none;
+  background: var(--t2-sunset);
+  box-shadow: 0 0 18px rgba(255, 79, 163, 0.8);
+}
+html[data-theme="2"] .accent-bars {
+  display: none;
+}
+html[data-theme="2"] .hero-panel {
+  align-items: flex-start;
+  padding-top: 13vh;
+}
+html[data-theme="2"] .logo-mark {
+  border-radius: 28px;
+  color: #ffffff;
+  background: var(--t2-sunset-v);
+  box-shadow: 0 10px 40px rgba(255, 79, 163, 0.45);
+}
+html[data-theme="2"] .hero-logo h1 {
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  text-shadow: 0 0 30px rgba(255, 79, 163, 0.65), 0 4px 0 rgba(120, 30, 90, 0.6);
+}
+html[data-theme="2"] .hero-logo h1 .at {
+  color: #ffb347;
+}
+html[data-theme="2"] .click-hint {
+  color: #f6eefe;
+  text-shadow: 0 0 12px rgba(255, 79, 163, 0.8);
+}
+html[data-theme="2"] .click-hint::before,
+html[data-theme="2"] .click-hint::after {
+  background: var(--t2-sunset);
+}
+
+/* ---------- 공통 배경(곡 선택/결과/로딩/게임오버) ---------- */
+html[data-theme="2"] .bg-lines,
+html[data-theme="2"] .rs-lines,
+html[data-theme="2"] .ls-lines,
+html[data-theme="2"] .go-lines {
+  background: radial-gradient(ellipse 70% 45% at 50% 110%, rgba(255, 122, 90, 0.22), transparent 70%);
+}
+html[data-theme="2"] .bg-vignette {
+  background: linear-gradient(90deg, rgba(13, 8, 32, 0.92) 0%, rgba(13, 8, 32, 0.45) 45%, rgba(13, 8, 32, 0.8) 100%);
+}
+
+/* ---------- 곡 선택 ---------- */
+html[data-theme="2"] .top-bar,
+html[data-theme="2"] .rs-top {
+  background: linear-gradient(180deg, rgba(13, 8, 32, 0.95), rgba(13, 8, 32, 0.4));
+  border-bottom: 1px solid transparent;
+  border-image: var(--t2-sunset) 1;
+}
+html[data-theme="2"] .top-title,
+html[data-theme="2"] .rs-top {
+  letter-spacing: 0.24em;
+}
+html[data-theme="2"] .top-title .slashes,
+html[data-theme="2"] .rs-top .slashes,
+html[data-theme="2"] .ls-label .slashes,
+html[data-theme="2"] .go-label .slashes {
+  color: #ffb347;
+}
+html[data-theme="2"] .top-hint kbd {
+  border-radius: 6px;
+}
+html[data-theme="2"] .jacket-frame,
+html[data-theme="2"] .rs-jacket-frame,
+html[data-theme="2"] .ls-jacket-frame {
+  border-radius: 22px;
+  padding: 3px;
+  border: none;
+  background: var(--t2-sunset);
+  box-shadow: 0 18px 50px rgba(255, 79, 163, 0.28);
+}
+html[data-theme="2"] .jacket,
+html[data-theme="2"] .rs-jacket,
+html[data-theme="2"] .ls-jacket,
+html[data-theme="2"] .album-art,
+html[data-theme="2"] .rs-art,
+html[data-theme="2"] .ls-art {
+  border-radius: 19px;
+}
+html[data-theme="2"] .song-title,
+html[data-theme="2"] .rs-title,
+html[data-theme="2"] .ls-title {
+  letter-spacing: 0.03em;
+  text-shadow: 0 0 24px rgba(255, 79, 163, 0.35);
+}
+html[data-theme="2"] .song-artist,
+html[data-theme="2"] .rs-artist,
+html[data-theme="2"] .ls-artist {
+  color: #ffb347;
+}
+html[data-theme="2"] .detail-card,
+html[data-theme="2"] .rs-chip,
+html[data-theme="2"] .ls-chip {
+  border-radius: var(--t2-radius);
+  border-left: none;
+  background: rgba(40, 26, 76, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 79, 163, 0.22);
+}
+html[data-theme="2"] .detail-card strong,
+html[data-theme="2"] .song-index,
+html[data-theme="2"] .song-len,
+html[data-theme="2"] .list-count,
+html[data-theme="2"] .rs-figure-value,
+html[data-theme="2"] .score-num,
+html[data-theme="2"] .score-acc,
+html[data-theme="2"] .speed-value {
+  font-variant-numeric: tabular-nums;
+}
+html[data-theme="2"] .song-item {
+  border-radius: var(--t2-radius);
+  background: rgba(30, 19, 62, 0.72);
+}
+html[data-theme="2"] .song-item::before {
+  display: none;
+}
+html[data-theme="2"] .song-item.active {
+  border: 1px solid transparent;
+  background: linear-gradient(90deg, rgba(64, 24, 84, 0.95), rgba(40, 20, 70, 0.95)) padding-box,
+    var(--t2-sunset) border-box;
+  box-shadow: 0 0 26px rgba(255, 79, 163, 0.3);
+}
+html[data-theme="2"] .song-item.active .song-index {
+  color: #ffb347;
+}
+html[data-theme="2"] .play-action {
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(255, 79, 163, 0.3);
+}
+html[data-theme="2"] .play-go {
+  color: #ffffff;
+  background: var(--t2-sunset);
+  letter-spacing: 0.28em;
+}
+html[data-theme="2"] .quick-settings-panel {
+  border-radius: 24px;
+  border: 1px solid transparent;
+  background: linear-gradient(rgba(22, 13, 46, 0.97), rgba(22, 13, 46, 0.97)) padding-box,
+    var(--t2-sunset) border-box;
+}
+html[data-theme="2"] .quick-settings-header h2 {
+  letter-spacing: 0.18em;
+}
+html[data-theme="2"] .quick-settings-section {
+  border-top-color: rgba(255, 79, 163, 0.2);
+}
+html[data-theme="2"] .slider-wrap select {
+  border-radius: 10px;
+  background: #1d1240;
+  border-color: rgba(255, 79, 163, 0.35);
+}
+html[data-theme="2"] .settings-btn {
+  border-radius: 999px;
+}
+html[data-theme="2"] .settings-btn.save {
+  color: #1a0b2e;
+  background: var(--t2-sunset);
+  border-color: transparent;
+}
+
+/* ---------- 배속 설정 ---------- */
+html[data-theme="2"] .speed-setup {
+  background: var(--t2-sky);
+}
+html[data-theme="2"] .panel {
+  border-radius: 24px;
+  border: 1px solid transparent;
+  background: linear-gradient(rgba(22, 13, 46, 0.95), rgba(22, 13, 46, 0.95)) padding-box,
+    var(--t2-sunset) border-box;
+}
+html[data-theme="2"] .speed-value {
+  background: var(--t2-sunset);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 14px rgba(255, 79, 163, 0.5));
+}
+html[data-theme="2"] .preview {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* ---------- 로딩 화면 ---------- */
+html[data-theme="2"] .loading-screen {
+  background: var(--t2-sky);
+}
+html[data-theme="2"] .ls-keys .key {
+  border-radius: 10px;
+}
+
+/* ---------- 플레이 화면 (위치/크기 변경 없음, 색/그림만) ---------- */
+html[data-theme="2"] .gear-overlay {
+  border-left-color: #ff4fa3;
+  border-right-color: #ffb347;
+  box-shadow: 0 0 24px rgba(255, 79, 163, 0.28), inset 0 0 50px rgba(255, 79, 163, 0.05);
+}
+html[data-theme="2"] .judgment-line {
+  background: linear-gradient(180deg, rgba(255, 79, 163, 0) 0%, rgba(255, 122, 120, 0.35) 100%);
+  box-shadow: inset 0 -4px 0 #ffffff, 0 0 14px rgba(255, 79, 163, 0.9), 0 0 34px rgba(255, 179, 71, 0.4);
+}
+html[data-theme="2"] .arcade-buttons {
+  background: linear-gradient(180deg, #1c1038 0%, #0d0820 100%);
+  border-left-color: #ff4fa3;
+  border-right-color: #ffb347;
+}
+html[data-theme="2"] .arcade-btn {
+  background: linear-gradient(180deg, #24164a 0%, #110a26 100%);
+  color: #4d3f7a;
+  border-radius: 0 0 14px 14px;
+}
+html[data-theme="2"] .arcade-btn.d-key,
+html[data-theme="2"] .arcade-btn.k-key {
+  border-top-color: #d9ccff;
+}
+html[data-theme="2"] .arcade-btn.d-key.is-pressed,
+html[data-theme="2"] .arcade-btn.k-key.is-pressed {
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(241, 232, 255, 0.55) 0%, #110a26 100%);
+  box-shadow: inset 0 0 22px rgba(241, 232, 255, 0.5);
+}
+html[data-theme="2"] .arcade-btn.f-key.is-pressed,
+html[data-theme="2"] .arcade-btn.j-key.is-pressed {
+  background: linear-gradient(180deg, rgba(255, 79, 163, 0.6) 0%, #110a26 100%);
+  box-shadow: inset 0 0 22px rgba(255, 79, 163, 0.6);
+}
+/* 진행 바(인라인 색 지정이라 !important) */
+html[data-theme="2"] .top-progress {
+  background: var(--t2-sunset) !important;
+  box-shadow: 0 0 10px rgba(255, 79, 163, 0.7) !important;
+}
+html[data-theme="2"] .score-acc {
+  color: #ffb347;
+}
+html[data-theme="2"] .health-bar {
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+/* ---------- 결과 화면 ---------- */
+html[data-theme="2"] .result-page {
+  background: var(--t2-sky);
+}
+html[data-theme="2"] .rs-figure {
+  border-radius: var(--t2-radius);
+}
+html[data-theme="2"] .rs-figure-value.acc {
+  background: var(--t2-sunset);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+html[data-theme="2"] .rs-tag {
+  border-radius: 999px;
+}
+html[data-theme="2"] .rs-row {
+  border-radius: 0 10px 10px 0;
+}
+
+/* ---------- 게임 오버: 빨강 유지, 밤하늘 배경 ---------- */
+html[data-theme="2"] .gameover-container {
+  background: var(--t2-sky);
+}
+html[data-theme="2"] .go-beam {
+  opacity: 0.45;
+}
+
+/* =====================================================================
+   레이아웃 재구성 (테마 2 전용 구성. 판정선/기어 크기와 판정 표시는 그대로)
+   ===================================================================== */
+
+/* ---------- 곡 선택: 트랙 리스트 왼쪽, 자켓 오른쪽 중앙, START 우하단 ---------- */
+html[data-theme="2"] .top-bar {
+  justify-content: center;
+}
+html[data-theme="2"] .top-hint {
+  position: absolute;
+  right: 48px;
+}
+html[data-theme="2"] .layout-container {
+  flex-direction: row-reverse;
+  padding: 104px 64px 48px;
+  gap: 72px;
+}
+html[data-theme="2"] .left-panel {
+  flex: 0 0 min(42%, 600px);
+  align-items: center;
+  justify-content: center;
+}
+html[data-theme="2"] .song-info {
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+  margin-top: -40px;
+}
+html[data-theme="2"] .title-block {
+  border-left: none;
+  padding-left: 0;
+}
+html[data-theme="2"] .detail-grid {
+  justify-content: center;
+}
+html[data-theme="2"] .play-panel {
+  position: fixed;
+  right: 64px;
+  bottom: 44px;
+  margin: 0;
+  z-index: 5;
+}
+html[data-theme="2"] .right-panel {
+  justify-content: center;
+}
+html[data-theme="2"] .list-head {
+  padding-left: 6px;
+  border-bottom: none;
+}
+html[data-theme="2"] .list-container {
+  flex: 0 1 auto;
+  max-height: 74vh;
+  margin-left: 0;
+  padding: 6px 40px 6px 6px;
+}
+html[data-theme="2"] .song-item {
+  opacity: 0.6;
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+html[data-theme="2"] .song-item:hover {
+  opacity: 0.85;
+}
+html[data-theme="2"] .song-item.active {
+  opacity: 1;
+  transform: translateX(26px) scale(1.03);
+}
+
+/* ---------- 배속 설정: 미리보기 레인을 왼쪽에 ---------- */
+html[data-theme="2"] .container {
+  flex-direction: row-reverse;
+}
+
+/* ---------- 로딩: 자켓 위, 정보 아래로 세로 중앙 정렬 ---------- */
+html[data-theme="2"] .ls-content {
+  flex-direction: column;
+  gap: 34px;
+  padding: 0 8vw 40px;
+}
+html[data-theme="2"] .ls-info {
+  border-left: none;
+  padding-left: 0;
+  text-align: center;
+}
+html[data-theme="2"] .ls-chips,
+html[data-theme="2"] .ls-keys {
+  justify-content: center;
+}
+
+/* ---------- 플레이 HUD: 점수 카드를 기어 오른쪽 위로, 진행 바는 화면 아래로 ---------- */
+html[data-theme="2"] .game .score {
+  top: 96px;
+  bottom: auto;
+  left: calc(50% + 292px);
+  min-width: 190px;
+  padding: 14px 22px 16px;
+  border-left: none;
+  border-radius: 18px;
+  background: rgba(24, 15, 50, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 79, 163, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+html[data-theme="2"] .top-progress {
+  top: auto !important;
+  bottom: 0 !important;
+  height: 5px !important;
+}
+
+/* ---------- 일시정지: 가운데 카드 → 오른쪽 세로 패널 ---------- */
+html[data-theme="2"] .game .modal-backdrop {
+  justify-content: flex-end; /* Game.vue가 backdrop을 row 방향으로 둠 → 주축=가로 */
+}
+html[data-theme="2"] .game .modal {
+  width: 420px;
+  max-width: 90vw;
+  height: 100vh;
+  justify-content: flex-start;
+  padding-top: 26vh;
+  box-sizing: border-box;
+  border-radius: 32px 0 0 32px;
+}
+
+/* ---------- 결과: 상단 가로 헤더(작은 자켓·제목·칩) + 아래 랭크/수치/판정표 ---------- */
+html[data-theme="2"] .rs-layout {
+  flex-direction: column;
+  gap: 26px;
+  padding: 92px 64px 40px;
+}
+html[data-theme="2"] .rs-left {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 28px;
+  padding: 14px 18px;
+  border-radius: 22px;
+  background: rgba(30, 19, 62, 0.6);
+}
+html[data-theme="2"] .rs-jacket-frame {
+  width: 132px;
+  flex: 0 0 auto;
+}
+html[data-theme="2"] .rs-title-block {
+  border-left: none;
+  padding-left: 0;
+}
+html[data-theme="2"] .rs-chips {
+  margin-left: auto;
+}
+html[data-theme="2"] .rs-right {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 56px;
+}
+html[data-theme="2"] .rs-main {
+  flex: 0 0 44%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  border-bottom: none;
+  padding: 22px 26px;
+  border-radius: 24px;
+  background: rgba(30, 19, 62, 0.55);
+}
+html[data-theme="2"] .rs-rank {
+  font-size: clamp(120px, 20vh, 200px);
+}
+html[data-theme="2"] .rs-judges {
+  flex: 1;
+}
+
+html[data-theme="2"] .actions button {
+  border-radius: 999px;
+}
+html[data-theme="2"] .actions button:first-child {
+  color: #1a0b2e;
+  background: var(--t2-sunset);
+  border-color: transparent;
+}

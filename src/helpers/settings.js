@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   mirror: false, // 좌우 반전
   noFail: false, // 체력 0이어도 게임오버 안 됨
   showFastSlow: false, // FAST/SLOW 표시(기존엔 없던 표시라 기본은 끔)
-  theme: 1, // 화면 테마(1 = 기존 디자인, 2 = MILITARY HUD)
+  theme: 1, // 화면 테마(1 = 기존 디자인, 2 = AFTERGLOW)
 });
 
 // 숫자 범위 보정(잘못 저장된 값이 들어와도 안전하게)

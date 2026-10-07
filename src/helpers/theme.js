@@ -1,10 +1,10 @@
-// 화면 테마. CSS 쪽은 <html data-theme="N">로 바꾸고(public/theme-military.css),
+// 화면 테마. CSS 쪽은 <html data-theme="N">로 바꾸고(public/theme-afterglow.css),
 // 캔버스(기어/노트/키 빔 등)는 아래 CANVAS_THEMES 색을 GameInstance가 곡 시작 때 읽어서 쓴다.
 // 판정 관련 표시(판정 글자/콤보/FAST·SLOW, 타격 이펙트의 판정별 색)는 테마와 무관하게 고정.
 
 export const THEMES = [
   { id: 1, name: "DJMAX 스타일" },
-  { id: 2, name: "MILITARY HUD (MUSYNX:RETURN 참고)" },
+  { id: 2, name: "AFTERGLOW (해 질 녘 시티팝)" },
 ];
 
 const MISSED = {
@@ -36,20 +36,20 @@ export const CANVAS_THEMES = {
       failedSingle: FAILED_SINGLE,
     },
   },
-  // 테마 2: 건메탈 바탕 + 앰버 신호색 + 본화이트. 각진 직사각형 노트, 차가운 기어.
+  // 테마 2 AFTERGLOW: 남보라 밤하늘 + 핫핑크/선셋 오렌지. 판정 글자(청록)와 겹치지 않는 노트 색.
   2: {
-    gearBg: "rgba(9, 11, 10, 0.86)",
-    beamFrom: "rgba(255, 186, 64, 0.55)",
-    beamTo: "rgba(255, 186, 64, 0)",
-    uiText: "#8c917f",
-    uiFont: '600 16px "Barlow Condensed", Consolas, monospace',
-    coverFill: "#0b0d0c",
-    coverEdge: "#ffb21e",
+    gearBg: "rgba(14, 8, 30, 0.84)",
+    beamFrom: "rgba(255, 92, 170, 0.6)",
+    beamTo: "rgba(255, 150, 90, 0)",
+    uiText: "#9a8cc0",
+    uiFont: '600 17px "Barlow Condensed", sans-serif',
+    coverFill: "#120a26",
+    coverEdge: "#ff4fa3",
     notes: {
-      outer: { main: "#e6e8dc", light: "#ffffff", dark: "#5f6356" },
-      inner: { main: "#ffb21e", light: "#ffe0a0", dark: "#8a5600" },
-      // 기믹(레인 이동) 노트는 안쪽 앰버와 구분되게 청색
-      shift: { main: "#5fd0ff", light: "#c8f0ff", dark: "#1d6f94" },
+      outer: { main: "#f1e8ff", light: "#ffffff", dark: "#8e7cc0" },
+      inner: { main: "#ff4fa3", light: "#ffc2e0", dark: "#a3226a" },
+      // 기믹(레인 이동) 노트는 핑크와 구분되게 민트
+      shift: { main: "#5ef2d6", light: "#cffff5", dark: "#1f8f7c" },
       missed: MISSED,
       failedSingle: FAILED_SINGLE,
     },
