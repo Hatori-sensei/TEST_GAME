@@ -277,9 +277,11 @@ export default class Note {
   }
 
   _getPalette(isShiftNote, isFailed) {
-    if (this.missed) return NOTE_PALETTES.missed;
-    if (isFailed) return NOTE_PALETTES.failedSingle;
-    if (isShiftNote) return NOTE_PALETTES.shift;
+    // [테마] 노트 색은 현재 테마 팔레트(테마1 = 아래 NOTE_PALETTES와 동일 값)
+    const palettes = (this.game.theme && this.game.theme.notes) || NOTE_PALETTES;
+    if (this.missed) return palettes.missed;
+    if (isFailed) return palettes.failedSingle;
+    if (isShiftNote) return palettes.shift;
     // [버그수정] 예전엔 키 이름("d"/"k")으로 바깥 레인을 판별해서, 키 배치를 바꾸면
     // (예: d→s) 바깥 레인 노트도 안쪽 색(청록)으로 그려졌음 → 실제 레인 위치로 판별.
     if (this.isOuterLane === undefined) {
@@ -287,7 +289,7 @@ export default class Note {
       const lane = binds.indexOf(this.key);
       this.isOuterLane = lane === 0 || lane === binds.length - 1;
     }
-    return this.isOuterLane ? NOTE_PALETTES.outer : NOTE_PALETTES.inner;
+    return this.isOuterLane ? palettes.outer : palettes.inner;
   }
 
   _drawNoteHead(pal, yTop = this.y) {

@@ -275,8 +275,9 @@ export default class DropTrack {
         0,
         0
       );
-      grad.addColorStop(0, "rgba(150, 220, 255, 0.7)");
-      grad.addColorStop(1, "rgba(150, 220, 255, 0)");
+      // [테마] 키 빔 색(테마1 = rgba(150, 220, 255, 0.7 → 0))
+      grad.addColorStop(0, this.game.theme.beamFrom);
+      grad.addColorStop(1, this.game.theme.beamTo);
       this.game.ctx.fillStyle = grad;
       this.game.ctx.fillRect(this.x, 0, this.width, this.game.checkHitLineY);
     }

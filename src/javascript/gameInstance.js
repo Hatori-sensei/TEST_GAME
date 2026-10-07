@@ -2,6 +2,7 @@ import DropTrack from "./track";
 import FeverEffect from "./FeverEffect";
 import { Howl, Howler } from "howler";
 import { resolveMediaUrl } from "../utils/pathResolver";
+import { getCanvasTheme } from "../helpers/theme";
 
 const LEAD_IN_SEC = 2;
 const SHOW_FPS = true;
@@ -45,6 +46,8 @@ export default class GameInstance {
     this.audioTime = 0; // 오프셋 적용 전 실제 오디오 재생 시간(영상 싱크용)
     this.laneCoverRatio = 0; // 레인 커버 비율
     this.autoPlay = false; // 오토플레이
+    // [테마] 캔버스 색(기어/노트/키 빔). 곡 시작 시 다시 읽어 고정. 매 프레임 조회 없음
+    this.theme = getCanvasTheme();
 
     this.feverEff = new FeverEffect(vm, this);
     this.createTracks(4);
@@ -589,8 +592,8 @@ export default class GameInstance {
     ).toFixed(1);
     this.ctx.save();
     this.ctx.textAlign = "right";
-    this.ctx.fillStyle = "#7f95ab";
-    this.ctx.font = 'italic 700 18px "Barlow Condensed", sans-serif';
+    this.ctx.fillStyle = this.theme.uiText; // [테마]
+    this.ctx.font = this.theme.uiFont;
     this.ctx.fillText(`SPEED x${currentSpeed}`, this.endX - 12, 28);
     // [설정] 오토플레이 중 표시
     if (this.autoPlay) {
@@ -605,7 +608,7 @@ export default class GameInstance {
     // 배경 (블랙)
 
     // 🚨 노트보다 먼저 도화지에 그려지는 반투명 기어 배경
-    this.ctx.fillStyle = "rgba(3, 7, 14, 0.8)";
+    this.ctx.fillStyle = this.theme.gearBg; // [테마] 테마1 = rgba(3, 7, 14, 0.8)
     this.ctx.fillRect(
       this.startX,
       0,
@@ -695,6 +698,7 @@ export default class GameInstance {
     const cover = Number(this.vm.laneCover);
     this.laneCoverRatio = playMode && Number.isFinite(cover) ? Math.min(0.6, Math.max(0, cover)) : 0;
     this.autoPlay = playMode && this.vm.autoPlay === true;
+    this.theme = getCanvasTheme(); // [테마]
 
     this.reposition();
     if (this.audioPath && !this.howl) {
@@ -1056,9 +1060,9 @@ export default class GameInstance {
     const ctx = this.ctx;
     const width = this.endX - this.startX;
     const h = Math.round(this.checkHitLineY * this.laneCoverRatio);
-    ctx.fillStyle = "#05080f";
+    ctx.fillStyle = this.theme.coverFill; // [테마]
     ctx.fillRect(this.startX, 0, width, h);
-    ctx.fillStyle = "#19d3ff";
+    ctx.fillStyle = this.theme.coverEdge;
     ctx.fillRect(this.startX, h - 2, width, 2);
   }
 

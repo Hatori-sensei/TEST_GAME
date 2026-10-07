@@ -102,6 +102,20 @@
             <div class="hint">ESC를 눌러 닫기</div>
           </div>
 
+          <!-- [테마] 화면 테마 선택(바꾸면 바로 미리보기, Apply 시 저장, Close 시 원래대로) -->
+          <div class="quick-settings-section">
+            <h3>화면 테마</h3>
+            <div class="settings-row">
+              <label for="themeSelect">테마</label>
+              <div class="slider-wrap">
+                <select id="themeSelect" v-model.number="quickGameSt.theme" @change="previewTheme">
+                  <option v-for="t in themeList" :key="t.id" :value="t.id">{{ t.id }}. {{ t.name }}</option>
+                </select>
+              </div>
+              <strong>{{ quickGameSt.theme }}</strong>
+            </div>
+          </div>
+
           <div class="quick-settings-section">
             <h3>키,배속 설정</h3>
             <div class="settings-row">
@@ -277,7 +291,8 @@ import VueSlider from "vue-slider-component";
 import { getSheetList, getSongListCached, updateUserProfile } from "../javascript/db";
 import { logEvent } from "../helpers/analytics";
 import { resolveSongPreviewRange } from "../javascript/localCatalog";
-import { saveSettings, DEFAULT_SETTINGS } from "../helpers/settings";
+import { saveSettings, loadSettings, DEFAULT_SETTINGS } from "../helpers/settings";
+import { THEMES, applyTheme } from "../helpers/theme";
 
 // [설정] 오프셋 자동 측정: 메트로놈 간격/횟수
 const CALIB_INTERVAL_SEC = 0.6;
@@ -324,7 +339,9 @@ export default {
         noFail: DEFAULT_SETTINGS.noFail,
         showFastSlow: DEFAULT_SETTINGS.showFastSlow,
         autoPlay: false,
+        theme: DEFAULT_SETTINGS.theme, // [테마]
       },
+      themeList: THEMES,
       // [설정] 오프셋 자동 측정 상태
       calib: { state: "idle", taps: [], beats: [], message: "" },
       quickPreference: {
@@ -419,6 +436,7 @@ export default {
       this.quickGameSt.noFail = gameSt.noFail === true;
       this.quickGameSt.showFastSlow = gameSt.showFastSlow === true;
       this.quickGameSt.autoPlay = this.$store.state.autoPlay === true;
+      this.quickGameSt.theme = loadSettings().theme; // [테마] 저장된 테마
       this.quickPreference.keyMap = {
         ...DEFAULT_KEY_MAP,
         ...(preference.keyMap || {}),
@@ -439,8 +457,13 @@ export default {
       this.showQuickSettings = true;
       this.$store.state.audio.playEffect("ui/pop");
     },
+    // [테마] 선택 즉시 화면에 미리 적용
+    previewTheme() {
+      applyTheme(this.quickGameSt.theme);
+    },
     closeQuickSettings() {
       this.stopCalibration();
+      applyTheme(loadSettings().theme); // [테마] Apply 안 하고 닫으면 저장된 테마로 되돌림
       this.showQuickSettings = false;
       this.$store.state.audio.playEffect("ui/loose");
     },
@@ -520,6 +543,7 @@ export default {
         keyMap: preference.keyMap,
         bgmVolume: this.quickSound.bgmVolume,
         effectVolume: this.quickSound.effectVolume,
+        theme: applyTheme(this.quickGameSt.theme), // [테마] 적용 + 저장
       });
 
       try {
@@ -798,8 +822,8 @@ export default {
   z-index: 0;
   background: repeating-linear-gradient(
     115deg,
-    rgba(25, 211, 255, 0.05) 0,
-    rgba(25, 211, 255, 0.05) 1px,
+    rgba(var(--dm-cyan-rgb), 0.05) 0,
+    rgba(var(--dm-cyan-rgb), 0.05) 1px,
     transparent 1px,
     transparent 16px
   );
@@ -904,7 +928,7 @@ export default {
   /* width / aspect-ratio come from the image's real size (see jacketStyle) */
   width: min(100%, 44vh);
   padding: 2px;
-  background: linear-gradient(135deg, var(--dm-cyan) 0%, rgba(25, 211, 255, 0.15) 45%, var(--dm-cyan) 100%);
+  background: linear-gradient(135deg, var(--dm-cyan) 0%, rgba(var(--dm-cyan-rgb), 0.15) 45%, var(--dm-cyan) 100%);
   clip-path: polygon(0 0, calc(100% - 34px) 0, 100% 34px, 100% 100%, 34px 100%, 0 calc(100% - 34px));
 }
 
@@ -1037,7 +1061,7 @@ export default {
   padding: 0 34px 0 22px;
   color: var(--dm-amber);
   gap: 6px;
-  border-left: 1px solid rgba(25, 211, 255, 0.25);
+  border-left: 1px solid rgba(var(--dm-cyan-rgb), 0.25);
   clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
   margin-right: -14px;
 }
@@ -1141,7 +1165,7 @@ export default {
   top: 0;
   bottom: 0;
   width: 5px;
-  background: rgba(25, 211, 255, 0.22);
+  background: rgba(var(--dm-cyan-rgb), 0.22);
   transition: background 0.18s;
 }
 

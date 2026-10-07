@@ -1083,18 +1083,18 @@ export default {
       90deg,
       transparent 0,
       transparent 124px,
-      rgba(25, 211, 255, 0.16) 124px,
-      rgba(25, 211, 255, 0.16) 125px
+      rgba(var(--dm-cyan-rgb), 0.16) 124px,
+      rgba(var(--dm-cyan-rgb), 0.16) 125px
     ),
     linear-gradient(
       180deg,
       transparent 0%,
       transparent 60%,
-      rgba(25, 211, 255, 0.1) 100%
+      rgba(var(--dm-cyan-rgb), 0.1) 100%
     );
   border-left: 2px solid var(--dm-cyan);
   border-right: 2px solid var(--dm-cyan);
-  box-shadow: 0 0 18px rgba(25, 211, 255, 0.35), inset 0 0 40px rgba(25, 211, 255, 0.06);
+  box-shadow: 0 0 18px rgba(var(--dm-cyan-rgb), 0.35), inset 0 0 40px rgba(var(--dm-cyan-rgb), 0.06);
   pointer-events: none;
   z-index: 10;
 }
@@ -1111,8 +1111,8 @@ export default {
   height: 260px; /* 기존 높이 유지 */
   background: repeating-linear-gradient(
       135deg,
-      rgba(25, 211, 255, 0.05) 0,
-      rgba(25, 211, 255, 0.05) 2px,
+      rgba(var(--dm-cyan-rgb), 0.05) 0,
+      rgba(var(--dm-cyan-rgb), 0.05) 2px,
       transparent 2px,
       transparent 14px
     ),
@@ -1145,12 +1145,12 @@ export default {
   /* soft cyan band that ends in a crisp 4px white edge on the box's bottom side */
   background: linear-gradient(
     180deg,
-    rgba(25, 211, 255, 0) 0%,
-    rgba(25, 211, 255, 0.35) 100%
+    rgba(var(--dm-cyan-rgb), 0) 0%,
+    rgba(var(--dm-cyan-rgb), 0.35) 100%
   );
   z-index: 50;
-  box-shadow: inset 0 -4px 0 #ffffff, 0 0 14px rgba(25, 211, 255, 0.9),
-    0 0 34px rgba(25, 211, 255, 0.45);
+  box-shadow: inset 0 -4px 0 #ffffff, 0 0 14px rgba(var(--dm-cyan-rgb), 0.9),
+    0 0 34px rgba(var(--dm-cyan-rgb), 0.45);
 }
 
 /* =======================================================
@@ -1207,7 +1207,7 @@ export default {
 .arcade-btn.f-key.is-pressed,
 .arcade-btn.j-key.is-pressed {
   color: #ffffff;
-  background: linear-gradient(180deg, rgba(25, 211, 255, 0.55) 0%, #050a12 100%);
-  box-shadow: inset 0px 0px 22px rgba(25, 211, 255, 0.6);
+  background: linear-gradient(180deg, rgba(var(--dm-cyan-rgb), 0.55) 0%, #050a12 100%);
+  box-shadow: inset 0px 0px 22px rgba(var(--dm-cyan-rgb), 0.6);
 }
 </style>

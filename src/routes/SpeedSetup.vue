@@ -128,8 +128,8 @@ export default {
   height: 100vh;
   background: repeating-linear-gradient(
       115deg,
-      rgba(25, 211, 255, 0.05) 0,
-      rgba(25, 211, 255, 0.05) 1px,
+      rgba(var(--dm-cyan-rgb), 0.05) 0,
+      rgba(var(--dm-cyan-rgb), 0.05) 1px,
       transparent 1px,
       transparent 16px
     ),
@@ -191,7 +191,7 @@ export default {
   font-size: 96px;
   line-height: 1;
   color: #ffffff;
-  text-shadow: 0 0 18px rgba(25, 211, 255, 0.55);
+  text-shadow: 0 0 18px rgba(var(--dm-cyan-rgb), 0.55);
 }
 
 .actions {
@@ -252,10 +252,10 @@ export default {
   width: 84px;
   height: 100%;
   min-height: 380px;
-  background: linear-gradient(180deg, rgba(4, 8, 16, 0.85), rgba(25, 211, 255, 0.1));
+  background: linear-gradient(180deg, rgba(4, 8, 16, 0.85), rgba(var(--dm-cyan-rgb), 0.1));
   border-left: 2px solid var(--dm-cyan);
   border-right: 2px solid var(--dm-cyan);
-  box-shadow: 0 0 16px rgba(25, 211, 255, 0.3);
+  box-shadow: 0 0 16px rgba(var(--dm-cyan-rgb), 0.3);
   position: relative;
   overflow: hidden;
 }

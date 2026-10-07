@@ -373,8 +373,8 @@ export default {
   inset: 0;
   background: repeating-linear-gradient(
     115deg,
-    rgba(25, 211, 255, 0.05) 0,
-    rgba(25, 211, 255, 0.05) 1px,
+    rgba(var(--dm-cyan-rgb), 0.05) 0,
+    rgba(var(--dm-cyan-rgb), 0.05) 1px,
     transparent 1px,
     transparent 16px
   );
@@ -445,7 +445,7 @@ export default {
   width: min(100%, 38vh);
   aspect-ratio: 1 / 1;
   padding: 2px;
-  background: linear-gradient(135deg, var(--dm-cyan) 0%, rgba(25, 211, 255, 0.15) 45%, var(--dm-cyan) 100%);
+  background: linear-gradient(135deg, var(--dm-cyan) 0%, rgba(var(--dm-cyan-rgb), 0.15) 45%, var(--dm-cyan) 100%);
   clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 30px 100%, 0 calc(100% - 30px));
 }
 

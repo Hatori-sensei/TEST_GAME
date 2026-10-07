@@ -53,6 +53,7 @@ import PageBackground from "./components/common/PageBackground.vue";
 import { logEvent } from "./helpers/analytics";
 import semver from "semver";
 import { hasSavedSettings, loadSettings } from "./helpers/settings";
+import { applyTheme } from "./helpers/theme";
 import "vue-awesome/icons/volume-up";
 import "vue-awesome/icons/volume-mute";
 import "vue-awesome/icons/expand";
@@ -80,6 +81,8 @@ export default {
       audio.maxVolume = saved.bgmVolume;
       audio.effectVolume = saved.effectVolume;
     }
+    // [테마] 저장된 테마 적용(저장값 없으면 1 = 기존 디자인)
+    applyTheme(loadSettings().theme);
     this.$store.commit("setAudio", audio);
     this.$store.commit("setGlobalModal", this.$refs.gm);
     this.$store.commit("setFloatingAlert", this.$refs.alert);
