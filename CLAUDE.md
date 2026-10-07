@@ -58,6 +58,13 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - 판정 기준: 채보 시간 기준(judgeY = 채보 시간에 판정선). 노트 그림은 `y = judgeY - 30`(아래 끝이 정타 시점에 판정선). 예전 "노트 아래 끝 기준"(배속마다 75/25ms 앞당겨짐)에서 변경.
 - 미해결 질문/수치 불일치(배속 8.0 상한, 체력 회복량 문서 불일치)는 보고서 [C] 참고.
 
+## 테마 (2026-10)
+- 설정(곡 선택 ESC) → 화면 테마: 1 = 기존 DJMAX 스타일(기본), 2 = MILITARY HUD(MUSYNX: RETURN 참고). localStorage `djon.settings.theme`.
+- 구조: `<html data-theme="N">`. CSS는 `public/theme-military.css`(테마 2 전용, 변수 덮어쓰기+장식), 캔버스 색은 `src/helpers/theme.js` CANVAS_THEMES(곡 시작 시 고정).
+- 화면 CSS의 청록은 `var(--dm-cyan)` / `rgba(var(--dm-cyan-rgb), a)`로 씀. 새 색을 넣을 때도 이 변수 사용.
+- 판정 표시(MarkComboJudge, 타격 이펙트 판정색, 결과 판정 행/랭크 색)는 테마와 무관하게 고정. 테마 2에서도 변수를 테마 1 값으로 재지정해 유지.
+- 모바일은 지원 안 함(사용 중 화면의 모바일 CSS 삭제).
+
 ## 작업 메모
 - 파일 줄바꿈이 CRLF인 파일이 많음. 스크립트로 수정할 땐 보존할 것.
 - 개발 서버는 3000번 포트(`npm start`). 확인은 `node_modules/.bin/electron . --windowed --rp-debug --remote-debugging-port=9222` 후 CDP로 캡처했음. HMR 중에 게임이 시작되면 개발용 오류 오버레이가 뜨는데 실제 결함 아님.
