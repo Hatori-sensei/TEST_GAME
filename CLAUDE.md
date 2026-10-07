@@ -59,10 +59,11 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - 미해결 질문/수치 불일치(배속 8.0 상한, 체력 회복량 문서 불일치)는 보고서 [C] 참고.
 
 ## 테마 (2026-10)
-- 설정(곡 선택 ESC) → 화면 테마: 1 = 기존 DJMAX 스타일(기본), 2 = MILITARY HUD(MUSYNX: RETURN 참고). localStorage `djon.settings.theme`.
-- 구조: `<html data-theme="N">`. CSS는 `public/theme-military.css`(테마 2 전용, 변수 덮어쓰기+장식), 캔버스 색은 `src/helpers/theme.js` CANVAS_THEMES(곡 시작 시 고정).
+- 설정(곡 선택 ESC) → 화면 테마: 1 = 기존 DJMAX 스타일(기본), 2 = AFTERGLOW(해 질 녘 시티팝, Claude가 자유 디자인). localStorage `djon.settings.theme`.
+- 구조: `<html data-theme="N">`. CSS는 `public/theme-afterglow.css`(테마 2 전용, 변수 덮어쓰기+장식+화면 구성 변경), 캔버스 색은 `src/helpers/theme.js` CANVAS_THEMES(곡 시작 시 고정).
 - 화면 CSS의 청록은 `var(--dm-cyan)` / `rgba(var(--dm-cyan-rgb), a)`로 씀. 새 색을 넣을 때도 이 변수 사용.
 - 판정 표시(MarkComboJudge, 타격 이펙트 판정색, 결과 판정 행/랭크 색)는 테마와 무관하게 고정. 테마 2에서도 변수를 테마 1 값으로 재지정해 유지.
+- 테마 2는 화면 배치도 다름(곡 선택 좌우 반전, 점수 카드 기어 오른쪽 위, 일시정지 오른쪽 패널, 결과 2단). 단 판정선/기어 기하는 테마 1과 동일해야 함.
 - 모바일은 지원 안 함(사용 중 화면의 모바일 CSS 삭제).
 
 ## 작업 메모
