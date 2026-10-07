@@ -1142,15 +1142,12 @@ export default {
   left: 0;
   width: 100%;
   height: 18px;
-  /* soft cyan band that ends in a crisp 4px white edge on the box's bottom side */
-  background: linear-gradient(
-    180deg,
-    rgba(var(--dm-cyan-rgb), 0) 0%,
-    rgba(var(--dm-cyan-rgb), 0.35) 100%
-  );
+  /* [디자인 복원] 18px 전체가 꽉 찬 흰색 띠 + 글로우(원래 디자인).
+     디자인 변경 때 '아래 4px만 흰색 + 위는 그라디언트'로 바뀌어 얇은 선처럼 보였음.
+     위치/높이는 그대로, 그림만 원래대로. */
+  background-color: #ffffff;
   z-index: 50;
-  box-shadow: inset 0 -4px 0 #ffffff, 0 0 14px rgba(var(--dm-cyan-rgb), 0.9),
-    0 0 34px rgba(var(--dm-cyan-rgb), 0.45);
+  box-shadow: 0px 0px 15px #ffffff, 0px 0px 30px #00f0ff;
 }
 
 /* =======================================================
