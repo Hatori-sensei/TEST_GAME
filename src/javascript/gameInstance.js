@@ -3,6 +3,7 @@ import FeverEffect from "./FeverEffect";
 import { Howl, Howler } from "howler";
 import { resolveMediaUrl } from "../utils/pathResolver";
 import { getCanvasTheme } from "../helpers/theme";
+import { FxPlayer } from "./fx";
 
 const LEAD_IN_SEC = 2;
 const SHOW_FPS = true;
@@ -48,6 +49,10 @@ export default class GameInstance {
     this.autoPlay = false; // 오토플레이
     // [테마] 캔버스 색(기어/노트/키 빔). 곡 시작 시 다시 읽어 고정. 매 프레임 조회 없음
     this.theme = getCanvasTheme();
+    // [연출 기믹] 채보의 화면 연출(섬광/암전 등). 판정과 무관. 곡 시작 시 켜짐 여부 고정
+    this.fx = new FxPlayer();
+    this.fxEnabled = false;
+    this.fxGeo = { width: 0, height: 0, startX: 0, endX: 0, hitY: 0 }; // 매 프레임 재사용
 
     this.feverEff = new FeverEffect(vm, this);
     this.createTracks(4);
@@ -540,7 +545,20 @@ export default class GameInstance {
       this.effectCanvas.height
     );
 
+    // [연출 기믹] 연출이 있는 채보에서만 동작(없으면 조건 하나만 확인하고 넘어감)
+    const fxOn = this.fxEnabled && this.fx.hasFx;
+    if (fxOn) {
+      this.fx.advance(this.currentTime);
+      const geo = this.fxGeo;
+      geo.width = this.canvas.width;
+      geo.height = this.canvas.height;
+      geo.startX = this.startX;
+      geo.endX = this.endX;
+      geo.hitY = this.checkHitLineY - 9; // 판정선(높이 18px) 중앙
+      this.fx.draw(this.ctx, this.currentTime, "back", geo); // BGA 위, 기어 배경 아래
+    }
     this.drawDecoration();
+    if (fxOn) this.fx.draw(this.ctx, this.currentTime, "gear", this.fxGeo); // 기어 위, 노트 아래
     this.dropTrackArr.forEach((track) => track.update());
     // [설정] 오토플레이는 노트 위치가 갱신된 뒤(위 track.update) 판정
     if (this.autoPlay && !this.paused) this._runAutoPlay();
@@ -699,6 +717,9 @@ export default class GameInstance {
     this.laneCoverRatio = playMode && Number.isFinite(cover) ? Math.min(0.6, Math.max(0, cover)) : 0;
     this.autoPlay = playMode && this.vm.autoPlay === true;
     this.theme = getCanvasTheme(); // [테마]
+    // [연출 기믹] 플레이 모드 + 설정이 켜져 있을 때만(채보 에디터는 제외)
+    this.fxEnabled = playMode && this.vm.fxEnabled !== false;
+    this.fx.reset();
 
     this.reposition();
     if (this.audioPath && !this.howl) {
@@ -1205,6 +1226,7 @@ export default class GameInstance {
 
   bakeVisualPositions(notes, gimmicks = []) {
     this.buildVisualTimeline(gimmicks);
+    if (this.fx) this.fx.load(gimmicks); // [연출 기믹] 연출 타입만 골라 정렬(speed/stop은 무시됨)
     if (!Array.isArray(notes)) return notes;
 
     notes.forEach((noteObj) => {

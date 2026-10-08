@@ -248,6 +248,7 @@
               <Checkbox label="미러 (좌우 반전)" :model="quickGameSt" modelKey="mirror" cbStyle="form"></Checkbox>
               <Checkbox label="No Fail (게임오버 없음)" :model="quickGameSt" modelKey="noFail" cbStyle="form"></Checkbox>
               <Checkbox label="오토플레이 (이번 실행만)" :model="quickGameSt" modelKey="autoPlay" cbStyle="form"></Checkbox>
+              <Checkbox label="채보 연출 효과 (섬광/암전 등)" :model="quickGameSt" modelKey="fxEnabled" cbStyle="form"></Checkbox>
             </div>
           </div>
 
@@ -353,6 +354,7 @@ export default {
         noFail: DEFAULT_SETTINGS.noFail,
         showFastSlow: DEFAULT_SETTINGS.showFastSlow,
         autoPlay: false,
+        fxEnabled: DEFAULT_SETTINGS.fxEnabled, // [연출]
         theme: DEFAULT_SETTINGS.theme, // [테마]
       },
       themeList: THEMES,
@@ -463,6 +465,7 @@ export default {
       this.quickGameSt.mirror = gameSt.mirror === true;
       this.quickGameSt.noFail = gameSt.noFail === true;
       this.quickGameSt.showFastSlow = gameSt.showFastSlow === true;
+      this.quickGameSt.fxEnabled = gameSt.fxEnabled !== false;
       this.quickGameSt.autoPlay = this.$store.state.autoPlay === true;
       this.quickGameSt.theme = loadSettings().theme; // [테마] 저장된 테마
       this.quickPreference.keyMap = {
@@ -547,6 +550,7 @@ export default {
         mirror: this.quickGameSt.mirror,
         noFail: this.quickGameSt.noFail,
         showFastSlow: this.quickGameSt.showFastSlow,
+        fxEnabled: this.quickGameSt.fxEnabled,
       };
       const preference = {
         ...(profile.preference || {}),

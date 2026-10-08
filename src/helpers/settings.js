@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   noFail: false, // 체력 0이어도 게임오버 안 됨
   showFastSlow: false, // FAST/SLOW 표시(기존엔 없던 표시라 기본은 끔)
   theme: 1, // 화면 테마(1 = 기존 디자인, 2 = AFTERGLOW)
+  fxEnabled: true, // 채보 연출 효과(섬광/암전 등). 기존 채보엔 연출이 없어서 켜져 있어도 동작 동일
 });
 
 // 숫자 범위 보정(잘못 저장된 값이 들어와도 안전하게)
@@ -103,6 +104,7 @@ export function toGameSt(s) {
     mirror: s.mirror,
     noFail: s.noFail,
     showFastSlow: s.showFastSlow,
+    fxEnabled: s.fxEnabled,
   };
   // 배속은 저장한 적 있을 때만 넣음(없으면 SpeedSetup이 store 값을 쓰는 기존 동작 유지)
   if (s.noteSpeed !== null && s.noteSpeed !== undefined) gameSt.noteSpeed = s.noteSpeed;

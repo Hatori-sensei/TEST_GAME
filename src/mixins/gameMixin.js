@@ -81,6 +81,7 @@ export default {
       mirror: false,
       autoPlay: false,
       showFastSlow: false,
+      fxEnabled: true, // [연출] 채보 연출 효과
       totalNoteCount: 0,
       scorePerJudge: 0,
       scoreAccRaw: 0,
@@ -149,6 +150,7 @@ export default {
       this.bgaDim = Number.isFinite(dim) ? dim : 0.35;
       this.mirror = gameSettings.mirror === true;
       this.showFastSlow = gameSettings.showFastSlow === true;
+      this.fxEnabled = gameSettings.fxEnabled !== false;
     }
     // 오토플레이는 저장하지 않는 이번 실행 한정 설정(store)
     this.autoPlay = this.$store.state.autoPlay === true;
