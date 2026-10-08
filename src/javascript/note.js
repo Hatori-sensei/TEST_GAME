@@ -310,12 +310,22 @@ export default class Note {
     ctx.fillRect(x + w - 2, y + 5, 2, h - 8);
   }
 
-  _drawLongBody(pal, bodyTop, bodyHeight) {
+  // [롱노트] 색 선택: 놓침(회색) > 누르는 중(밝은 색) > 롱노트 전용 색.
+  // 테마에 long 색이 없으면 기존처럼 레인 색을 씀.
+  _getLongPalette(isShiftNote) {
+    const palettes = (this.game.theme && this.game.theme.notes) || NOTE_PALETTES;
+    if (this.missed) return palettes.missed;
+    if (this.holding && palettes.longHold) return palettes.longHold;
+    if (palettes.long) return palettes.long;
+    return this._getPalette(isShiftNote, false);
+  }
+
+  _drawLongBody(pal, bodyTop, bodyHeight, alpha = 0.4) {
     const ctx = this.ctx;
     const x = this.x + NOTE_INSET_PX;
     const w = this.width - NOTE_INSET_PX * 2;
     ctx.fillStyle = pal.main;
-    ctx.globalAlpha = 0.4;
+    ctx.globalAlpha = alpha;
     ctx.fillRect(x, bodyTop, w, bodyHeight);
     ctx.globalAlpha = 1;
     ctx.fillRect(x, bodyTop, 3, bodyHeight);
@@ -429,8 +439,9 @@ export default class Note {
       }
       const isVisible = bodyTop <= canvasHeight + 150 && this.y >= -150;
       if (isVisible) {
-        const pal = this._getPalette(isShiftNote, false);
-        this._drawLongBody(pal, bodyTop, bodyHeight);
+        // [롱노트] 전용 색 + 누르는 동안 밝게(몸통도 더 진하게) → 잡고 있는지 바로 보임
+        const pal = this._getLongPalette(isShiftNote);
+        this._drawLongBody(pal, bodyTop, bodyHeight, this.holding ? 0.72 : 0.4);
         // Release marker: a second note block at the tail. Its center reaches the
         // judgment line's center exactly at endTime, i.e. when the key should be let go.
         this._drawNoteHead(pal, bodyTop);

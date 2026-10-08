@@ -32,6 +32,9 @@ export const CANVAS_THEMES = {
       outer: { main: "#dcefff", light: "#ffffff", dark: "#6f93b0" },
       inner: { main: "#19d3ff", light: "#c4f5ff", dark: "#0a7fa6" },
       shift: { main: "#ffb400", light: "#ffe6a0", dark: "#9a6400" },
+      // 롱노트 전용 색(단노트와 구분) / 누르고 있는 동안의 밝은 색
+      long: { main: "#a98bff", light: "#e2d6ff", dark: "#5a3fb0" },
+      longHold: { main: "#ece4ff", light: "#ffffff", dark: "#a98bff" },
       missed: MISSED,
       failedSingle: FAILED_SINGLE,
     },
@@ -50,6 +53,9 @@ export const CANVAS_THEMES = {
       inner: { main: "#ff4fa3", light: "#ffc2e0", dark: "#a3226a" },
       // 기믹(레인 이동) 노트는 핑크와 구분되게 민트
       shift: { main: "#5ef2d6", light: "#cffff5", dark: "#1f8f7c" },
+      // 롱노트 전용 색(선셋 오렌지) / 누르고 있는 동안의 밝은 색
+      long: { main: "#ffb347", light: "#ffe0b0", dark: "#a8641a" },
+      longHold: { main: "#ffe8c8", light: "#ffffff", dark: "#ffb347" },
       missed: MISSED,
       failedSingle: FAILED_SINGLE,
     },
