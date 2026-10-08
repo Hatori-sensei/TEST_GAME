@@ -255,8 +255,23 @@ export function getSongById(songId) {
   );
 }
 
+// [대기 화면] SAMPLE PLAY 전용 채보. localCatalog.charts에 넣지 않아서 곡 선택/랭킹/대전 목록엔
+// 안 나오고, getChartById로만 불러온다. startAt: 데모를 곡 중간(브레이크 직전)부터 보여줌.
+export const DEMO_CHARTS = {
+  "Doit-sample": createChartTemplate({
+    id: "Doit-sample",
+    songId: "Doit",
+    title: "Do it (SAMPLE)",
+    difficulty: 2,
+    tags: ["Doit", "local", "bga", "demo"],
+    sheetFile: "Doit.sample.json",
+    startAt: 72.59,
+  }),
+};
+export const DEMO_CHART_ID = "Doit-sample";
+
 export function getChartById(chartId) {
-  return localCatalog.charts[chartId] ?? null;
+  return localCatalog.charts[chartId] ?? DEMO_CHARTS[chartId] ?? null;
 }
 
 export function getChartForSong(songId) {
