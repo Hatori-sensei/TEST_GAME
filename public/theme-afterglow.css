@@ -640,3 +640,40 @@ html[data-theme="2"] .rs-right {
 html[data-theme="2"] .rs-missions {
   flex: 0 0 100%;
 }
+
+/* ---------- LAN 대전(로비/결과/HUD) ---------- */
+html[data-theme="2"] .vs-page {
+  background: var(--t2-sky);
+}
+html[data-theme="2"] .vs-card,
+html[data-theme="2"] .vs-song,
+html[data-theme="2"] .vs-slot,
+html[data-theme="2"] .vs-res-row,
+html[data-theme="2"] .vs-row {
+  border-radius: 0 14px 14px 0;
+  background: rgba(30, 19, 62, 0.65);
+}
+html[data-theme="2"] .vs-song.active,
+html[data-theme="2"] .vs-slot.me,
+html[data-theme="2"] .vs-row.me {
+  background: rgba(var(--dm-cyan-rgb), 0.18);
+}
+html[data-theme="2"] .vs-res-row.win {
+  background: linear-gradient(90deg, rgba(255, 211, 106, 0.25), rgba(30, 19, 62, 0.65));
+}
+html[data-theme="2"] .vs-form input {
+  border-radius: 999px;
+  background: rgba(10, 6, 24, 0.6);
+}
+html[data-theme="2"] .vs-tag,
+html[data-theme="2"] .vs-badge {
+  border-radius: 999px;
+  font-style: normal;
+}
+html[data-theme="2"] .vs-bar,
+html[data-theme="2"] .vs-bar-fill {
+  border-radius: 999px;
+}
+html[data-theme="2"] .vs-bar-fill {
+  background: var(--t2-sunset);
+}

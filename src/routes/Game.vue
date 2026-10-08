@@ -17,7 +17,7 @@
       <a
         class="pause_button"
         @click="pauseGame"
-        v-if="started && instance && !instance.paused && !isGameEnded"
+        v-if="started && instance && !instance.paused && !isGameEnded && !vs"
       >
         <v-icon name="regular/pause-circle" scale="1.5" />
       </a>
@@ -99,6 +99,17 @@
     ></Visualizer>
 
     <ScorePanel></ScorePanel>
+
+    <!-- [LAN 대전] 대전 중일 때만: 상대 점수/순위 + 시작 카운트다운 -->
+    <VsHud
+      v-if="vs"
+      :vs="vs"
+      :result="result"
+      :health="health"
+      :percentage="percentage"
+      :currentTime="progressTime"
+      :startAt="vsStartAt"
+    ></VsHud>
 
     <HealthBar v-show="!isGameEnded && !loadingScreen" :health="health"></HealthBar>
     <div v-if="srcMode === 'youtube' && !isGameEnded" v-show="initialized">
@@ -261,6 +272,8 @@ import MarkComboJudge from "../components/game/MarkComboJudge.vue";
 import Tutorial from "../components/game/Tutorial.vue";
 import ScorePanel from "../components/game/ScorePanel.vue";
 import HealthBar from "../components/game/HealthBar.vue";
+import VsHud from "../components/game/VsHud.vue";
+import { vsLoaded, vsFinish, waitForStartAt } from "../helpers/vs";
 import GameMixin from "../mixins/gameMixin";
 import { Youtube } from "vue-youtube";
 import {
@@ -280,6 +293,7 @@ const isDev = process.env.NODE_ENV === "development";
 const GAME_START_DELAY_MS = 4000;
 const LOADING_SCREEN_MIN_MS = 1800;
 const SONG_END_FADE_DELAY_MS = 2200;
+const VS_FALLBACK_START_MS = 25000; // [LAN 대전] 호스트 응답이 없으면 이 시간 뒤 혼자라도 시작
 
 export default {
   name: "Game",
@@ -299,6 +313,7 @@ export default {
     Tutorial,
     ScorePanel,
     HealthBar,
+    VsHud,
   },
   mixins: [GameMixin],
   data() {
@@ -323,9 +338,14 @@ export default {
       // [성능] 진행 바용 재생 시간(0.1초 단위로만 갱신). progress가 instance.currentTime을
       // 직접 읽으면 매 프레임 Game 화면 전체가 다시 렌더링됐음.
       progressTime: 0,
+      vsStartAt: 0, // [LAN 대전] 호스트가 정한 시작 시각(호스트 시계 ms)
     };
   },
   computed: {
+    // [LAN 대전] 대전 컨텍스트(평소엔 null → 아래 대전 분기는 전부 건너뜀)
+    vs() {
+      return this.$store.state.vs;
+    },
     progress() {
       if (!this.currentSong || !this.instance) return 0;
       const startAt = Number(this.currentSong.startAt ?? 0);
@@ -575,6 +595,10 @@ export default {
     async startGameDirect() {
       logEvent("start_game", { songId: this.currentSong.songId });
       this.health = 100;
+      if (this.vs) {
+        await this.vsWaitAndStart();
+        return;
+      }
       this.$refs.zoom.show("Get Ready...");
       // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
       await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
@@ -585,9 +609,27 @@ export default {
         this.currentSong.songId
       );
     },
+    // [LAN 대전] 로딩 완료를 호스트에 알리고, 호스트가 정한 시각에 모든 PC가 동시에 시작.
+    // 호스트 시각 → 이 PC 시각 = startAt - offsetMs (offsetMs는 로비에서 /time 왕복으로 측정)
+    async vsWaitAndStart() {
+      this.$refs.zoom.show("Waiting...");
+      vsLoaded();
+      const startAt = await waitForStartAt(VS_FALLBACK_START_MS);
+      if (this.isGameEnded || this.started || !this.instance) return;
+      const offset = Number(this.vs && this.vs.offsetMs) || 0;
+      let delay = 0;
+      if (startAt) {
+        this.vsStartAt = startAt;
+        delay = Math.max(0, startAt - offset - Date.now());
+      }
+      setTimeout(() => {
+        if (!this.isGameEnded && !this.started && this.instance) this.instance.startSong();
+      }, delay);
+    },
     triggerGameOverImmediate() {
       // [설정] No Fail: 체력이 0이 돼도 게임오버 없이 끝까지 진행
-      if (this.noFail) return;
+      // [LAN 대전] 대전 중에도 게임오버 없음(먼저 체력이 다 떨어져도 끝까지)
+      if (this.noFail || this.vs) return;
       if (this.tvOff) return;
       this.fadeOutMusic();
       this.tvOff = true;
@@ -641,6 +683,11 @@ export default {
       // [버그수정] 곡 종료 페이드아웃(isEndingSong) 중에 창이 포커스를 잃으면
       // 일시정지 메뉴가 떠서 결과 화면 이동과 겹쳤음 → 이때도 무시.
       if (!this.started || this.isGameEnded || this.isEndingSong) return;
+      // [LAN 대전] 대전 중엔 일시정지 없음(다른 PC와 시간이 어긋나므로). 누르던 키만 해제
+      if (this.vs) {
+        this.instance?.releaseHeldKeys?.();
+        return;
+      }
       // [버그수정] 재개 카운트다운 도중 창이 포커스를 잃으면(blur) 일시정지 메뉴가 떠도
       // 카운트다운은 계속 돌아 3초 뒤 메뉴가 열린 채로 게임이 재개됐음 → 카운트다운 취소.
       this.$refs.countdown?.clear(false);
@@ -753,7 +800,20 @@ export default {
         const result = await Promise.all([uploadPromise, achievementPromise]);
         const res = result[0];
         Logger.log(res);
-        this.$router.push("/result/" + res.data.resultId);
+        if (this.vs) {
+          // [LAN 대전] 최종 결과 보고 후 대전 결과 화면으로(보고 실패해도 이동)
+          const r = this.result;
+          await vsFinish({
+            score: r.score,
+            accuracy: this.percentage,
+            maxCombo: r.maxCombo,
+            isFullCombo: r.marks.miss === 0,
+            breaks: r.marks.miss,
+          });
+          this.$router.push({ path: "/vs", query: { result: res.data.resultId } });
+        } else {
+          this.$router.push("/result/" + res.data.resultId);
+        }
         this.$confetti.stop();
         this.updatePlay({ status: "finished", resultId: res.data.resultId });
         logEvent("result_uploaded", {

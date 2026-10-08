@@ -57,6 +57,8 @@ export const store = new Vuex.Store({
     randomGimmickMode: "off",
     // 오토플레이(시연용). 실수로 켜둔 채 축제 운영되지 않도록 저장하지 않고 이번 실행에만 유지.
     autoPlay: false,
+    // [LAN 대전] 대전 중일 때만 { pcId, sheetId, offsetMs, roomId } (평소엔 null → 기존 동작)
+    vs: null,
   },
   actions: {
     async fetchUserProfile() {
@@ -225,6 +227,9 @@ export const store = new Vuex.Store({
     },
     setAutoPlay(state, val) {
       state.autoPlay = !!val;
+    },
+    setVs(state, val) {
+      state.vs = val && typeof val === "object" ? { ...val } : null;
     },
     setRandomGimmickMode(state, val) {
       const mode = String(val || "off").toLowerCase();

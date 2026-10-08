@@ -13,6 +13,7 @@
         <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> SELECT</span>
         <span><kbd>ENTER</kbd> START</span>
         <span><kbd>R</kbd> RANKING</span>
+        <span><kbd>V</kbd> VS</span>
         <span><kbd>ESC</kbd> OPTIONS</span>
       </div>
     </header>
@@ -876,6 +877,10 @@ export default {
         if (this.sheetList && this.sheetList.length > 0) {
           this.playGame(this.sheetList[0].id);
         }
+      } else if ((e.key === 'v' || e.key === 'V') && !e.repeat) {
+        // [LAN 대전] 대전 로비로
+        e.preventDefault();
+        this.$router.push('/vs');
       } else if ((e.key === 'r' || e.key === 'R') && !e.repeat) {
         // [축제 랭킹] 선택 곡 랭킹 화면으로
         e.preventDefault();

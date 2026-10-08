@@ -4,6 +4,7 @@ import Game from "../routes/Game.vue";
 import Auth from "../routes/Auth.vue";
 import Result from "../routes/Result.vue";
 import Rankings from "../routes/Rankings.vue";
+import VsLobby from "../routes/VsLobby.vue";
 import SongSelect from "../routes/SongSelect.vue";
 import SpeedSetup from "../routes/SpeedSetup.vue";
 import MyStudio from "../routes/MyStudio.vue";
@@ -49,6 +50,13 @@ const router = new VueRouter({
       component: Rankings,
       // [축제 랭킹] 전체 화면 보드라 상단 메뉴 없이 배경만
       meta: { requireBg: true, showNav: false, backgroundOnly: true, title: "Rankings" },
+    },
+    {
+      // [LAN 대전] 로비/대전 결과
+      name: "vs",
+      path: "/vs",
+      component: VsLobby,
+      meta: { requireBg: true, showNav: false, backgroundOnly: true, title: "VS" },
     },
     {
       path: "/speed-setup",
