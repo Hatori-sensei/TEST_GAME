@@ -740,6 +740,8 @@ export default {
           }, 2000);
         });
       }
+      // [축제 랭킹/미션] 오토플레이 결과는 기록 등록·미션 달성 불가로 표시
+      this.result.autoPlay = !!(this.instance && this.instance.autoPlay);
       try {
         const uploadPromise = uploadResult({
           result: this.result,

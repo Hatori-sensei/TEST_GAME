@@ -26,6 +26,8 @@ const createJudgeDetails = () => ({
 
 // [UI] 결과 화면용 타이밍 통계(FAST/SLOW 개수, 평균 오차). 점수/판정 계산과는 무관.
 const createTimingStats = () => ({ fast: 0, slow: 0, sumMs: 0, count: 0 });
+// [미션] 롱노트 성공/실패 개수(미션 "롱노트 전부 성공" 평가용). 판정/점수와 무관.
+const createLongStats = () => ({ cleared: 0, failed: 0 });
 
 export default {
   data() {
@@ -50,6 +52,7 @@ export default {
         judgeSummary: createJudgeSummary(),
         judgeDetails: createJudgeDetails(),
         timing: createTimingStats(),
+        longStats: createLongStats(),
       },
       fever: { value: 1, time: 0, percent: 0 },
       health: 100,
@@ -263,6 +266,7 @@ export default {
         judgeSummary: createJudgeSummary(),
         judgeDetails: createJudgeDetails(),
         timing: createTimingStats(),
+        longStats: createLongStats(),
       };
       this.scoreAccRaw = 0;
       this.scorePerJudge =

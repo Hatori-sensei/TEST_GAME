@@ -30,7 +30,11 @@
         </div>
 
         <!-- [축제 랭킹] 기록 등록: 이름/소속 입력 → 랭킹·소속 대항전에 반영 -->
-        <div class="rs-register" v-if="reg.state !== 'skipped'">
+        <div class="rs-register" v-if="isAutoPlay">
+          <div class="rs-register-head">RANKING ENTRY</div>
+          <div class="rs-register-hint">AUTO PLAY 결과는 랭킹에 등록되지 않습니다</div>
+        </div>
+        <div class="rs-register" v-else-if="reg.state !== 'skipped'">
           <div class="rs-register-head">RANKING ENTRY</div>
           <template v-if="reg.state === 'form'">
             <div class="rs-register-row">
@@ -145,6 +149,22 @@
           </div>
         </div>
 
+        <!-- [미션] 도장판: 달성한 미션은 도장이 찍힘(기록 등록 시 같이 저장) -->
+        <div class="rs-missions" v-if="missions.length">
+          <div class="rs-judge-head">MISSION</div>
+          <div class="rs-stamps">
+            <div
+              v-for="m in missions"
+              :key="m.id"
+              class="rs-stamp"
+              :class="{ on: m.achieved }"
+            >
+              <span class="rs-stamp-mark">{{ m.achieved ? "CLEAR" : "" }}</span>
+              <span class="rs-stamp-text">{{ m.text }}</span>
+            </div>
+          </div>
+        </div>
+
         <div class="btn_sec">
           <div class="btn-action btn-dark rs-btn rs-btn-main" @click="replay">
             <v-icon name="redo" />
@@ -210,6 +230,7 @@ import {
   GUEST_GROUP,
 } from "../helpers/records";
 import { postSharedRecord } from "../helpers/lan";
+import { evaluateMissions } from "../helpers/missions";
 
 export default {
   name: "Result",
@@ -235,9 +256,17 @@ export default {
     };
   },
   computed: {
-    // [미션] 달성한 미션 id 목록(2단계에서 채움). 기록에 같이 저장됨
+    // [미션] 이 결과의 미션 목록과 달성 여부
+    missions() {
+      if (!this.result || !this.result.result) return [];
+      return evaluateMissions(this.result.sheetId, this.result.result);
+    },
+    // [미션] 달성한 미션 id 목록. 기록 등록 시 같이 저장됨
     achievedMissionIds() {
-      return [];
+      return this.missions.filter((m) => m.achieved).map((m) => m.id);
+    },
+    isAutoPlay() {
+      return !!(this.result && this.result.result && this.result.result.autoPlay);
     },
     summaryJudgeEntries() {
       const summary = this.result?.result?.judgeSummary || {};
@@ -386,7 +415,7 @@ export default {
   methods: {
     // [축제 랭킹] 결과를 이름/소속과 함께 기록 저장
     submitRecord() {
-      if (this.reg.state !== "form" || !this.result || !this.sheet) return;
+      if (this.reg.state !== "form" || !this.result || !this.sheet || this.isAutoPlay) return;
       const name = this.reg.name.trim();
       if (!name) {
         this.$refs.regName && this.$refs.regName.focus();
@@ -630,6 +659,65 @@ export default {
 }
 .rs-register-done strong {
   color: var(--dm-cyan);
+}
+
+/* [미션] 도장판 */
+.rs-missions .rs-judge-head {
+  margin-bottom: 10px;
+}
+.rs-stamps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.rs-stamp {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 172px;
+  height: 72px;
+  padding: 26px 12px 8px;
+  box-sizing: border-box;
+  background: rgba(8, 16, 30, 0.8);
+  border: 1px dashed rgba(var(--dm-cyan-rgb), 0.3);
+  color: var(--dm-muted);
+  font-size: 14px;
+}
+.rs-stamp.on {
+  border: 1px solid var(--dm-cyan);
+  background: rgba(var(--dm-cyan-rgb), 0.14);
+  color: var(--dm-text);
+}
+.rs-stamp-mark {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  padding: 0 6px;
+  font-family: var(--dm-font-display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: #04121c;
+  background: var(--dm-cyan);
+  transform: rotate(-6deg);
+}
+.rs-stamp-mark:empty {
+  display: none;
+}
+.rs-stamp.on .rs-stamp-mark {
+  animation: rs-stamp-in 0.35s ease-out both;
+}
+@keyframes rs-stamp-in {
+  from {
+    opacity: 0;
+    transform: rotate(-6deg) scale(2.2);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-6deg) scale(1);
+  }
 }
 
 .rs-chips {

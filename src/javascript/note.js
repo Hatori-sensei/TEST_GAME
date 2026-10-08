@@ -110,6 +110,8 @@ export default class Note {
     }
     this.missed = true;
     this.vm.result.marks.miss += 1;
+    // [미션] 롱노트를 아예 못 친 경우 실패로 집계(표시/판정 불변)
+    if (this.isLong && this.vm.result.longStats) this.vm.result.longStats.failed += 1;
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(0);
     }
@@ -159,6 +161,12 @@ export default class Note {
   }
 
   _applyLongReleaseJudge(judgeText, judgePercent) {
+    // [미션] 롱노트 끝 판정: BREAK면 실패, 그 외(MAX 100% / MAX 1%)는 성공으로 집계
+    const longStats = this.vm.result.longStats;
+    if (longStats) {
+      if (judgeText === "BREAK") longStats.failed += 1;
+      else longStats.cleared += 1;
+    }
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(judgePercent);
     }

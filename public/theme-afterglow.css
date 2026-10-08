@@ -618,3 +618,24 @@ html[data-theme="2"] .rk-bar-fill {
 html[data-theme="2"] .rk-bar-fill {
   background: var(--t2-sunset);
 }
+html[data-theme="2"] .rs-stamp {
+  border-radius: 14px;
+  background: rgba(30, 19, 62, 0.6);
+}
+html[data-theme="2"] .rs-stamp.on {
+  background: rgba(var(--dm-cyan-rgb), 0.16);
+}
+html[data-theme="2"] .rs-stamp-mark {
+  border-radius: 999px;
+  font-style: normal;
+  color: #1a0b2e;
+  background: var(--t2-sunset);
+}
+/* 결과 화면이 가로 배치라 미션 도장판은 아래 줄 전체 폭으로 */
+html[data-theme="2"] .rs-right {
+  flex-wrap: wrap;
+  row-gap: 22px;
+}
+html[data-theme="2"] .rs-missions {
+  flex: 0 0 100%;
+}
