@@ -677,3 +677,15 @@ html[data-theme="2"] .vs-bar-fill {
 html[data-theme="2"] .vs-bar-fill {
   background: var(--t2-sunset);
 }
+
+/* ---------- 대기 화면 SAMPLE PLAY ---------- */
+html[data-theme="2"] .demo-title {
+  border-radius: 999px;
+  font-style: normal;
+  color: #1a0b2e;
+  background: var(--t2-sunset);
+  box-shadow: 0 0 30px rgba(255, 79, 163, 0.5);
+}
+html[data-theme="2"] .demo-sub {
+  font-style: normal;
+}

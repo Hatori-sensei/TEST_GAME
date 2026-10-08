@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   showFastSlow: false, // FAST/SLOW 표시(기존엔 없던 표시라 기본은 끔)
   theme: 1, // 화면 테마(1 = 기존 디자인, 2 = AFTERGLOW)
   fxEnabled: true, // 채보 연출 효과(섬광/암전 등). 기존 채보엔 연출이 없어서 켜져 있어도 동작 동일
+  attractMode: true, // [대기 화면] 입력이 없으면 타이틀 → SAMPLE PLAY 자동 진행
   // [LAN] 여러 PC 연결(기본 = 사용 안 함 → 기존 동작과 동일)
   lanRole: "off", // off / host(이 PC가 서버) / client(다른 PC에 참가)
   lanHost: "", // 참가할 호스트 주소(예: 192.168.0.10 또는 192.168.0.10:41235)

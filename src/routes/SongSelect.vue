@@ -250,6 +250,7 @@
               <Checkbox label="No Fail (게임오버 없음)" :model="quickGameSt" modelKey="noFail" cbStyle="form"></Checkbox>
               <Checkbox label="오토플레이 (이번 실행만)" :model="quickGameSt" modelKey="autoPlay" cbStyle="form"></Checkbox>
               <Checkbox label="채보 연출 효과 (섬광/암전 등)" :model="quickGameSt" modelKey="fxEnabled" cbStyle="form"></Checkbox>
+              <Checkbox label="대기 화면 (방치 시 타이틀 → SAMPLE PLAY)" :model="quickGameSt" modelKey="attractMode" cbStyle="form"></Checkbox>
             </div>
           </div>
 
@@ -402,6 +403,7 @@ export default {
         showFastSlow: DEFAULT_SETTINGS.showFastSlow,
         autoPlay: false,
         fxEnabled: DEFAULT_SETTINGS.fxEnabled, // [연출]
+        attractMode: DEFAULT_SETTINGS.attractMode, // [대기 화면]
         theme: DEFAULT_SETTINGS.theme, // [테마]
       },
       themeList: THEMES,
@@ -516,6 +518,7 @@ export default {
       this.quickGameSt.noFail = gameSt.noFail === true;
       this.quickGameSt.showFastSlow = gameSt.showFastSlow === true;
       this.quickGameSt.fxEnabled = gameSt.fxEnabled !== false;
+      this.quickGameSt.attractMode = loadSettings().attractMode; // [대기 화면]
       this.quickGameSt.autoPlay = this.$store.state.autoPlay === true;
       this.quickGameSt.theme = loadSettings().theme; // [테마] 저장된 테마
       this.quickPreference.keyMap = {
@@ -653,6 +656,7 @@ export default {
         bgmVolume: this.quickSound.bgmVolume,
         effectVolume: this.quickSound.effectVolume,
         theme: applyTheme(this.quickGameSt.theme), // [테마] 적용 + 저장
+        attractMode: this.quickGameSt.attractMode, // [대기 화면]
         // [LAN]
         lanRole: this.quickLan.role,
         lanHost: this.quickLan.host.trim(),

@@ -100,6 +100,12 @@
 
     <ScorePanel></ScorePanel>
 
+    <!-- [대기 화면] 데모 자동 연주 표시 -->
+    <div class="demo-banner" v-if="isDemo">
+      <div class="demo-title">SAMPLE PLAY</div>
+      <div class="demo-sub">PRESS ANY KEY</div>
+    </div>
+
     <!-- [LAN 대전] 대전 중일 때만: 상대 점수/순위 + 시작 카운트다운 -->
     <VsHud
       v-if="vs"
@@ -274,6 +280,7 @@ import ScorePanel from "../components/game/ScorePanel.vue";
 import HealthBar from "../components/game/HealthBar.vue";
 import VsHud from "../components/game/VsHud.vue";
 import { vsLoaded, vsFinish, waitForStartAt } from "../helpers/vs";
+import { setGameIdleCheck, DEMO_LENGTH_SEC } from "../helpers/attract";
 import GameMixin from "../mixins/gameMixin";
 import { Youtube } from "vue-youtube";
 import {
@@ -345,6 +352,10 @@ export default {
     // [LAN 대전] 대전 컨텍스트(평소엔 null → 아래 대전 분기는 전부 건너뜀)
     vs() {
       return this.$store.state.vs;
+    },
+    // [대기 화면] SAMPLE PLAY(타이틀 방치 시 자동 연주). 기록/결과 화면 없이 끝나면 타이틀로
+    isDemo() {
+      return this.$route.query.demo === "1";
     },
     progress() {
       if (!this.currentSong || !this.instance) return 0;
@@ -427,6 +438,17 @@ export default {
     }
     window.addEventListener("keydown", this.handleUIKeyDown);
     window.addEventListener("keyup", this.handleUIKeyUp);
+
+    // [대기 화면] 일시정지 메뉴를 띄운 채 방치되면 타이틀로 돌아가도록 상태 제공
+    setGameIdleCheck(() => this.started && !this.isGameEnded && !this.vs && !this.isDemo && !!this.instance && this.instance.paused);
+    if (this.isDemo) {
+      // 데모: 오토플레이 + 게임오버 없음. 아무 키(또는 클릭)나 누르면 타이틀로
+      this.autoPlay = true;
+      this.noFail = true;
+      window.addEventListener("keydown", this.onDemoKey, true);
+      window.addEventListener("pointerdown", this.blockDemoPointer, true);
+      window.addEventListener("click", this.onDemoKey, true);
+    }
   },
   beforeDestroy() {
     // [버그수정] 리스너 해제를 early return 앞으로 이동. 예전엔 곡을 끝까지 플레이하거나
@@ -434,6 +456,11 @@ export default {
     // 파괴된 Game 화면 전체(BGA video, canvas 등)가 메모리에 계속 남았음(장시간 운영 시 누적).
     window.removeEventListener("keydown", this.handleUIKeyDown);
     window.removeEventListener("keyup", this.handleUIKeyUp);
+    setGameIdleCheck(null);
+    window.removeEventListener("keydown", this.onDemoKey, true);
+    window.removeEventListener("pointerdown", this.blockDemoPointer, true);
+    window.removeEventListener("click", this.onDemoKey, true);
+    clearTimeout(this.demoTimer);
 
     if (this.isGameEnded) return;
     this.reportExit("closed");
@@ -487,6 +514,10 @@ export default {
       }
     },
     async handleSongFinished() {
+      if (this.isDemo) {
+        this.exitDemo();
+        return;
+      }
       if (this.isGameEnded || this.isEndingSong) return;
       this.isEndingSong = true;
       this.songFadeOut = true;
@@ -595,6 +626,12 @@ export default {
     async startGameDirect() {
       logEvent("start_game", { songId: this.currentSong.songId });
       this.health = 100;
+      if (this.isDemo) {
+        // 데모는 "Get Ready" 대기 없이 바로, 정해진 길이만큼만 보여줌(리드인 2초 포함)
+        this.instance.startSong();
+        this.demoTimer = setTimeout(this.exitDemo, (DEMO_LENGTH_SEC + 2) * 1000);
+        return;
+      }
       if (this.vs) {
         await this.vsWaitAndStart();
         return;
@@ -625,6 +662,21 @@ export default {
       setTimeout(() => {
         if (!this.isGameEnded && !this.started && this.instance) this.instance.startSong();
       }, delay);
+    },
+    // [대기 화면] 데모 중 입력: 게임 입력으로 전달하지 않고 타이틀로
+    onDemoKey(e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      this.exitDemo();
+    },
+    blockDemoPointer(e) {
+      e.stopImmediatePropagation();
+    },
+    exitDemo() {
+      if (this.demoExited) return;
+      this.demoExited = true;
+      clearTimeout(this.demoTimer);
+      this.$router.push("/").catch(() => {});
     },
     triggerGameOverImmediate() {
       // [설정] No Fail: 체력이 0이 돼도 게임오버 없이 끝까지 진행
@@ -684,7 +736,8 @@ export default {
       // 일시정지 메뉴가 떠서 결과 화면 이동과 겹쳤음 → 이때도 무시.
       if (!this.started || this.isGameEnded || this.isEndingSong) return;
       // [LAN 대전] 대전 중엔 일시정지 없음(다른 PC와 시간이 어긋나므로). 누르던 키만 해제
-      if (this.vs) {
+      // [대기 화면] 데모도 창 포커스와 무관하게 계속 재생
+      if (this.vs || this.isDemo) {
         this.instance?.releaseHeldKeys?.();
         return;
       }
@@ -868,6 +921,40 @@ export default {
 </script>
 
 <style scoped>
+/* [대기 화면] SAMPLE PLAY 표시(기어 위쪽 가운데, 입력/판정과 무관) */
+.demo-banner {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  pointer-events: none;
+  text-align: center;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+}
+.demo-title {
+  padding: 2px 24px;
+  font-weight: 800;
+  font-size: 34px;
+  letter-spacing: 0.18em;
+  color: #04121c;
+  background: var(--dm-cyan);
+  box-shadow: 0 0 30px rgba(var(--dm-cyan-rgb), 0.6);
+}
+.demo-sub {
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.4em;
+  color: var(--dm-text);
+  animation: demo-blink 1.2s steps(2, start) infinite;
+}
+@keyframes demo-blink {
+  to {
+    visibility: hidden;
+  }
+}
 * {
   overflow: hidden;
 }

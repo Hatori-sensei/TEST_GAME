@@ -75,6 +75,8 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - LAN: `electron/lan-server.js`(호스트 HTTP+SSE 서버, TCP 41235, 기록은 userData/djon-festival-records.json), `electron/lan-main.js`(IPC, UDP 41234 찾기, 요청 대행), `electron/preload.js`(window.djonLan). app://는 http LAN fetch가 mixed content로 막혀서 통신은 전부 메인 프로세스가 함. 설정 lanRole(off/host/client)/lanHost/pcName, 기본 off.
 - LAN 대전: `/vs`(VsLobby.vue), `src/helpers/vs.js`, `components/game/VsHud.vue`. store `vs`가 있을 때만 Game.vue 분기(시작 시각 동기, 일시정지/게임오버 없음, 종료 보고). 최대 4명.
 - 확인: Node 단독 서버 테스트, 실제 Electron 25(Linux, Xvfb) 호스트 + 브라우저 참가 PC로 통합 랭킹/2인 대전/끊김 처리. **Windows exe·실제 여러 PC·방화벽은 미확인**(가이드의 체크리스트).
+- 대기 화면: `src/helpers/attract.js`(IDLE_TO_TITLE_SEC 60 / TITLE_TO_DEMO_SEC 10 / DEMO_LENGTH_SEC 42). 메뉴·배속·결과·게임오버·일시정지 방치 → 타이틀 → SAMPLE PLAY(`/game/Doit-sample?demo=1`, 오토+No Fail, 아무 키나 클릭 시 타이틀, 결과/기록 없음). 랭킹·대전·플레이 중엔 동작 안 함. 설정 attractMode(기본 켜짐).
+- 샘플 채보 `public/charts/Doit.sample.json`(Doit.json과 별개, BPM 129/첫 박 0.028s 분석값). localCatalog `DEMO_CHARTS`에만 있어 목록엔 안 나옴.
 - 곡 선택 화면은 keep-alive라 키 리스너는 activated/deactivated에서 붙이고 뗌(예전엔 결과 화면 Enter가 곡 시작으로 새던 버그).
 
 ## 작업 메모

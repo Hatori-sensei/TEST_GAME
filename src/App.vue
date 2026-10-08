@@ -54,6 +54,7 @@ import { logEvent } from "./helpers/analytics";
 import semver from "semver";
 import { hasSavedSettings, loadSettings } from "./helpers/settings";
 import { applyTheme } from "./helpers/theme";
+import { installAttract, uninstallAttract } from "./helpers/attract";
 import "vue-awesome/icons/volume-up";
 import "vue-awesome/icons/volume-mute";
 import "vue-awesome/icons/expand";
@@ -90,8 +91,10 @@ export default {
     window.addEventListener("online", this.updateOnlineStatus);
     window.addEventListener("offline", this.updateOnlineStatus);
     this.updateOnlineStatus();
+    installAttract(this.$router, this.$store); // [대기 화면] 방치 시 타이틀/SAMPLE PLAY
   },
   beforeDestroy() {
+    uninstallAttract();
     window.removeEventListener("online", this.updateOnlineStatus);
     window.removeEventListener("offline", this.updateOnlineStatus);
   },
