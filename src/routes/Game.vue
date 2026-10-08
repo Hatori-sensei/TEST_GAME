@@ -280,7 +280,7 @@ import ScorePanel from "../components/game/ScorePanel.vue";
 import HealthBar from "../components/game/HealthBar.vue";
 import VsHud from "../components/game/VsHud.vue";
 import { vsLoaded, vsFinish, waitForStartAt } from "../helpers/vs";
-import { setGameIdleCheck, DEMO_LENGTH_SEC } from "../helpers/attract";
+import { setGameIdleCheck } from "../helpers/attract";
 import GameMixin from "../mixins/gameMixin";
 import { Youtube } from "vue-youtube";
 import {
@@ -472,6 +472,8 @@ export default {
     async playWithId(sheetId) {
       try {
         let song = await getGameSheet(sheetId);
+        // [대기 화면] 재생 목록에서 시작 위치를 지정한 경우(?from=초)
+        if (this.isDemo && Number(this.$route.query.from) > 0) song = { ...song, startAt: Number(this.$route.query.from) };
         const pendingOptions = this.$store.state.pendingGameOptions;
         const gameOptions = pendingOptions && typeof pendingOptions === "object"
           ? pendingOptions
@@ -515,7 +517,12 @@ export default {
     },
     async handleSongFinished() {
       if (this.isDemo) {
-        this.exitDemo();
+        // 곡이 끝나면 페이드아웃 후 타이틀로(타이틀에서 10초 뒤 다음 SAMPLE PLAY)
+        if (this.isEndingSong) return;
+        this.isEndingSong = true;
+        this.songFadeOut = true;
+        this.instance?.pauseVideo?.();
+        setTimeout(this.exitDemo, SONG_END_FADE_DELAY_MS);
         return;
       }
       if (this.isGameEnded || this.isEndingSong) return;
@@ -627,9 +634,10 @@ export default {
       logEvent("start_game", { songId: this.currentSong.songId });
       this.health = 100;
       if (this.isDemo) {
-        // 데모는 "Get Ready" 대기 없이 바로, 정해진 길이만큼만 보여줌(리드인 2초 포함)
+        // 데모는 "Get Ready" 대기 없이 바로. 기본은 곡 끝까지, ?len=초가 있으면 그만큼만(리드인 2초 포함)
         this.instance.startSong();
-        this.demoTimer = setTimeout(this.exitDemo, (DEMO_LENGTH_SEC + 2) * 1000);
+        const len = Number(this.$route.query.len);
+        if (len > 0) this.demoTimer = setTimeout(this.exitDemo, (len + 2) * 1000);
         return;
       }
       if (this.vs) {
