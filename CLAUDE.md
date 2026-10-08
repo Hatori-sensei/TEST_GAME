@@ -67,6 +67,16 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - 모바일은 지원 안 함(사용 중 화면의 모바일 CSS 삭제).
 - 롱노트: 테마 팔레트의 long(전용 색)/longHold(누르는 중) 사용. 보류 중: 강조색 직접 지정 기능.
 
+## 차별화 기능 (2026-10, 운영 방법: docs/축제_LAN_운영가이드.md)
+- 축제 랭킹: `src/helpers/records.js`(localStorage `djon.records` {version:1, entries}, 이름 8자/소속 10자, 빈 소속=GUEST). 결과 화면 등록 패널, `/rankings` 보드(곡별 TOP10, 오늘/전체 T, 소속 대항전/미션 도장 TAB, Ctrl+Shift+Delete 초기화), 곡 선택 TOP3 + `R`.
+- 소속 대항전 점수 = 사람(이름+소속)별·곡별 최고점/10000 합계.
+- 미션: `src/helpers/missions.js`(결과만 보고 평가). 기본 5개, 차트에 `missions` 배열로 교체 가능. `result.longStats`(롱노트 성공/실패)는 note.js에서 집계만 함. 오토플레이 결과는 등록/미션 불가(`result.autoPlay`).
+- 연출 기믹: `src/javascript/fx.js`(flash/blackout/tint/pulse/beat). 판정·노트·판정선/기어 기하 불변. 설정 `fxEnabled`(기본 켜짐). 작성법 docs/채보_연출기믹.md.
+- LAN: `electron/lan-server.js`(호스트 HTTP+SSE 서버, TCP 41235, 기록은 userData/djon-festival-records.json), `electron/lan-main.js`(IPC, UDP 41234 찾기, 요청 대행), `electron/preload.js`(window.djonLan). app://는 http LAN fetch가 mixed content로 막혀서 통신은 전부 메인 프로세스가 함. 설정 lanRole(off/host/client)/lanHost/pcName, 기본 off.
+- LAN 대전: `/vs`(VsLobby.vue), `src/helpers/vs.js`, `components/game/VsHud.vue`. store `vs`가 있을 때만 Game.vue 분기(시작 시각 동기, 일시정지/게임오버 없음, 종료 보고). 최대 4명.
+- 확인: Node 단독 서버 테스트, 실제 Electron 25(Linux, Xvfb) 호스트 + 브라우저 참가 PC로 통합 랭킹/2인 대전/끊김 처리. **Windows exe·실제 여러 PC·방화벽은 미확인**(가이드의 체크리스트).
+- 곡 선택 화면은 keep-alive라 키 리스너는 activated/deactivated에서 붙이고 뗌(예전엔 결과 화면 Enter가 곡 시작으로 새던 버그).
+
 ## 작업 메모
 - 파일 줄바꿈이 CRLF인 파일이 많음. 스크립트로 수정할 땐 보존할 것.
 - 개발 서버는 3000번 포트(`npm start`). 확인은 `node_modules/.bin/electron . --windowed --rp-debug --remote-debugging-port=9222` 후 CDP로 캡처했음. HMR 중에 게임이 시작되면 개발용 오류 오버레이가 뜨는데 실제 결함 아님.
