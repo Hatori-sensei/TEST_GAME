@@ -18,6 +18,10 @@ module.exports = {
   mode: isProduction() ? "production" : "development",
   devtool: isProduction() ? false : "source-map",
   resolve: { extensions: ["*", ".js"] },
+  // vue-loader 15 + webpack 5 조합에서 .vue의 <style> 블록마다 나는 무해한 경고
+  // (export 'default' (imported as 'styleN') was not found). CSS 모듈을 안 쓰므로 무시.
+  // 개발 서버의 "Compiled with problems" 오버레이도 이 경고 때문에 떴음.
+  ignoreWarnings: [/export 'default' \(imported as 'style\d+'\) was not found/],
   output: {
     path: path.resolve(__dirname, "dist"),
     filename: "[name].[contenthash].bundle.js",
