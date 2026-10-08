@@ -25,6 +25,10 @@ export const DEFAULT_SETTINGS = Object.freeze({
   showFastSlow: false, // FAST/SLOW 표시(기존엔 없던 표시라 기본은 끔)
   theme: 1, // 화면 테마(1 = 기존 디자인, 2 = AFTERGLOW)
   fxEnabled: true, // 채보 연출 효과(섬광/암전 등). 기존 채보엔 연출이 없어서 켜져 있어도 동작 동일
+  // [LAN] 여러 PC 연결(기본 = 사용 안 함 → 기존 동작과 동일)
+  lanRole: "off", // off / host(이 PC가 서버) / client(다른 PC에 참가)
+  lanHost: "", // 참가할 호스트 주소(예: 192.168.0.10 또는 192.168.0.10:41235)
+  pcName: "", // 이 PC 이름(기록/대전에 표시)
 });
 
 // 숫자 범위 보정(잘못 저장된 값이 들어와도 안전하게)
@@ -41,6 +45,13 @@ const RANGES = {
 // 정수만 허용하는 항목
 const INTEGER_KEYS = ["theme"];
 
+// 문자열 항목: 최대 길이 / 허용 값(enum)
+const STRING_RULES = {
+  lanRole: { enum: ["off", "host", "client"] },
+  lanHost: { max: 64 },
+  pcName: { max: 12 },
+};
+
 function sanitize(raw) {
   const out = { ...DEFAULT_SETTINGS };
   if (!raw || typeof raw !== "object") return out;
@@ -56,6 +67,16 @@ function sanitize(raw) {
       }
     } else if (typeof def === "boolean") {
       if (typeof val === "boolean") out[key] = val;
+    } else if (STRING_RULES[key]) {
+      if (typeof val === "string") {
+        const rule = STRING_RULES[key];
+        const v = val.replace(/[\r\n\t]/g, " ").trim();
+        if (rule.enum) {
+          if (rule.enum.includes(v)) out[key] = v;
+        } else {
+          out[key] = v.slice(0, rule.max);
+        }
+      }
     } else if (key === "keyMap") {
       if (val && typeof val === "object") out[key] = { ...val };
     }

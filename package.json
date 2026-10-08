@@ -33,6 +33,7 @@
       "!dist/videos/**",
       "!dist/**/*.map",
       "background.js",
+      "electron/**/*",
       "package.json",
       "!**/node_modules/**"
     ],

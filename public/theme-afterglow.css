@@ -277,7 +277,8 @@ html[data-theme="2"] .quick-settings-header h2 {
 html[data-theme="2"] .quick-settings-section {
   border-top-color: rgba(255, 79, 163, 0.2);
 }
-html[data-theme="2"] .slider-wrap select {
+html[data-theme="2"] .slider-wrap select,
+html[data-theme="2"] .lan-input {
   border-radius: 10px;
   background: #1d1240;
   border-color: rgba(255, 79, 163, 0.35);

@@ -1,7 +1,8 @@
 const path = require("path");
 const fs = require("fs");
 const { Readable } = require("stream");
-const { app, BrowserWindow, Menu, protocol } = require("electron");
+const { app, BrowserWindow, Menu, protocol, ipcMain } = require("electron");
+const { registerLan } = require("./electron/lan-main");
 
 // ---------------------------------------------------------------------------
 // Run modes
@@ -184,6 +185,8 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // [LAN] 통합 랭킹/대전용 최소 API(window.djonLan)만 노출
+      preload: path.join(__dirname, "electron", "preload.js"),
       autoplayPolicy: "no-user-gesture-required",
       backgroundThrottling: false,
       devTools: !lockdown,
@@ -242,6 +245,13 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     if (!isDev) registerAppProtocol();
+    // [LAN] 호스트 서버/참가 통신(설정에서 켜기 전에는 아무것도 열지 않음)
+    registerLan({
+      ipcMain,
+      app,
+      getWindow: () => mainWindow,
+      log: (...a) => (DEBUG || isDev) && console.log(...a),
+    });
     createMainWindow();
 
     app.on("activate", () => {

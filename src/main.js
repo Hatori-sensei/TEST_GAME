@@ -10,6 +10,7 @@ import { store } from "./helpers/store";
 import { auth, remoteConfig } from "./helpers/firebaseConfig";
 import Icon from "vue-awesome/components/Icon";
 import { logEvent, logError } from "./helpers/analytics";
+import { getLanConfig, applyLanRole } from "./helpers/lan";
 
 import "animate.css";
 
@@ -47,6 +48,11 @@ Logger.setHandler((messages, context) => {
     logError(messages[0]);
   }
 });
+
+// [LAN] 이 PC가 호스트로 설정돼 있으면 앱 시작 때 축제 서버를 켬(설정 안 했으면 아무것도 안 함)
+if (getLanConfig().role === "host") {
+  applyLanRole().then((r) => r && !r.ok && Logger.warn("LAN host start failed", r.error));
+}
 
 new Vue({
   router,

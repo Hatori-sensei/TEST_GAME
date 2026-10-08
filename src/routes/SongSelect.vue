@@ -286,6 +286,51 @@
             </div>
           </div>
 
+          <!-- [LAN] 여러 PC 연결: 통합 랭킹 / 대전. 기본 = 사용 안 함 -->
+          <div class="quick-settings-section">
+            <h3>LAN (여러 PC 연결)</h3>
+            <div v-if="!lan.available" class="calib-msg">설치된 앱(exe)에서만 사용할 수 있어요. (지금은 브라우저 개발 모드)</div>
+            <template v-else>
+              <div class="settings-row">
+                <label for="lanRole">역할</label>
+                <div class="slider-wrap">
+                  <select id="lanRole" v-model="quickLan.role">
+                    <option value="off">사용 안 함</option>
+                    <option value="host">호스트 (이 PC가 서버 · 랭킹 보드용 PC 추천)</option>
+                    <option value="client">참가 (호스트에 연결)</option>
+                  </select>
+                </div>
+                <strong></strong>
+              </div>
+              <div class="settings-row" v-if="quickLan.role !== 'off'">
+                <label for="pcName">PC 이름</label>
+                <div class="slider-wrap">
+                  <input id="pcName" class="lan-input" v-model="quickLan.pcName" maxlength="12" placeholder="예: 1번 PC" />
+                </div>
+                <strong></strong>
+              </div>
+              <div class="settings-row" v-if="quickLan.role === 'client'">
+                <label for="lanHost">호스트 주소</label>
+                <div class="calib-box">
+                  <input id="lanHost" class="lan-input" v-model="quickLan.host" maxlength="64" placeholder="예: 192.168.0.10" />
+                  <button class="settings-btn calib-btn" :disabled="lan.busy" @click="findLanHosts">찾기</button>
+                  <button class="settings-btn calib-btn" :disabled="lan.busy || !quickLan.host" @click="testLanHost">연결 확인</button>
+                </div>
+                <strong></strong>
+              </div>
+              <div class="lan-found" v-if="quickLan.role === 'client' && lan.found.length">
+                <button v-for="h in lan.found" :key="h.address" class="settings-btn calib-btn" @click="quickLan.host = h.address">
+                  {{ h.name }} · {{ h.address }}
+                </button>
+              </div>
+              <div class="calib-msg" v-if="quickLan.role === 'host'">
+                다른 PC에서 "찾기"를 누르거나 이 주소를 입력하세요:
+                <strong class="lan-ip">{{ lan.ips.length ? lan.ips.join(" / ") : "(네트워크 연결 없음)" }}</strong>
+              </div>
+              <div class="calib-msg" v-if="lan.message">{{ lan.message }}</div>
+            </template>
+          </div>
+
           <div class="quick-settings-actions">
             <button class="settings-btn save" @click="saveQuickSettings">Apply</button>
             <button class="settings-btn" @click="closeQuickSettings">Close</button>
@@ -307,6 +352,7 @@ import { resolveSongPreviewRange } from "../javascript/localCatalog";
 import { saveSettings, loadSettings, DEFAULT_SETTINGS } from "../helpers/settings";
 import { THEMES, applyTheme } from "../helpers/theme";
 import { loadRecords, topBySheet } from "../helpers/records";
+import { isLanAvailable, getLanConfig, applyLanRole, lanStatus, discoverHosts, pingHost } from "../helpers/lan";
 
 // [설정] 오프셋 자동 측정: 메트로놈 간격/횟수
 const CALIB_INTERVAL_SEC = 0.6;
@@ -358,6 +404,9 @@ export default {
         theme: DEFAULT_SETTINGS.theme, // [테마]
       },
       themeList: THEMES,
+      // [LAN] 설정 화면 상태
+      quickLan: { role: "off", host: "", pcName: "" },
+      lan: { available: isLanAvailable(), busy: false, found: [], ips: [], message: "" },
       // [설정] 오프셋 자동 측정 상태
       calib: { state: "idle", taps: [], beats: [], message: "" },
       quickPreference: {
@@ -485,8 +534,35 @@ export default {
     },
     openQuickSettings() {
       this.initQuickSettings();
+      this.initLanSettings();
       this.showQuickSettings = true;
       this.$store.state.audio.playEffect("ui/pop");
+    },
+    // [LAN] 저장된 LAN 설정 불러오기 + 이 PC 주소 표시
+    async initLanSettings() {
+      this.quickLan = { ...getLanConfig() };
+      this.lan.found = [];
+      this.lan.message = "";
+      const st = await lanStatus();
+      if (st) {
+        this.lan.ips = st.ips.map((ip) => `${ip}:${st.port}`);
+        if (this.quickLan.role === "host") this.lan.message = st.hosting ? "호스트 실행 중" : "호스트가 꺼져 있어요(Apply로 다시 켜기)";
+      }
+    },
+    async findLanHosts() {
+      this.lan.busy = true;
+      this.lan.message = "같은 네트워크에서 호스트를 찾는 중...";
+      this.lan.found = await discoverHosts(1500);
+      this.lan.message = this.lan.found.length ? "찾은 호스트를 눌러 선택하세요" : "못 찾았어요. 호스트 PC 화면의 주소를 직접 입력하세요(방화벽/같은 공유기 확인)";
+      if (this.lan.found.length === 1) this.quickLan.host = this.lan.found[0].address;
+      this.lan.busy = false;
+    },
+    async testLanHost() {
+      this.lan.busy = true;
+      this.lan.message = "연결 확인 중...";
+      const r = await pingHost(this.quickLan.host.trim());
+      this.lan.message = r.ok ? `연결됨: ${r.name} · 기록 ${r.records}개 · ${r.rttMs}ms` : `연결 실패: ${r.error}`;
+      this.lan.busy = false;
     },
     // [테마] 선택 즉시 화면에 미리 적용
     previewTheme() {
@@ -576,7 +652,17 @@ export default {
         bgmVolume: this.quickSound.bgmVolume,
         effectVolume: this.quickSound.effectVolume,
         theme: applyTheme(this.quickGameSt.theme), // [테마] 적용 + 저장
+        // [LAN]
+        lanRole: this.quickLan.role,
+        lanHost: this.quickLan.host.trim(),
+        pcName: this.quickLan.pcName.trim(),
       });
+      // [LAN] 역할에 맞게 호스트 서버 켜기/끄기(LAN을 안 쓰면 꺼진 상태 유지)
+      if (this.lan.available) {
+        applyLanRole().then((r) => {
+          if (r && !r.ok) this.$store.state.alert.error(`LAN 호스트 시작 실패: ${r.error}`);
+        });
+      }
 
       try {
         await updateUserProfile({ gameSt, preference });
@@ -1487,6 +1573,36 @@ export default {
   border: 1px solid var(--dm-cyan-dim);
   border-radius: 0;
   font-family: var(--dm-font-body);
+}
+
+/* [LAN] */
+.lan-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  color: var(--dm-text);
+  background: #071a2b;
+  border: 1px solid var(--dm-cyan-dim);
+  font-family: var(--dm-font-body);
+  font-size: 15px;
+  outline: none;
+}
+.lan-input:focus {
+  border-color: var(--dm-cyan);
+}
+.lan-found {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 10px 176px;
+}
+.lan-ip {
+  color: var(--dm-cyan);
+  font-family: var(--dm-font-display);
+  font-size: 16px;
+  margin-left: 6px;
 }
 
 .quick-settings-actions {

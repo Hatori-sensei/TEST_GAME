@@ -229,7 +229,7 @@ import {
   GROUP_MAX,
   GUEST_GROUP,
 } from "../helpers/records";
-import { postSharedRecord } from "../helpers/lan";
+import { postSharedRecord, getLanConfig } from "../helpers/lan";
 import { evaluateMissions } from "../helpers/missions";
 
 export default {
@@ -432,6 +432,7 @@ export default {
         maxCombo: r.maxCombo,
         isFullCombo: this.result.isFullCombo,
         missions: this.achievedMissionIds || [],
+        pc: getLanConfig().pcName, // [LAN] 어느 PC에서 친 기록인지
       });
       if (!entry) return;
       saveLastPlayer(entry.name, entry.group === GUEST_GROUP ? "" : entry.group);
