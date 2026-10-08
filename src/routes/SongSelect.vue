@@ -405,6 +405,13 @@ export default {
     this.songList = this.allSongs || [];
     this.selectSong(0);
     this.initQuickSettings();
+  },
+  // [버그 수정] 이 화면은 keep-alive로 캐시돼서 다른 화면으로 가도 파괴되지 않음.
+  // 예전엔 mounted에서 건 keydown 리스너가 게임/결과 화면에서도 살아 있어서
+  // 결과 화면의 Enter → 곡 시작(speed-setup 이동), 게임 중 ESC → 숨은 설정창 토글 등이 발생했음.
+  // → 화면이 보일 때(activated)만 리스너를 걸고, 떠날 때(deactivated) 제거.
+  activated() {
+    window.removeEventListener('keydown', this.handleKeydown);
     window.addEventListener('keydown', this.handleKeydown);
   },
   beforeDestroy() {
@@ -413,6 +420,7 @@ export default {
     window.removeEventListener('keydown', this.handleKeydown);
   },
   deactivated() {
+    window.removeEventListener('keydown', this.handleKeydown);
     this.clearPreviewTimer();
   },
   methods: {
