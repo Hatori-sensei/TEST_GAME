@@ -315,6 +315,10 @@ export default {
       isEndingSong: false,
       // full-screen loading screen, shown from the moment the game screen opens
       loadingScreen: true,
+      // [버그수정] mixin 기본값 "youtube" 때문에 곡 정보를 읽기 전 잠깐 YouTube 플레이어가
+      // 만들어져 매 판 youtube.com 접속을 시도했고, 실패 시 "problem with the source" 오류
+      // 팝업이 가끔 떴음(오프라인 축제 PC). 곡은 전부 로컬이므로 기본값을 local로.
+      srcMode: "local",
       loadingScreenSince: Date.now(),
       // [성능] 진행 바용 재생 시간(0.1초 단위로만 갱신). progress가 instance.currentTime을
       // 직접 읽으면 매 프레임 Game 화면 전체가 다시 렌더링됐음.
