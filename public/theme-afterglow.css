@@ -575,3 +575,46 @@ html[data-theme="2"] .actions button:first-child {
   background: var(--t2-sunset);
   border-color: transparent;
 }
+
+/* ---------- 축제 랭킹(기록 등록 / 곡 선택 TOP3 / 랭킹 보드) ---------- */
+html[data-theme="2"] .rs-register {
+  border-left: none;
+  border-radius: 18px;
+  background: rgba(30, 19, 62, 0.7);
+}
+html[data-theme="2"] .rs-register-row input {
+  border-radius: 999px;
+  background: rgba(10, 6, 24, 0.6);
+}
+html[data-theme="2"] .mini-rank {
+  width: 100%;
+  margin: 0 auto;
+  text-align: left;
+  border-left: none;
+  border-radius: 16px;
+  background: rgba(30, 19, 62, 0.6);
+}
+html[data-theme="2"] .mini-rank-head {
+  text-align: center;
+}
+html[data-theme="2"] .rank-page {
+  background: var(--t2-sky);
+}
+html[data-theme="2"] .rk-song,
+html[data-theme="2"] .rk-row {
+  border-radius: 0 12px 12px 0;
+  background: rgba(30, 19, 62, 0.6);
+}
+html[data-theme="2"] .rk-song.active {
+  background: rgba(var(--dm-cyan-rgb), 0.18);
+}
+html[data-theme="2"] .rk-row.rank-1 {
+  background: linear-gradient(90deg, rgba(255, 211, 106, 0.22), rgba(30, 19, 62, 0.6));
+}
+html[data-theme="2"] .rk-bar,
+html[data-theme="2"] .rk-bar-fill {
+  border-radius: 999px;
+}
+html[data-theme="2"] .rk-bar-fill {
+  background: var(--t2-sunset);
+}

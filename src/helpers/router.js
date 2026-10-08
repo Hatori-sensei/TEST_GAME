@@ -47,7 +47,8 @@ const router = new VueRouter({
       name: "rankings",
       path: "/rankings",
       component: Rankings,
-      meta: { requireBg: true, title: "Rankings" },
+      // [축제 랭킹] 전체 화면 보드라 상단 메뉴 없이 배경만
+      meta: { requireBg: true, showNav: false, backgroundOnly: true, title: "Rankings" },
     },
     {
       path: "/speed-setup",

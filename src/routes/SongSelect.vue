@@ -12,6 +12,7 @@
       <div class="top-hint">
         <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> SELECT</span>
         <span><kbd>ENTER</kbd> START</span>
+        <span><kbd>R</kbd> RANKING</span>
         <span><kbd>ESC</kbd> OPTIONS</span>
       </div>
     </header>
@@ -51,6 +52,17 @@
               </button>
             </div>
             <Loading v-else :show="true" text="Loading Sheets..." />
+
+            <!-- [축제 랭킹] 선택 곡 오늘 TOP3 (R 키로 전체 랭킹) -->
+            <div class="mini-rank" v-if="miniTop.length > 0">
+              <div class="mini-rank-head">TODAY TOP 3</div>
+              <div v-for="(e, i) in miniTop" :key="e.id" class="mini-rank-row">
+                <span class="mini-rank-pos">{{ i + 1 }}</span>
+                <span class="mini-rank-name">{{ e.name }}</span>
+                <span class="mini-rank-group">{{ e.group }}</span>
+                <span class="mini-rank-score">{{ e.score.toLocaleString() }}</span>
+              </div>
+            </div>
           </div>
 
           <div v-else class="empty-state">
@@ -293,6 +305,7 @@ import { logEvent } from "../helpers/analytics";
 import { resolveSongPreviewRange } from "../javascript/localCatalog";
 import { saveSettings, loadSettings, DEFAULT_SETTINGS } from "../helpers/settings";
 import { THEMES, applyTheme } from "../helpers/theme";
+import { loadRecords, topBySheet } from "../helpers/records";
 
 // [설정] 오프셋 자동 측정: 메트로놈 간격/횟수
 const CALIB_INTERVAL_SEC = 0.6;
@@ -322,6 +335,7 @@ export default {
       sheetList: null,
       selectedSong: null,
       selectedIndex: 0,
+      records: [], // [축제 랭킹] 이 PC 기록(화면 진입 시 1번 읽음)
       previewStopTimer: null,
       previewFadeOutTimer: null,
       previewToken: 0,
@@ -369,6 +383,11 @@ export default {
     bgImage() {
       return this.coverImage ? `url(${this.coverImage})` : 'none';
     },
+    // [축제 랭킹] 선택 곡의 오늘 TOP3
+    miniTop() {
+      const sheet = this.sheetList && this.sheetList[0];
+      return sheet ? topBySheet(this.records, sheet.id, 3, { todayOnly: true }) : [];
+    },
     selectedSongBpm() {
       const bpm = this.selectedSong?.bpm;
       if (typeof bpm === "number") return String(Math.round(bpm));
@@ -411,6 +430,7 @@ export default {
   // 결과 화면의 Enter → 곡 시작(speed-setup 이동), 게임 중 ESC → 숨은 설정창 토글 등이 발생했음.
   // → 화면이 보일 때(activated)만 리스너를 걸고, 떠날 때(deactivated) 제거.
   activated() {
+    this.records = loadRecords(); // [축제 랭킹] 결과 화면에서 등록한 기록 반영
     window.removeEventListener('keydown', this.handleKeydown);
     window.addEventListener('keydown', this.handleKeydown);
   },
@@ -766,6 +786,11 @@ export default {
         if (this.sheetList && this.sheetList.length > 0) {
           this.playGame(this.sheetList[0].id);
         }
+      } else if ((e.key === 'r' || e.key === 'R') && !e.repeat) {
+        // [축제 랭킹] 선택 곡 랭킹 화면으로
+        e.preventDefault();
+        const sheet = this.sheetList && this.sheetList[0];
+        this.$router.push(sheet ? `/rankings?sheet=${encodeURIComponent(sheet.id)}` : '/rankings');
       }
     },
     scrollToSelected() {
@@ -1026,6 +1051,55 @@ export default {
 /* ---------- start button ---------- */
 .play-panel {
   margin-top: 4px;
+}
+
+/* [축제 랭킹] 선택 곡 TOP3 */
+.mini-rank {
+  box-sizing: border-box;
+  max-width: 560px;
+  padding: 8px 14px;
+  background: rgba(5, 10, 20, 0.7);
+  border-left: 3px solid var(--dm-cyan);
+}
+.mini-rank-head {
+  font-family: var(--dm-font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  color: var(--dm-cyan);
+  margin-bottom: 4px;
+}
+.mini-rank-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  height: 26px;
+  font-size: 16px;
+}
+.mini-rank-pos {
+  width: 16px;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  color: var(--dm-cyan);
+}
+.mini-rank-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mini-rank-group {
+  color: var(--dm-muted);
+  font-size: 14px;
+}
+.mini-rank-score {
+  width: 96px;
+  text-align: right;
+  font-family: var(--dm-font-display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .play-action {

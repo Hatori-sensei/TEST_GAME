@@ -28,6 +28,35 @@
             <small>{{ chip.label }}</small>{{ chip.value }}
           </span>
         </div>
+
+        <!-- [축제 랭킹] 기록 등록: 이름/소속 입력 → 랭킹·소속 대항전에 반영 -->
+        <div class="rs-register" v-if="reg.state !== 'skipped'">
+          <div class="rs-register-head">RANKING ENTRY</div>
+          <template v-if="reg.state === 'form'">
+            <div class="rs-register-row">
+              <input
+                ref="regName"
+                v-model="reg.name"
+                :maxlength="nameMax"
+                placeholder="이름"
+                @keydown.enter.prevent="onRegEnter"
+                @keydown.esc.prevent="skipRecord"
+              />
+              <input
+                v-model="reg.group"
+                :maxlength="groupMax"
+                placeholder="소속 (예: 2-3, 컴공)"
+                @keydown.enter.prevent="onRegEnter"
+                @keydown.esc.prevent="skipRecord"
+              />
+            </div>
+            <div class="rs-register-hint">ENTER 등록 · ESC 건너뛰기 · 소속을 비우면 {{ guestGroup }}</div>
+          </template>
+          <div v-else class="rs-register-done">
+            <strong>{{ reg.savedName }}</strong> ({{ reg.savedGroup }}) 등록 완료
+            <span v-if="reg.rank">· 이 곡 오늘 {{ reg.rank }}위</span>
+          </div>
+        </div>
       </section>
 
       <section class="rs-right">
@@ -170,6 +199,17 @@ import {
   getUserProfile,
 } from "../javascript/db";
 import ICountUp from "vue-countup-v2";
+import {
+  addRecord,
+  loadRecords,
+  topBySheet,
+  loadLastPlayer,
+  saveLastPlayer,
+  NAME_MAX,
+  GROUP_MAX,
+  GUEST_GROUP,
+} from "../helpers/records";
+import { postSharedRecord } from "../helpers/lan";
 
 export default {
   name: "Result",
@@ -187,9 +227,18 @@ export default {
       newRecord: false,
       oldProfileInfo: null,
       overrideProfile: null,
+      // [축제 랭킹] 기록 등록 상태: form(입력) / done(등록됨) / skipped(건너뜀)
+      reg: { state: "form", name: "", group: "", savedName: "", savedGroup: "", rank: 0 },
+      nameMax: NAME_MAX,
+      groupMax: GROUP_MAX,
+      guestGroup: GUEST_GROUP,
     };
   },
   computed: {
+    // [미션] 달성한 미션 id 목록(2단계에서 채움). 기록에 같이 저장됨
+    achievedMissionIds() {
+      return [];
+    },
     summaryJudgeEntries() {
       const summary = this.result?.result?.judgeSummary || {};
       return [
@@ -301,6 +350,12 @@ export default {
       this.showError();
     }
 
+    // [축제 랭킹] 마지막 입력값 채우고 이름 칸에 포커스
+    const last = loadLastPlayer();
+    this.reg.name = last.name;
+    this.reg.group = last.group;
+    this.$nextTick(() => this.$refs.regName && this.$refs.regName.focus());
+
     window.onresize = () => {
       this.windowWidth = window.innerWidth;
     };
@@ -329,6 +384,43 @@ export default {
     this.$store.state.audio.stop();
   },
   methods: {
+    // [축제 랭킹] 결과를 이름/소속과 함께 기록 저장
+    submitRecord() {
+      if (this.reg.state !== "form" || !this.result || !this.sheet) return;
+      const name = this.reg.name.trim();
+      if (!name) {
+        this.$refs.regName && this.$refs.regName.focus();
+        return;
+      }
+      const r = this.result.result || {};
+      const entry = addRecord({
+        name,
+        group: this.reg.group,
+        sheetId: this.result.sheetId,
+        title: this.sheet.song && this.sheet.song.title,
+        score: r.score,
+        accuracy: r.percentage,
+        maxCombo: r.maxCombo,
+        isFullCombo: this.result.isFullCombo,
+        missions: this.achievedMissionIds || [],
+      });
+      if (!entry) return;
+      saveLastPlayer(entry.name, entry.group === GUEST_GROUP ? "" : entry.group);
+      const top = topBySheet(loadRecords(), entry.sheetId, 9999, { todayOnly: true });
+      const idx = top.findIndex((e) => e.name === entry.name && e.group === entry.group);
+      this.reg = { ...this.reg, state: "done", savedName: entry.name, savedGroup: entry.group, rank: idx + 1 };
+      postSharedRecord(entry); // LAN 통합 랭킹(미사용이면 아무것도 안 함)
+      this.$emit("record-added", entry);
+      this.$store.state.audio.playEffect("ui/slide2");
+    },
+    // 한글 입력 조합 중의 Enter는 글자 확정용이라 무시(다음 Enter에 등록)
+    onRegEnter(e) {
+      if (e.isComposing || e.keyCode === 229) return;
+      this.submitRecord();
+    },
+    skipRecord() {
+      this.reg.state = "skipped";
+    },
     showError() {
       this.$store.state.gModal.show({
         bodyText: "This result is unavaliable.",
@@ -491,6 +583,52 @@ export default {
   font-size: 22px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  color: var(--dm-cyan);
+}
+
+.rs-register {
+  margin-top: 6px;
+  padding: 14px 16px;
+  background: rgba(8, 16, 30, 0.85);
+  border-left: 3px solid var(--dm-cyan);
+  max-width: 460px;
+}
+.rs-register-head {
+  font-family: var(--dm-font-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  color: var(--dm-muted);
+  margin-bottom: 10px;
+}
+.rs-register-row {
+  display: flex;
+  gap: 10px;
+}
+.rs-register-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  color: var(--dm-text);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dm-cyan-dim);
+  font-family: var(--dm-font-body);
+  font-size: 18px;
+  outline: none;
+}
+.rs-register-row input:focus {
+  border-color: var(--dm-cyan);
+}
+.rs-register-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--dm-muted);
+}
+.rs-register-done {
+  font-size: 18px;
+  color: var(--dm-text);
+}
+.rs-register-done strong {
   color: var(--dm-cyan);
 }
 
