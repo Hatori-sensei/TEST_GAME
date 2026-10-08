@@ -502,7 +502,16 @@ function createFestivalServer({ dataDir, port = DEFAULT_PORT, name = "DJ@ON HOST
       const srv = server;
       server = null;
       clearInterval(srv.keepAliveTick);
-      return new Promise((resolve) => srv.close(() => resolve()));
+      return new Promise((resolve) => {
+        // close()는 열린 연결(keep-alive/SSE)이 끝날 때까지 기다려서, 참가 PC가 계속 요청 중이면
+        // 영원히 안 끝났음 → 열린 연결을 강제로 닫고, 그래도 늦으면 1초 뒤 그냥 완료 처리
+        const done = setTimeout(resolve, 1000);
+        srv.close(() => {
+          clearTimeout(done);
+          resolve();
+        });
+        if (typeof srv.closeAllConnections === "function") srv.closeAllConnections();
+      });
     },
     // 테스트용
     _flush: flushSave,
