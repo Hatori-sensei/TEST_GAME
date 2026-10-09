@@ -19,7 +19,7 @@ export default {
   computed: {
     healthStyle() {
       const percentage = Math.max(0, Math.min(100, this.health));
-      let color = "#19d3ff";
+      let color = "var(--dm-cyan)"; // [테마] 정상 상태 색은 테마 강조색(테마1 = #19d3ff)
       if (percentage <= 50) {
         color = "#ffb400";
       }

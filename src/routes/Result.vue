@@ -28,6 +28,39 @@
             <small>{{ chip.label }}</small>{{ chip.value }}
           </span>
         </div>
+
+        <!-- [축제 랭킹] 기록 등록: 이름/소속 입력 → 랭킹·소속 대항전에 반영 -->
+        <div class="rs-register" v-if="isAutoPlay">
+          <div class="rs-register-head">RANKING ENTRY</div>
+          <div class="rs-register-hint">AUTO PLAY 결과는 랭킹에 등록되지 않습니다</div>
+        </div>
+        <div class="rs-register" v-else-if="reg.state !== 'skipped'">
+          <div class="rs-register-head">RANKING ENTRY</div>
+          <template v-if="reg.state === 'form'">
+            <div class="rs-register-row">
+              <input
+                ref="regName"
+                v-model="reg.name"
+                :maxlength="nameMax"
+                placeholder="이름"
+                @keydown.enter.prevent="onRegEnter"
+                @keydown.esc.prevent="skipRecord"
+              />
+              <input
+                v-model="reg.group"
+                :maxlength="groupMax"
+                placeholder="소속 (예: 2-3, 컴공)"
+                @keydown.enter.prevent="onRegEnter"
+                @keydown.esc.prevent="skipRecord"
+              />
+            </div>
+            <div class="rs-register-hint">ENTER 등록 · ESC 건너뛰기 · 소속을 비우면 {{ guestGroup }}</div>
+          </template>
+          <div v-else class="rs-register-done">
+            <strong>{{ reg.savedName }}</strong> ({{ reg.savedGroup }}) 등록 완료
+            <span v-if="reg.rank">· 이 곡 오늘 {{ reg.rank }}위</span>
+          </div>
+        </div>
       </section>
 
       <section class="rs-right">
@@ -84,6 +117,23 @@
               <span class="rs-row-label">{{ entry.label }}</span>
               <ICountUp :endVal="entry.value" :options="{ decimalPlaces: 0 }" />
             </div>
+            <!-- [UI] 타이밍 분석: IIDX의 FAST/SLOW 개수 + osu!의 평균 오차(ms) 참고 -->
+            <div class="rs-timing" v-if="timingInfo">
+              <div class="rs-judge-head">TIMING</div>
+              <div class="rs-row small">
+                <span class="rs-row-label fs-fast">FAST</span>
+                <span>{{ timingInfo.fast }}</span>
+              </div>
+              <div class="rs-row small">
+                <span class="rs-row-label fs-slow">SLOW</span>
+                <span>{{ timingInfo.slow }}</span>
+              </div>
+              <div class="rs-row small">
+                <span class="rs-row-label">AVG</span>
+                <span>{{ timingInfo.avgText }}</span>
+              </div>
+              <div class="rs-timing-hint" v-if="timingInfo.hint">{{ timingInfo.hint }}</div>
+            </div>
           </div>
           <div class="rs-judge-col rs-judge-detail">
             <div class="rs-judge-head">DETAILED</div>
@@ -95,6 +145,22 @@
             >
               <span class="rs-row-label">{{ entry.label }}</span>
               <ICountUp :endVal="entry.value" :options="{ decimalPlaces: 0 }" />
+            </div>
+          </div>
+        </div>
+
+        <!-- [미션] 도장판: 달성한 미션은 도장이 찍힘(기록 등록 시 같이 저장) -->
+        <div class="rs-missions" v-if="missions.length">
+          <div class="rs-judge-head">MISSION</div>
+          <div class="rs-stamps">
+            <div
+              v-for="m in missions"
+              :key="m.id"
+              class="rs-stamp"
+              :class="{ on: m.achieved }"
+            >
+              <span class="rs-stamp-mark">{{ m.achieved ? "CLEAR" : "" }}</span>
+              <span class="rs-stamp-text">{{ m.text }}</span>
             </div>
           </div>
         </div>
@@ -153,6 +219,18 @@ import {
   getUserProfile,
 } from "../javascript/db";
 import ICountUp from "vue-countup-v2";
+import {
+  addRecord,
+  loadRecords,
+  topBySheet,
+  loadLastPlayer,
+  saveLastPlayer,
+  NAME_MAX,
+  GROUP_MAX,
+  GUEST_GROUP,
+} from "../helpers/records";
+import { postSharedRecord, getLanConfig } from "../helpers/lan";
+import { evaluateMissions } from "../helpers/missions";
 
 export default {
   name: "Result",
@@ -170,9 +248,26 @@ export default {
       newRecord: false,
       oldProfileInfo: null,
       overrideProfile: null,
+      // [축제 랭킹] 기록 등록 상태: form(입력) / done(등록됨) / skipped(건너뜀)
+      reg: { state: "form", name: "", group: "", savedName: "", savedGroup: "", rank: 0 },
+      nameMax: NAME_MAX,
+      groupMax: GROUP_MAX,
+      guestGroup: GUEST_GROUP,
     };
   },
   computed: {
+    // [미션] 이 결과의 미션 목록과 달성 여부
+    missions() {
+      if (!this.result || !this.result.result) return [];
+      return evaluateMissions(this.result.sheetId, this.result.result);
+    },
+    // [미션] 달성한 미션 id 목록. 기록 등록 시 같이 저장됨
+    achievedMissionIds() {
+      return this.missions.filter((m) => m.achieved).map((m) => m.id);
+    },
+    isAutoPlay() {
+      return !!(this.result && this.result.result && this.result.result.autoPlay);
+    },
     summaryJudgeEntries() {
       const summary = this.result?.result?.judgeSummary || {};
       return [
@@ -221,6 +316,18 @@ export default {
             ? "offbeat"
             : "good",
       }));
+    },
+    // [UI] 타이밍 통계(기록이 없는 예전 결과면 표시 안 함)
+    timingInfo() {
+      const t = this.result?.result?.timing;
+      if (!t || !t.count) return null;
+      const avg = Math.round(t.sumMs / t.count);
+      const avgText = `${avg > 0 ? "+" : ""}${avg}ms`;
+      let hint = "";
+      // 평균이 한쪽으로 15ms 이상 치우치면 오프셋 조정 안내(설정 > 오디오 오프셋)
+      if (avg >= 15) hint = `늦게 치는 편 → 오디오 오프셋 +${avg}ms 정도 권장`;
+      else if (avg <= -15) hint = `빠르게 치는 편 → 오디오 오프셋 ${avg}ms 정도 권장`;
+      return { fast: t.fast, slow: t.slow, avgText, hint };
     },
     // song info lives in chart.song
     cover() {
@@ -272,6 +379,12 @@ export default {
       this.showError();
     }
 
+    // [축제 랭킹] 마지막 입력값 채우고 이름 칸에 포커스
+    const last = loadLastPlayer();
+    this.reg.name = last.name;
+    this.reg.group = last.group;
+    this.$nextTick(() => this.$refs.regName && this.$refs.regName.focus());
+
     window.onresize = () => {
       this.windowWidth = window.innerWidth;
     };
@@ -300,6 +413,44 @@ export default {
     this.$store.state.audio.stop();
   },
   methods: {
+    // [축제 랭킹] 결과를 이름/소속과 함께 기록 저장
+    submitRecord() {
+      if (this.reg.state !== "form" || !this.result || !this.sheet || this.isAutoPlay) return;
+      const name = this.reg.name.trim();
+      if (!name) {
+        this.$refs.regName && this.$refs.regName.focus();
+        return;
+      }
+      const r = this.result.result || {};
+      const entry = addRecord({
+        name,
+        group: this.reg.group,
+        sheetId: this.result.sheetId,
+        title: this.sheet.song && this.sheet.song.title,
+        score: r.score,
+        accuracy: r.percentage,
+        maxCombo: r.maxCombo,
+        isFullCombo: this.result.isFullCombo,
+        missions: this.achievedMissionIds || [],
+        pc: getLanConfig().pcName, // [LAN] 어느 PC에서 친 기록인지
+      });
+      if (!entry) return;
+      saveLastPlayer(entry.name, entry.group === GUEST_GROUP ? "" : entry.group);
+      const top = topBySheet(loadRecords(), entry.sheetId, 9999, { todayOnly: true });
+      const idx = top.findIndex((e) => e.name === entry.name && e.group === entry.group);
+      this.reg = { ...this.reg, state: "done", savedName: entry.name, savedGroup: entry.group, rank: idx + 1 };
+      postSharedRecord(entry); // LAN 통합 랭킹(미사용이면 아무것도 안 함)
+      this.$emit("record-added", entry);
+      this.$store.state.audio.playEffect("ui/slide2");
+    },
+    // 한글 입력 조합 중의 Enter는 글자 확정용이라 무시(다음 Enter에 등록)
+    onRegEnter(e) {
+      if (e.isComposing || e.keyCode === 229) return;
+      this.submitRecord();
+    },
+    skipRecord() {
+      this.reg.state = "skipped";
+    },
     showError() {
       this.$store.state.gModal.show({
         bodyText: "This result is unavaliable.",
@@ -344,8 +495,8 @@ export default {
   inset: 0;
   background: repeating-linear-gradient(
     115deg,
-    rgba(25, 211, 255, 0.05) 0,
-    rgba(25, 211, 255, 0.05) 1px,
+    rgba(var(--dm-cyan-rgb), 0.05) 0,
+    rgba(var(--dm-cyan-rgb), 0.05) 1px,
     transparent 1px,
     transparent 16px
   );
@@ -416,7 +567,7 @@ export default {
   width: min(100%, 38vh);
   aspect-ratio: 1 / 1;
   padding: 2px;
-  background: linear-gradient(135deg, var(--dm-cyan) 0%, rgba(25, 211, 255, 0.15) 45%, var(--dm-cyan) 100%);
+  background: linear-gradient(135deg, var(--dm-cyan) 0%, rgba(var(--dm-cyan-rgb), 0.15) 45%, var(--dm-cyan) 100%);
   clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 30px 100%, 0 calc(100% - 30px));
 }
 
@@ -463,6 +614,111 @@ export default {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--dm-cyan);
+}
+
+.rs-register {
+  margin-top: 6px;
+  padding: 14px 16px;
+  background: rgba(8, 16, 30, 0.85);
+  border-left: 3px solid var(--dm-cyan);
+  max-width: 460px;
+}
+.rs-register-head {
+  font-family: var(--dm-font-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  color: var(--dm-muted);
+  margin-bottom: 10px;
+}
+.rs-register-row {
+  display: flex;
+  gap: 10px;
+}
+.rs-register-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  color: var(--dm-text);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--dm-cyan-dim);
+  font-family: var(--dm-font-body);
+  font-size: 18px;
+  outline: none;
+}
+.rs-register-row input:focus {
+  border-color: var(--dm-cyan);
+}
+.rs-register-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--dm-muted);
+}
+.rs-register-done {
+  font-size: 18px;
+  color: var(--dm-text);
+}
+.rs-register-done strong {
+  color: var(--dm-cyan);
+}
+
+/* [미션] 도장판 */
+.rs-missions .rs-judge-head {
+  margin-bottom: 10px;
+}
+.rs-stamps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.rs-stamp {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 172px;
+  height: 72px;
+  padding: 26px 12px 8px;
+  box-sizing: border-box;
+  background: rgba(8, 16, 30, 0.8);
+  border: 1px dashed rgba(var(--dm-cyan-rgb), 0.3);
+  color: var(--dm-muted);
+  font-size: 14px;
+}
+.rs-stamp.on {
+  border: 1px solid var(--dm-cyan);
+  background: rgba(var(--dm-cyan-rgb), 0.14);
+  color: var(--dm-text);
+}
+.rs-stamp-mark {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  padding: 0 6px;
+  font-family: var(--dm-font-display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: #04121c;
+  background: var(--dm-cyan);
+  transform: rotate(-6deg);
+}
+.rs-stamp-mark:empty {
+  display: none;
+}
+.rs-stamp.on .rs-stamp-mark {
+  animation: rs-stamp-in 0.35s ease-out both;
+}
+@keyframes rs-stamp-in {
+  from {
+    opacity: 0;
+    transform: rotate(-6deg) scale(2.2);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-6deg) scale(1);
+  }
 }
 
 .rs-chips {
@@ -617,6 +873,23 @@ export default {
   font-size: 24px;
 }
 
+/* [UI] 타이밍 분석 카드 */
+.rs-timing {
+  margin-top: 14px;
+}
+.rs-row-label.fs-fast {
+  color: #19d3ff;
+}
+.rs-row-label.fs-slow {
+  color: #ff5a7a;
+}
+.rs-timing-hint {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--dm-muted);
+  word-break: keep-all;
+}
+
 .rs-row.small {
   font-size: 17px;
   line-height: 1.15;
@@ -680,29 +953,5 @@ export default {
 .flex_row {
   flex-direction: row;
   padding: 30px 0;
-}
-
-@media only screen and (max-width: 1000px) {
-  .rs-layout {
-    flex-direction: column;
-    overflow-y: auto;
-    gap: 28px;
-  }
-
-  .rs-left {
-    flex: none;
-  }
-
-  .rs-main {
-    flex-direction: column;
-  }
-
-  .rs-judges {
-    flex-direction: column;
-  }
-
-  .btn_sec {
-    position: static;
-  }
 }
 </style>

@@ -255,8 +255,28 @@ export function getSongById(songId) {
   );
 }
 
+// [대기 화면] SAMPLE PLAY 전용 채보. localCatalog.charts에 넣지 않아서 곡 선택/랭킹/대전 목록엔
+// 안 나오고, getChartById로만 불러온다.
+export const DEMO_CHARTS = {
+  "Doit-sample": createChartTemplate({
+    id: "Doit-sample",
+    songId: "Doit",
+    title: "Do it (SAMPLE)",
+    difficulty: 2,
+    tags: ["Doit", "local", "bga", "demo"],
+    sheetFile: "Doit.sample.json",
+  }),
+};
+
+// [대기 화면] SAMPLE PLAY 재생 순서. 타이틀에서 방치될 때마다 다음 항목으로 넘어가고 끝나면 처음부터.
+// - chartId: DEMO_CHARTS의 샘플 채보 또는 일반 채보 id(예: "kamui-sheet-1")
+// - from(선택): 시작 위치(초). 없으면 곡 처음부터
+// - lengthSec(선택): 이만큼만 보여주고 타이틀로. 없으면 곡 끝까지
+// 다른 곡 추가 예: { chartId: "Apollo-sheet-1" }, { chartId: "kamui-sheet-1", from: 60, lengthSec: 40 }
+export const DEMO_PLAYLIST = [{ chartId: "Doit-sample" }];
+
 export function getChartById(chartId) {
-  return localCatalog.charts[chartId] ?? null;
+  return localCatalog.charts[chartId] ?? DEMO_CHARTS[chartId] ?? null;
 }
 
 export function getChartForSong(songId) {

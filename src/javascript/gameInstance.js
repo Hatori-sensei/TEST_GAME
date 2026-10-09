@@ -2,6 +2,8 @@ import DropTrack from "./track";
 import FeverEffect from "./FeverEffect";
 import { Howl, Howler } from "howler";
 import { resolveMediaUrl } from "../utils/pathResolver";
+import { getCanvasTheme } from "../helpers/theme";
+import { FxPlayer } from "./fx";
 
 const LEAD_IN_SEC = 2;
 const SHOW_FPS = true;
@@ -40,6 +42,17 @@ export default class GameInstance {
     this.reverseBlend = 0;
     this.enableRandomGimmicks = false;
     this.randomGimmickMode = "off";
+    // [설정] 곡 시작 시 고정되는 값들(기본값 = 기존 동작)
+    this.audioOffsetSec = 0; // 오디오 오프셋(초). currentTime = 오디오 시간 - 오프셋
+    this.audioTime = 0; // 오프셋 적용 전 실제 오디오 재생 시간(영상 싱크용)
+    this.laneCoverRatio = 0; // 레인 커버 비율
+    this.autoPlay = false; // 오토플레이
+    // [테마] 캔버스 색(기어/노트/키 빔). 곡 시작 시 다시 읽어 고정. 매 프레임 조회 없음
+    this.theme = getCanvasTheme();
+    // [연출 기믹] 채보의 화면 연출(섬광/암전 등). 판정과 무관. 곡 시작 시 켜짐 여부 고정
+    this.fx = new FxPlayer();
+    this.fxEnabled = false;
+    this.fxGeo = { width: 0, height: 0, startX: 0, endX: 0, hitY: 0 }; // 매 프레임 재사용
 
     this.feverEff = new FeverEffect(vm, this);
     this.createTracks(4);
@@ -496,7 +509,7 @@ export default class GameInstance {
 
     if (typeof this.onTick === "function") {
       this.onTick({
-        audioTime: Math.max(0, this.currentTime),
+        audioTime: Math.max(0, this.audioTime),
         paused: this.paused,
       });
     }
@@ -506,7 +519,8 @@ export default class GameInstance {
       !this.videoElement.paused &&
       typeof this.videoElement.currentTime === "number"
     ) {
-      const drift = Math.abs(this.videoElement.currentTime - this.currentTime);
+      // [설정] 영상은 오프셋과 무관하게 실제 오디오 시간에 맞춘다(오프셋 0이면 기존과 동일)
+      const drift = Math.abs(this.videoElement.currentTime - this.audioTime);
       // Only correct noticeable desync, and not more often than every 500ms —
       // seeking every frame on small (~50ms) drift causes visible video stutter.
       const now = performance.now();
@@ -515,7 +529,7 @@ export default class GameInstance {
         (!this.lastVideoSyncAt || now - this.lastVideoSyncAt >= 500)
       ) {
         try {
-          this.videoElement.currentTime = this.currentTime;
+          this.videoElement.currentTime = this.audioTime;
           this.lastVideoSyncAt = now;
         } catch (e) {
           // ignore invalid seek while video is not ready
@@ -531,8 +545,24 @@ export default class GameInstance {
       this.effectCanvas.height
     );
 
+    // [연출 기믹] 연출이 있는 채보에서만 동작(없으면 조건 하나만 확인하고 넘어감)
+    const fxOn = this.fxEnabled && this.fx.hasFx;
+    if (fxOn) {
+      this.fx.advance(this.currentTime);
+      const geo = this.fxGeo;
+      geo.width = this.canvas.width;
+      geo.height = this.canvas.height;
+      geo.startX = this.startX;
+      geo.endX = this.endX;
+      geo.hitY = this.checkHitLineY - 9; // 판정선(높이 18px) 중앙
+      this.fx.draw(this.ctx, this.currentTime, "back", geo); // BGA 위, 기어 배경 아래
+    }
     this.drawDecoration();
+    if (fxOn) this.fx.draw(this.ctx, this.currentTime, "gear", this.fxGeo); // 기어 위, 노트 아래
     this.dropTrackArr.forEach((track) => track.update());
+    // [설정] 오토플레이는 노트 위치가 갱신된 뒤(위 track.update) 판정
+    if (this.autoPlay && !this.paused) this._runAutoPlay();
+    this.drawLaneCover();
     this.drawUI();
     this.drawFps();
   }
@@ -580,9 +610,15 @@ export default class GameInstance {
     ).toFixed(1);
     this.ctx.save();
     this.ctx.textAlign = "right";
-    this.ctx.fillStyle = "#7f95ab";
-    this.ctx.font = 'italic 700 18px "Barlow Condensed", sans-serif';
+    this.ctx.fillStyle = this.theme.uiText; // [테마]
+    this.ctx.font = this.theme.uiFont;
     this.ctx.fillText(`SPEED x${currentSpeed}`, this.endX - 12, 28);
+    // [설정] 오토플레이 중 표시
+    if (this.autoPlay) {
+      this.ctx.textAlign = "left";
+      this.ctx.fillStyle = "#ffb400";
+      this.ctx.fillText("AUTO PLAY", this.startX + 12, 28);
+    }
     this.ctx.restore();
   }
 
@@ -590,7 +626,7 @@ export default class GameInstance {
     // 배경 (블랙)
 
     // 🚨 노트보다 먼저 도화지에 그려지는 반투명 기어 배경
-    this.ctx.fillStyle = "rgba(3, 7, 14, 0.8)";
+    this.ctx.fillStyle = this.theme.gearBg; // [테마] 테마1 = rgba(3, 7, 14, 0.8)
     this.ctx.fillRect(
       this.startX,
       0,
@@ -611,7 +647,9 @@ export default class GameInstance {
       const seekValue = this.howl.seek();
       cTime = typeof seekValue === "number" ? seekValue : 0;
     }
-    this.currentTime = cTime || 0;
+    this.audioTime = cTime || 0;
+    // [설정] 오디오 오프셋: 노트/판정 시간 = 오디오 시간 - 오프셋 (오프셋 0이면 기존과 동일)
+    this.currentTime = this.audioTime - (this.audioOffsetSec || 0);
     this.currentGlobalVisualPos = this.getVisualPositionAtTime(this.currentTime);
     this.isReverse = false;
     this.reverseBlend = 0;
@@ -639,7 +677,9 @@ export default class GameInstance {
       return;
     }
 
-    this.currentTime = (Number(this.startSongAt) || 0) - this.leadInRemaining;
+    this.audioTime = (Number(this.startSongAt) || 0) - this.leadInRemaining;
+    // [설정] 리드인에서도 같은 오프셋을 빼서 오디오 시작 순간 노트가 튀지 않게 함
+    this.currentTime = this.audioTime - (this.audioOffsetSec || 0);
     this.currentGlobalVisualPos = this.getVisualPositionAtTime(this.currentTime);
     this.isReverse = false;
     this.reverseBlend = 0;
@@ -668,6 +708,18 @@ export default class GameInstance {
         : undefined;
     this.sessionSpeedMultiplier =
       storeSpeed !== undefined ? storeSpeed : this.vm.noteSpeed || 1.0;
+
+    // [설정] 곡 시작 시점에 오프셋/레인 커버/오토플레이 고정(에디터는 적용 안 함)
+    const playMode = this.vm.playMode !== false;
+    const offsetMs = Number(this.vm.audioOffsetMs);
+    this.audioOffsetSec = playMode && Number.isFinite(offsetMs) ? offsetMs / 1000 : 0;
+    const cover = Number(this.vm.laneCover);
+    this.laneCoverRatio = playMode && Number.isFinite(cover) ? Math.min(0.6, Math.max(0, cover)) : 0;
+    this.autoPlay = playMode && this.vm.autoPlay === true;
+    this.theme = getCanvasTheme(); // [테마]
+    // [연출 기믹] 플레이 모드 + 설정이 켜져 있을 때만(채보 에디터는 제외)
+    this.fxEnabled = playMode && this.vm.fxEnabled !== false;
+    this.fx.reset();
 
     this.reposition();
     if (this.audioPath && !this.howl) {
@@ -807,6 +859,12 @@ export default class GameInstance {
       parsedNotes = rawNotes;
     }
 
+    // [방어] 플레이 모드에서만 채보 JSON 정리(시간 정렬 + 잘못된 노트 제거).
+    // 에디터(playMode false)는 원본 그대로 편집해야 하므로 제외.
+    if (Array.isArray(parsedNotes) && (!this.vm || this.vm.playMode !== false)) {
+      parsedNotes = this._sanitizeChartNotes(parsedNotes);
+    }
+
     if (
       !parsedNotes ||
       !Array.isArray(parsedNotes) ||
@@ -859,6 +917,11 @@ export default class GameInstance {
 
     if (!this.usingFallbackNotes) {
       this.usingFallbackNotes = false;
+    }
+
+    // [설정] 미러(좌우 반전). 플레이 모드에서만, 원본 채보 객체는 바꾸지 않고 복사본에 적용.
+    if (this.vm && this.vm.mirror === true && this.vm.playMode !== false) {
+      parsedNotes = this._mirrorNotes(parsedNotes);
     }
 
     // Bake lane-shift source X once during chart parsing to avoid runtime lookups.
@@ -917,6 +980,111 @@ export default class GameInstance {
         this.audioPath
       );
     }
+  }
+
+  // [방어] 채보 노트 정리. 정상 채보(현재 채보 전부)는 결과가 원본과 동일함.
+  // - 시작 시간이 숫자가 아닌 노트, 레인(key 0~3 / k 문자열)을 알 수 없는 노트는 제외
+  //   (예전엔 화면에 안 나오는데 총 판정 수에는 포함돼 100만점이 불가능했음)
+  // - 시간순 정렬(안정 정렬): 스폰 루프가 "정렬돼 있다"고 가정하고 앞 노트에서 멈추므로
+  //   순서가 섞인 채보는 노트가 늦게/갑자기 나타났음
+  // - 같은 레인·같은 시간 중복, 음수 시간, 곡 길이 초과는 고치지 않고 콘솔 경고만 남김
+  _sanitizeChartNotes(notes) {
+    const timeOf = (n) => Number(n?.startTime ?? n?.t);
+    const valid = notes.filter((n) => {
+      if (!n || typeof n !== "object" || !Number.isFinite(timeOf(n))) return false;
+      if (typeof n.k === "string" && n.k) return true;
+      const key = Number(n.key);
+      return Number.isInteger(key) && key >= 0 && key < this.trackNum;
+    });
+    const removed = notes.length - valid.length;
+    let unsorted = false;
+    for (let i = 1; i < valid.length; i += 1) {
+      if (timeOf(valid[i]) < timeOf(valid[i - 1])) {
+        unsorted = true;
+        break;
+      }
+    }
+    // 정렬된 채보는 원본 배열을 그대로 사용(불필요한 복사/순서 변경 방지)
+    const result =
+      removed === 0 && !unsorted
+        ? notes
+        : valid
+            .map((n, i) => ({ n, i }))
+            .sort((a, b) => timeOf(a.n) - timeOf(b.n) || a.i - b.i)
+            .map((e) => e.n);
+    let negative = 0;
+    let duplicated = 0;
+    const seen = new Set();
+    result.forEach((n) => {
+      const t = timeOf(n);
+      if (t < 0) negative += 1;
+      const id = `${n.k ?? n.key}@${t}`;
+      if (seen.has(id)) duplicated += 1;
+      seen.add(id);
+    });
+    if (removed || unsorted || negative || duplicated) {
+      console.warn(
+        `[chart] 채보 점검: 제외 ${removed}개, 정렬 필요 ${unsorted}, 음수 시간 ${negative}개, 같은 레인·시간 중복 ${duplicated}개`
+      );
+    }
+    return result;
+  }
+
+  // [설정] 미러: 레인 i → (레인수-1-i). 레인 이동 기믹(shift.fromLane)도 같이 반전.
+  _mirrorNotes(notes) {
+    const last = this.trackNum - 1;
+    const defaultKeys = ["d", "f", "j", "k"];
+    return notes.map((n) => {
+      if (!n || typeof n !== "object") return n;
+      const copy = { ...n };
+      if (typeof n.k === "string") {
+        const idx = defaultKeys.indexOf(n.k.toLowerCase());
+        if (idx !== -1) copy.k = defaultKeys[last - idx];
+      } else if (Number.isInteger(Number(n.key))) {
+        copy.key = last - Number(n.key);
+      }
+      if (n.shift && typeof n.shift === "object") {
+        copy.shift = { ...n.shift };
+        const from = Number(n.shift.fromLane);
+        if (Number.isFinite(from)) copy.shift.fromLane = last - Math.trunc(from);
+        delete copy.shift.fromX;
+      }
+      return copy;
+    });
+  }
+
+  // [설정] 오토플레이(시연용): 노트가 판정 기준점에 닿으면 대신 누르고, 롱노트는 끝에서 뗀다.
+  // 단노트는 같은 프레임에 누르고 바로 떼며, 프레임이 낮아도 밀리지 않게 한 레인에서
+  // 기준점을 지난 노트를 최대 4개까지 연속 처리. 매 프레임 객체를 새로 만들지 않음.
+  _runAutoPlay() {
+    for (let i = 0; i < this.dropTrackArr.length; i += 1) {
+      const track = this.dropTrackArr[i];
+      const key = track.keyBind[0];
+      if (track.holdingNote) {
+        if (this.currentTime >= track.holdingNote.endTime) this.onKeyUp(key);
+        continue;
+      }
+      for (let n = 0; n < 4; n += 1) {
+        const note = track.noteArr.find((x) => !x.noteFailed && !x.holdCompleted);
+        if (!note || note.hitRegistered) break;
+        if (note.judgeY < this.checkHitLineY) break; // [판정 기준 변경] 채보 시간에 누름
+        this.onKeyDown(key); // onKeyDown/keyDown은 동기적으로 판정까지 끝남
+        if (track.holdingNote) break; // 롱노트는 끝날 때까지 누르고 있음
+        this.onKeyUp(key);
+      }
+    }
+  }
+
+  // [설정] 레인 커버(서든): 기어 위쪽을 가려 노트가 늦게 보이게 함. 0이면 아무것도 안 그림.
+  drawLaneCover() {
+    if (!(this.laneCoverRatio > 0)) return;
+    const ctx = this.ctx;
+    const width = this.endX - this.startX;
+    const h = Math.round(this.checkHitLineY * this.laneCoverRatio);
+    ctx.fillStyle = this.theme.coverFill; // [테마]
+    ctx.fillRect(this.startX, 0, width, h);
+    ctx.fillStyle = this.theme.coverEdge;
+    ctx.fillRect(this.startX, h - 2, width, 2);
   }
 
   _parseDuration(songLength) {
@@ -1058,6 +1226,7 @@ export default class GameInstance {
 
   bakeVisualPositions(notes, gimmicks = []) {
     this.buildVisualTimeline(gimmicks);
+    if (this.fx) this.fx.load(gimmicks); // [연출 기믹] 연출 타입만 골라 정렬(speed/stop은 무시됨)
     if (!Array.isArray(notes)) return notes;
 
     notes.forEach((noteObj) => {
@@ -1326,8 +1495,21 @@ export default class GameInstance {
     }
   }
 
+  // [버그수정] 일시정지(창 포커스 이탈 포함) 시 눌려 있던 키를 모두 뗀 것으로 처리.
+  // 포커스를 잃으면 keyup이 오지 않아 keyHoldingStatus가 true로 남아
+  // 재개 후 그 키의 첫 입력이 무시(입력 씹힘)되고, 키 빔이 켜진 채로 남았음.
+  // 잡고 있던 롱노트도 "홀드 중"으로 남아 키를 안 눌러도 콤보가 오르며 끝까지 진행됐으므로
+  // 이 시점에 손을 뗀 것으로 판정한다(일반 릴리즈 판정과 동일 규칙).
+  releaseHeldKeys() {
+    this.keyHoldingStatus = {};
+    this.dropTrackArr.forEach((track) => {
+      if (track.isKeyDown || track.holdingNote) track.keyUp(track.keyBind[0]);
+    });
+  }
+
   pauseGame() {
     this.paused = true;
+    this.releaseHeldKeys();
     this.leadInLastTick = null;
     if (this.howl && typeof this.howl.pause === "function") {
       this.howl.pause(this.currentHowlId || undefined);

@@ -8,7 +8,7 @@
 - 원작 웹 리듬게임 "Rhythm Plus"를 변형한 것. Vue 2 + webpack 5 + Howler + Electron 25 + electron-builder
 - 오프라인 축제 시연용이라 Firebase는 firebaseConfig.js에서 가짜 객체로 대체되어 있고, 곡/채보는 src/javascript/localCatalog.js, db.js에 있음. 곡 6개(kamui, 초 나이트 오브 나이츠, the EmpErroR, Mammal, Do it, Apollo).
 - 기록은 브라우저/앱 저장소(로컬)에만 남음. 결과(result)는 메모리에만 있어서 결과 화면(/result/..)에서 새로고침하면 사라짐(오류 팝업이 뜸, 정상).
-- 이번 세션의 모든 변경은 **아직 커밋하지 않음**(git status로 확인). 삭제 파일 24개 포함.
+- 위 변경은 모두 커밋됨: `c18d4ce`(축제용 엔진/디자인/배포 정리, 삭제 파일 24개 포함), `7102b64`(채보 JSON 로딩 public/charts/*.json, 키 배치 버그 수정, 결과/설정 화면 다듬기). 원격 master에 반영되어 있음.
 
 ## 절대 건드리지 말 것 (사용자 지시)
 - 판정선 위치(Game.vue `.judgment-line`: bottom 320px, height 18px)와 캔버스 판정선(checkHitLineY = canvas.height - 320)
@@ -49,6 +49,36 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 4. 실제 축제 PC 해상도/모니터에서 판정선 정렬, 기록 유지 여부, 장시간 구동 확인 필요.
 5. exe 재빌드 후 전체 플레이 확인, 저작권(곡/영상, 원작 라이선스) 확인.
 6. 남은 잡일: `.claude/launch.json`(불필요, 삭제 가능), `.husky`/`.github`/firebase.json은 손대지 않음. ESLint의 prettier 경고는 기존(줄바꿈 CRLF)이라 무시.
+
+## 2026-10 점검 (브랜치 claude/pensive-hopper-pj91pf, 상세: docs/점검보고서_2026-10.md)
+- 버그 수정: 시작 전/종료 중 ESC 이중 재생, 카운트다운 중 blur, blur 시 키/롱노트 상태 잔류, Restart 중복 노트, Game 리스너 누수, 결과 화면이 설정 초기화, 효과음 0% 무시, 키 배치 변경 시 레인 색.
+- 설정 저장: `src/helpers/settings.js` (localStorage `djon.settings`, version 1, 저장값 없으면 기존 동작 그대로). 곡 선택 ESC 설정에 오디오 오프셋(+자동 측정), 레인 커버, 배경 어둡게, 미러, No Fail, 오토플레이(저장 안 함), FAST/SLOW(기본 끔) 추가.
+- 오프셋은 `currentTime = 오디오 시간 - audioOffsetSec` (판정 범위 불변, 영상은 audioTime 기준).
+- 결과 화면 TIMING 카드(result.timing: fast/slow/sumMs/count, 메모리만).
+- 판정 기준: 채보 시간 기준(judgeY = 채보 시간에 판정선). 노트 그림은 `y = judgeY - 9 - 15`(정타 시점에 노트 중앙 = 판정선 중앙). 예전 "노트 아래 끝 기준"(배속마다 75/25ms 앞당겨짐)에서 변경.
+- 미해결 질문/수치 불일치(배속 8.0 상한, 체력 회복량 문서 불일치)는 보고서 [C] 참고.
+
+## 테마 (2026-10)
+- 설정(곡 선택 ESC) → 화면 테마: 1 = 기존 DJMAX 스타일(기본), 2 = AFTERGLOW(해 질 녘 시티팝, Claude가 자유 디자인). localStorage `djon.settings.theme`.
+- 구조: `<html data-theme="N">`. CSS는 `public/theme-afterglow.css`(테마 2 전용, 변수 덮어쓰기+장식+화면 구성 변경), 캔버스 색은 `src/helpers/theme.js` CANVAS_THEMES(곡 시작 시 고정).
+- 화면 CSS의 청록은 `var(--dm-cyan)` / `rgba(var(--dm-cyan-rgb), a)`로 씀. 새 색을 넣을 때도 이 변수 사용.
+- 판정 표시(MarkComboJudge, 타격 이펙트 판정색, 결과 판정 행/랭크 색)는 테마와 무관하게 고정. 테마 2에서도 변수를 테마 1 값으로 재지정해 유지.
+- 테마 2는 화면 배치도 다름(곡 선택 좌우 반전, 점수 카드 기어 오른쪽 위, 일시정지 오른쪽 패널, 결과 2단). 단 판정선/기어 기하는 테마 1과 동일해야 함.
+- 모바일은 지원 안 함(사용 중 화면의 모바일 CSS 삭제).
+- 롱노트: 테마 팔레트의 long(전용 색)/longHold(누르는 중) 사용. 보류 중: 강조색 직접 지정 기능.
+
+## 차별화 기능 (2026-10, 운영 방법: docs/축제_LAN_운영가이드.md)
+- 축제 랭킹: `src/helpers/records.js`(localStorage `djon.records` {version:1, entries}, 이름 8자/소속 10자, 빈 소속=GUEST). 결과 화면 등록 패널, `/rankings` 보드(곡별 TOP10, 오늘/전체 T, 소속 대항전/미션 도장 TAB, Ctrl+Shift+Delete 초기화), 곡 선택 TOP3 + `R`.
+- 소속 대항전 점수 = 사람(이름+소속)별·곡별 최고점/10000 합계.
+- 미션: `src/helpers/missions.js`(결과만 보고 평가). 기본 5개, 차트에 `missions` 배열로 교체 가능. `result.longStats`(롱노트 성공/실패)는 note.js에서 집계만 함. 오토플레이 결과는 등록/미션 불가(`result.autoPlay`).
+- 연출 기믹: `src/javascript/fx.js`(flash/blackout/tint/pulse/beat). 판정·노트·판정선/기어 기하 불변. 설정 `fxEnabled`(기본 켜짐). 작성법 docs/채보_연출기믹.md.
+- LAN: `electron/lan-server.js`(호스트 HTTP+SSE 서버, TCP 41235, 기록은 userData/djon-festival-records.json), `electron/lan-main.js`(IPC, UDP 41234 찾기, 요청 대행), `electron/preload.js`(window.djonLan). app://는 http LAN fetch가 mixed content로 막혀서 통신은 전부 메인 프로세스가 함. 설정 lanRole(off/host/client)/lanHost/pcName, 기본 off.
+- LAN 대전: `/vs`(VsLobby.vue), `src/helpers/vs.js`, `components/game/VsHud.vue`. store `vs`가 있을 때만 Game.vue 분기(시작 시각 동기, 일시정지/게임오버 없음, 종료 보고). 최대 4명.
+- 확인: Node 단독 서버 테스트, 실제 Electron 25(Linux, Xvfb) 호스트 + 브라우저 참가 PC로 통합 랭킹/2인 대전/끊김 처리. **Windows exe·실제 여러 PC·방화벽은 미확인**(가이드의 체크리스트).
+- 대기 화면: `src/helpers/attract.js`(IDLE_TO_TITLE_SEC 60 / TITLE_TO_DEMO_SEC 10). 메뉴·배속·결과·게임오버·일시정지 방치 → 타이틀 → SAMPLE PLAY(`/game/<채보>?demo=1`, 오토+No Fail, 기본 곡 끝까지, 아무 키나 클릭 시 타이틀, 결과/기록 없음) → 끝나면 타이틀 → 10초 뒤 다음 곡. 화면이 바뀌면 대기 시간 리셋. 재생 목록은 localCatalog `DEMO_PLAYLIST`({chartId, from?, lengthSec?}, 차례로 반복). 랭킹·대전·플레이 중엔 동작 안 함. 설정 attractMode(기본 켜짐).
+- 샘플 채보 `public/charts/Doit.sample.json`(Doit.json과 별개, BPM 129/첫 박 0.028s 분석값). localCatalog `DEMO_CHARTS`에만 있어 목록엔 안 나옴.
+- 타격 이펙트: `track.js` `HitEffect`(코어 3겹 후광+이중 선 메인 링+서브 링+스파크, 최대 지름 = 레인 폭 x `FX_SCALE`, 풀 재사용, shadowBlur 없음). 판정선(DOM 흰 띠, z-index 4 안)에 가려지지 않게 `#effectCanvas`(Game.vue z-index 5)에 그림. 롱노트 누르는 동안 `HOLD_FX_INTERVAL_SEC`(0.1초)마다 반복. 크기/시간/개수는 track.js FX_* 상수에서 조정. 판정별 색은 테마와 무관하게 고정. **실제 모양/동작은 코드 검토만 했고 직접 확인하지 못함(사용자 확인 예정).**
+- 곡 선택 화면은 keep-alive라 키 리스너는 activated/deactivated에서 붙이고 뗌(예전엔 결과 화면 Enter가 곡 시작으로 새던 버그).
 
 ## 작업 메모
 - 파일 줄바꿈이 CRLF인 파일이 많음. 스크립트로 수정할 땐 보존할 것.

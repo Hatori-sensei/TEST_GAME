@@ -17,7 +17,7 @@
       <a
         class="pause_button"
         @click="pauseGame"
-        v-if="started && instance && !instance.paused && !isGameEnded"
+        v-if="started && instance && !instance.paused && !isGameEnded && !vs"
       >
         <v-icon name="regular/pause-circle" scale="1.5" />
       </a>
@@ -55,7 +55,11 @@
         preload="auto"
         @error="(e) => { e.target.style.display = 'none'; }"
       ></video>
-      <div v-if="currentSong?.bgaPath" class="bga-overlay"></div>
+      <div
+        v-if="currentSong?.bgaPath"
+        class="bga-overlay"
+        :style="{ background: `rgba(0, 0, 0, ${bgaDim})` }"
+      ></div>
       <canvas ref="effectCanvas" id="effectCanvas"></canvas>
       <canvas
         ref="mainCanvas"
@@ -95,6 +99,23 @@
     ></Visualizer>
 
     <ScorePanel></ScorePanel>
+
+    <!-- [대기 화면] 데모 자동 연주 표시 -->
+    <div class="demo-banner" v-if="isDemo">
+      <div class="demo-title">SAMPLE PLAY</div>
+      <div class="demo-sub">PRESS ANY KEY</div>
+    </div>
+
+    <!-- [LAN 대전] 대전 중일 때만: 상대 점수/순위 + 시작 카운트다운 -->
+    <VsHud
+      v-if="vs"
+      :vs="vs"
+      :result="result"
+      :health="health"
+      :percentage="percentage"
+      :currentTime="progressTime"
+      :startAt="vsStartAt"
+    ></VsHud>
 
     <HealthBar v-show="!isGameEnded && !loadingScreen" :health="health"></HealthBar>
     <div v-if="srcMode === 'youtube' && !isGameEnded" v-show="initialized">
@@ -257,6 +278,9 @@ import MarkComboJudge from "../components/game/MarkComboJudge.vue";
 import Tutorial from "../components/game/Tutorial.vue";
 import ScorePanel from "../components/game/ScorePanel.vue";
 import HealthBar from "../components/game/HealthBar.vue";
+import VsHud from "../components/game/VsHud.vue";
+import { vsLoaded, vsFinish, waitForStartAt } from "../helpers/vs";
+import { setGameIdleCheck } from "../helpers/attract";
 import GameMixin from "../mixins/gameMixin";
 import { Youtube } from "vue-youtube";
 import {
@@ -276,6 +300,7 @@ const isDev = process.env.NODE_ENV === "development";
 const GAME_START_DELAY_MS = 4000;
 const LOADING_SCREEN_MIN_MS = 1800;
 const SONG_END_FADE_DELAY_MS = 2200;
+const VS_FALLBACK_START_MS = 25000; // [LAN 대전] 호스트 응답이 없으면 이 시간 뒤 혼자라도 시작
 
 export default {
   name: "Game",
@@ -295,6 +320,7 @@ export default {
     Tutorial,
     ScorePanel,
     HealthBar,
+    VsHud,
   },
   mixins: [GameMixin],
   data() {
@@ -311,10 +337,26 @@ export default {
       isEndingSong: false,
       // full-screen loading screen, shown from the moment the game screen opens
       loadingScreen: true,
+      // [버그수정] mixin 기본값 "youtube" 때문에 곡 정보를 읽기 전 잠깐 YouTube 플레이어가
+      // 만들어져 매 판 youtube.com 접속을 시도했고, 실패 시 "problem with the source" 오류
+      // 팝업이 가끔 떴음(오프라인 축제 PC). 곡은 전부 로컬이므로 기본값을 local로.
+      srcMode: "local",
       loadingScreenSince: Date.now(),
+      // [성능] 진행 바용 재생 시간(0.1초 단위로만 갱신). progress가 instance.currentTime을
+      // 직접 읽으면 매 프레임 Game 화면 전체가 다시 렌더링됐음.
+      progressTime: 0,
+      vsStartAt: 0, // [LAN 대전] 호스트가 정한 시작 시각(호스트 시계 ms)
     };
   },
   computed: {
+    // [LAN 대전] 대전 컨텍스트(평소엔 null → 아래 대전 분기는 전부 건너뜀)
+    vs() {
+      return this.$store.state.vs;
+    },
+    // [대기 화면] SAMPLE PLAY(타이틀 방치 시 자동 연주). 기록/결과 화면 없이 끝나면 타이틀로
+    isDemo() {
+      return this.$route.query.demo === "1";
+    },
     progress() {
       if (!this.currentSong || !this.instance) return 0;
       const startAt = Number(this.currentSong.startAt ?? 0);
@@ -324,7 +366,7 @@ export default {
           this.currentSong.length
       );
       const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 1;
-      const elapsed = Math.max(0, Number(this.instance.currentTime || 0) - startAt);
+      const elapsed = Math.max(0, Number(this.progressTime || 0) - startAt);
       return Math.min(1, elapsed / safeDuration);
     },
   },
@@ -353,6 +395,11 @@ export default {
 
     if (this.instance) {
       this.instance.onTick = (timeData) => {
+        // [성능] 진행 바 시간은 0.1초 이상 바뀔 때만 반영(ProgressBar도 100ms마다 샘플링함)
+        if (Math.abs(timeData.audioTime - this.progressTime) >= 0.1) {
+          this.progressTime = timeData.audioTime;
+        }
+
         if (
           this.$refs.trackComponent &&
           typeof this.$refs.trackComponent.update === "function"
@@ -391,13 +438,32 @@ export default {
     }
     window.addEventListener("keydown", this.handleUIKeyDown);
     window.addEventListener("keyup", this.handleUIKeyUp);
+
+    // [대기 화면] 일시정지 메뉴를 띄운 채 방치되면 타이틀로 돌아가도록 상태 제공
+    setGameIdleCheck(() => this.started && !this.isGameEnded && !this.vs && !this.isDemo && !!this.instance && this.instance.paused);
+    if (this.isDemo) {
+      // 데모: 오토플레이 + 게임오버 없음. 아무 키(또는 클릭)나 누르면 타이틀로
+      this.autoPlay = true;
+      this.noFail = true;
+      window.addEventListener("keydown", this.onDemoKey, true);
+      window.addEventListener("pointerdown", this.blockDemoPointer, true);
+      window.addEventListener("click", this.onDemoKey, true);
+    }
   },
   beforeDestroy() {
-    if (this.isGameEnded) return;
-    this.reportExit("closed");
-
+    // [버그수정] 리스너 해제를 early return 앞으로 이동. 예전엔 곡을 끝까지 플레이하거나
+    // 게임오버로 나가면(isGameEnded) 해제되지 않아, 판마다 window 리스너와 함께
+    // 파괴된 Game 화면 전체(BGA video, canvas 등)가 메모리에 계속 남았음(장시간 운영 시 누적).
     window.removeEventListener("keydown", this.handleUIKeyDown);
     window.removeEventListener("keyup", this.handleUIKeyUp);
+    setGameIdleCheck(null);
+    window.removeEventListener("keydown", this.onDemoKey, true);
+    window.removeEventListener("pointerdown", this.blockDemoPointer, true);
+    window.removeEventListener("click", this.onDemoKey, true);
+    clearTimeout(this.demoTimer);
+
+    if (this.isGameEnded) return;
+    this.reportExit("closed");
   },
   methods: {
     resolveMediaUrl(path) {
@@ -406,6 +472,9 @@ export default {
     async playWithId(sheetId) {
       try {
         let song = await getGameSheet(sheetId);
+        if (this.isGone()) return;
+        // [대기 화면] 재생 목록에서 시작 위치를 지정한 경우(?from=초)
+        if (this.isDemo && Number(this.$route.query.from) > 0) song = { ...song, startAt: Number(this.$route.query.from) };
         const pendingOptions = this.$store.state.pendingGameOptions;
         const gameOptions = pendingOptions && typeof pendingOptions === "object"
           ? pendingOptions
@@ -426,6 +495,11 @@ export default {
         logError("song_load_error_" + sheetId);
       }
     },
+    // [버그수정] 로딩 중에 화면을 떠나면(데모 중 키 입력, 곡 선택으로 이동 등) 이 화면이 파괴된 뒤에도
+    // 로딩/대기 콜백이 늦게 도착해 $refs.zoom(undefined).show 등에서 오류가 났음 → 파괴됐으면 무시
+    isGone() {
+      return this._isDestroyed || this._isBeingDestroyed || !this.instance;
+    },
     handleHover() {
       this.$store.state.audio.playHoverEffect("ui/ta");
     },
@@ -435,16 +509,29 @@ export default {
         LOADING_SCREEN_MIN_MS - (Date.now() - this.loadingScreenSince)
       );
       setTimeout(() => {
+        if (this.isGone()) return;
         this.loadingScreen = false;
         if (callback) callback();
       }, wait);
     },
     handleCountdownFinished() {
+      // [버그수정] 카운트다운이 끝났을 때 이미 곡이 끝났거나(페이드아웃/결과 이동 중)
+      // 아직 시작 전이면 재개하지 않음. 그대로 두면 끝난 곡이 처음부터 다시 재생됨.
+      if (!this.started || this.isGameEnded || this.isEndingSong) return;
       if (this.instance) {
         this.instance.resumeGame(false);
       }
     },
     async handleSongFinished() {
+      if (this.isDemo) {
+        // 곡이 끝나면 페이드아웃 후 타이틀로(타이틀에서 10초 뒤 다음 SAMPLE PLAY)
+        if (this.isEndingSong) return;
+        this.isEndingSong = true;
+        this.songFadeOut = true;
+        this.instance?.pauseVideo?.();
+        setTimeout(this.exitDemo, SONG_END_FADE_DELAY_MS);
+        return;
+      }
       if (this.isGameEnded || this.isEndingSong) return;
       this.isEndingSong = true;
       this.songFadeOut = true;
@@ -453,6 +540,7 @@ export default {
       this.gameEnded(false);
     },
     songLoaded() {
+      if (this.isGone()) return;
       Logger.log("playing");
       this.instance.loading = false;
       this.youtubeBuffering = false;
@@ -483,6 +571,7 @@ export default {
       }
     },
     onAudioLoaded(audioPath) {
+      if (this.isGone()) return;
       Logger.log("audio loaded", audioPath);
       this.instance.loading = false;
       this.youtubeBuffering = false;
@@ -492,6 +581,7 @@ export default {
       }
     },
     handleAudioLoadError(error, audioPath) {
+      if (this.isGone()) return;
       Logger.error("audio load error", audioPath, error);
       this.loadingScreen = false;
       this.instance.loading = false;
@@ -537,11 +627,13 @@ export default {
         this.$refs.zoom.show("Get Ready...");
         // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
         await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
+        if (this.isGone()) return;
         this.instance.startSong();
       } else {
         if (!this.tutorial) this.$refs.zoom.show("Get Ready...");
         // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
         await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
+        if (this.isGone()) return;
         this.instance.startSong();
       }
       if (isDev) return;
@@ -551,11 +643,24 @@ export default {
       );
     },
     async startGameDirect() {
+      if (this.isGone()) return;
       logEvent("start_game", { songId: this.currentSong.songId });
       this.health = 100;
+      if (this.isDemo) {
+        // 데모는 "Get Ready" 대기 없이 바로. 기본은 곡 끝까지, ?len=초가 있으면 그만큼만(리드인 2초 포함)
+        this.instance.startSong();
+        const len = Number(this.$route.query.len);
+        if (len > 0) this.demoTimer = setTimeout(this.exitDemo, (len + 2) * 1000);
+        return;
+      }
+      if (this.vs) {
+        await this.vsWaitAndStart();
+        return;
+      }
       this.$refs.zoom.show("Get Ready...");
       // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
       await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
+      if (this.isGone()) return;
       this.instance.startSong();
       if (isDev) return;
       this.playId = await createPlay(
@@ -563,7 +668,42 @@ export default {
         this.currentSong.songId
       );
     },
+    // [LAN 대전] 로딩 완료를 호스트에 알리고, 호스트가 정한 시각에 모든 PC가 동시에 시작.
+    // 호스트 시각 → 이 PC 시각 = startAt - offsetMs (offsetMs는 로비에서 /time 왕복으로 측정)
+    async vsWaitAndStart() {
+      this.$refs.zoom.show("Waiting...");
+      vsLoaded();
+      const startAt = await waitForStartAt(VS_FALLBACK_START_MS);
+      if (this.isGameEnded || this.started || !this.instance) return;
+      const offset = Number(this.vs && this.vs.offsetMs) || 0;
+      let delay = 0;
+      if (startAt) {
+        this.vsStartAt = startAt;
+        delay = Math.max(0, startAt - offset - Date.now());
+      }
+      setTimeout(() => {
+        if (!this.isGameEnded && !this.started && this.instance) this.instance.startSong();
+      }, delay);
+    },
+    // [대기 화면] 데모 중 입력: 게임 입력으로 전달하지 않고 타이틀로
+    onDemoKey(e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      this.exitDemo();
+    },
+    blockDemoPointer(e) {
+      e.stopImmediatePropagation();
+    },
+    exitDemo() {
+      if (this.demoExited) return;
+      this.demoExited = true;
+      clearTimeout(this.demoTimer);
+      this.$router.push("/").catch(() => {});
+    },
     triggerGameOverImmediate() {
+      // [설정] No Fail: 체력이 0이 돼도 게임오버 없이 끝까지 진행
+      // [LAN 대전] 대전 중에도 게임오버 없음(먼저 체력이 다 떨어져도 끝까지)
+      if (this.noFail || this.vs) return;
       if (this.tvOff) return;
       this.fadeOutMusic();
       this.tvOff = true;
@@ -612,7 +752,20 @@ export default {
       }, stepTime);
     },
     pauseGame() {
-      if (!this.started || this.isGameEnded) return;
+      // [버그수정] 포커스 이탈 시 keyup이 오지 않아 하단 버튼 눌림 표시가 남던 문제 → 해제
+      this.keyState = { key1: false, key2: false, key3: false, key4: false };
+      // [버그수정] 곡 종료 페이드아웃(isEndingSong) 중에 창이 포커스를 잃으면
+      // 일시정지 메뉴가 떠서 결과 화면 이동과 겹쳤음 → 이때도 무시.
+      if (!this.started || this.isGameEnded || this.isEndingSong) return;
+      // [LAN 대전] 대전 중엔 일시정지 없음(다른 PC와 시간이 어긋나므로). 누르던 키만 해제
+      // [대기 화면] 데모도 창 포커스와 무관하게 계속 재생
+      if (this.vs || this.isDemo) {
+        this.instance?.releaseHeldKeys?.();
+        return;
+      }
+      // [버그수정] 재개 카운트다운 도중 창이 포커스를 잃으면(blur) 일시정지 메뉴가 떠도
+      // 카운트다운은 계속 돌아 3초 뒤 메뉴가 열린 채로 게임이 재개됐음 → 카운트다운 취소.
+      this.$refs.countdown?.clear(false);
       this.instance.pauseGame();
       this.$refs.menu.show();
     },
@@ -625,6 +778,11 @@ export default {
       this.$refs.info.show();
     },
     resumeGame(fromMenu) {
+      // [버그수정] 로딩/"Get Ready" 중(시작 전)이나 곡 종료 페이드아웃 중에 ESC를 누르면
+      // 여기로 들어와 카운트다운 → instance.resumeGame()이 실행되어, 시작 전에 음악이
+      // 먼저 재생되거나(이후 startSong에서 한 번 더 재생 → 이중 재생/싱크 어긋남)
+      // 끝난 곡이 다시 재생됐음. pauseGame()과 같은 조건으로 막는다.
+      if (!this.started || this.isGameEnded || this.isEndingSong) return;
       this.hideMenu(true);
       if (!fromMenu) {
         this.$refs.countdown.clear(false);
@@ -637,7 +795,11 @@ export default {
       this.hideMenu();
       this.clearResult();
       this.health = 100; // 체력 초기화
-      this.instance.paused = false;
+      // [버그수정] 예전엔 여기서 instance.paused = false로 바꿨는데, 재시작 시 오디오를
+      // 다시 디코딩하는 동안(수백 ms) 게임 루프가 currentTime 0 기준으로 첫 노트들을 미리
+      // 생성했고, 로딩이 끝난 뒤 startSong()이 같은 노트를 한 번 더 생성해 중복 노트
+      // (한쪽은 무조건 BREAK)가 생겼음. 재개는 startSong() → resumeGame(true)가 담당하므로
+      // 일시정지 상태를 유지한다.
       // resetPlaying() clears audioPath, and startSong() only reloads audio
       // when audioPath is set — keep it so a restart doesn't come back silent.
       const audioPath = this.instance.audioPath;
@@ -700,6 +862,8 @@ export default {
           }, 2000);
         });
       }
+      // [축제 랭킹/미션] 오토플레이 결과는 기록 등록·미션 달성 불가로 표시
+      this.result.autoPlay = !!(this.instance && this.instance.autoPlay);
       try {
         const uploadPromise = uploadResult({
           result: this.result,
@@ -711,7 +875,20 @@ export default {
         const result = await Promise.all([uploadPromise, achievementPromise]);
         const res = result[0];
         Logger.log(res);
-        this.$router.push("/result/" + res.data.resultId);
+        if (this.vs) {
+          // [LAN 대전] 최종 결과 보고 후 대전 결과 화면으로(보고 실패해도 이동)
+          const r = this.result;
+          await vsFinish({
+            score: r.score,
+            accuracy: this.percentage,
+            maxCombo: r.maxCombo,
+            isFullCombo: r.marks.miss === 0,
+            breaks: r.marks.miss,
+          });
+          this.$router.push({ path: "/vs", query: { result: res.data.resultId } });
+        } else {
+          this.$router.push("/result/" + res.data.resultId);
+        }
         this.$confetti.stop();
         this.updatePlay({ status: "finished", resultId: res.data.resultId });
         logEvent("result_uploaded", {
@@ -766,6 +943,40 @@ export default {
 </script>
 
 <style scoped>
+/* [대기 화면] SAMPLE PLAY 표시(기어 위쪽 가운데, 입력/판정과 무관) */
+.demo-banner {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  pointer-events: none;
+  text-align: center;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+}
+.demo-title {
+  padding: 2px 24px;
+  font-weight: 800;
+  font-size: 34px;
+  letter-spacing: 0.18em;
+  color: #04121c;
+  background: var(--dm-cyan);
+  box-shadow: 0 0 30px rgba(var(--dm-cyan-rgb), 0.6);
+}
+.demo-sub {
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.4em;
+  color: var(--dm-text);
+  animation: demo-blink 1.2s steps(2, start) infinite;
+}
+@keyframes demo-blink {
+  to {
+    visibility: hidden;
+  }
+}
 * {
   overflow: hidden;
 }
@@ -815,8 +1026,11 @@ export default {
   pointer-events: none;
 }
 
+/* [이펙트] 타격 이펙트 전용. 판정선(.gear-overlay z-index 4 안의 흰색 띠)에 가려지지 않도록 그 위에 둠.
+   판정선 위치/크기는 그대로이고 쌓이는 순서만 다름. 클릭은 통과. */
 #effectCanvas {
-  z-index: 2;
+  z-index: 5;
+  pointer-events: none;
 }
 
 #gameCanvas {
@@ -1047,18 +1261,18 @@ export default {
       90deg,
       transparent 0,
       transparent 124px,
-      rgba(25, 211, 255, 0.16) 124px,
-      rgba(25, 211, 255, 0.16) 125px
+      rgba(var(--dm-cyan-rgb), 0.16) 124px,
+      rgba(var(--dm-cyan-rgb), 0.16) 125px
     ),
     linear-gradient(
       180deg,
       transparent 0%,
       transparent 60%,
-      rgba(25, 211, 255, 0.1) 100%
+      rgba(var(--dm-cyan-rgb), 0.1) 100%
     );
   border-left: 2px solid var(--dm-cyan);
   border-right: 2px solid var(--dm-cyan);
-  box-shadow: 0 0 18px rgba(25, 211, 255, 0.35), inset 0 0 40px rgba(25, 211, 255, 0.06);
+  box-shadow: 0 0 18px rgba(var(--dm-cyan-rgb), 0.35), inset 0 0 40px rgba(var(--dm-cyan-rgb), 0.06);
   pointer-events: none;
   z-index: 10;
 }
@@ -1075,8 +1289,8 @@ export default {
   height: 260px; /* 기존 높이 유지 */
   background: repeating-linear-gradient(
       135deg,
-      rgba(25, 211, 255, 0.05) 0,
-      rgba(25, 211, 255, 0.05) 2px,
+      rgba(var(--dm-cyan-rgb), 0.05) 0,
+      rgba(var(--dm-cyan-rgb), 0.05) 2px,
       transparent 2px,
       transparent 14px
     ),
@@ -1106,15 +1320,12 @@ export default {
   left: 0;
   width: 100%;
   height: 18px;
-  /* soft cyan band that ends in a crisp 4px white edge on the box's bottom side */
-  background: linear-gradient(
-    180deg,
-    rgba(25, 211, 255, 0) 0%,
-    rgba(25, 211, 255, 0.35) 100%
-  );
+  /* [디자인 복원] 18px 전체가 꽉 찬 흰색 띠 + 글로우(원래 디자인).
+     디자인 변경 때 '아래 4px만 흰색 + 위는 그라디언트'로 바뀌어 얇은 선처럼 보였음.
+     위치/높이는 그대로, 그림만 원래대로. */
+  background-color: #ffffff;
   z-index: 50;
-  box-shadow: inset 0 -4px 0 #ffffff, 0 0 14px rgba(25, 211, 255, 0.9),
-    0 0 34px rgba(25, 211, 255, 0.45);
+  box-shadow: 0px 0px 15px #ffffff, 0px 0px 30px #00f0ff;
 }
 
 /* =======================================================
@@ -1171,7 +1382,7 @@ export default {
 .arcade-btn.f-key.is-pressed,
 .arcade-btn.j-key.is-pressed {
   color: #ffffff;
-  background: linear-gradient(180deg, rgba(25, 211, 255, 0.55) 0%, #050a12 100%);
-  box-shadow: inset 0px 0px 22px rgba(25, 211, 255, 0.6);
+  background: linear-gradient(180deg, rgba(var(--dm-cyan-rgb), 0.55) 0%, #050a12 100%);
+  box-shadow: inset 0px 0px 22px rgba(var(--dm-cyan-rgb), 0.6);
 }
 </style>

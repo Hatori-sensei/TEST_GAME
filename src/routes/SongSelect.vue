@@ -12,6 +12,8 @@
       <div class="top-hint">
         <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> SELECT</span>
         <span><kbd>ENTER</kbd> START</span>
+        <span><kbd>R</kbd> RANKING</span>
+        <span><kbd>V</kbd> VS</span>
         <span><kbd>ESC</kbd> OPTIONS</span>
       </div>
     </header>
@@ -51,6 +53,17 @@
               </button>
             </div>
             <Loading v-else :show="true" text="Loading Sheets..." />
+
+            <!-- [축제 랭킹] 선택 곡 오늘 TOP3 (R 키로 전체 랭킹) -->
+            <div class="mini-rank" v-if="miniTop.length > 0">
+              <div class="mini-rank-head">TODAY TOP 3</div>
+              <div v-for="(e, i) in miniTop" :key="e.id" class="mini-rank-row">
+                <span class="mini-rank-pos">{{ i + 1 }}</span>
+                <span class="mini-rank-name">{{ e.name }}</span>
+                <span class="mini-rank-group">{{ e.group }}</span>
+                <span class="mini-rank-score">{{ e.score.toLocaleString() }}</span>
+              </div>
+            </div>
           </div>
 
           <div v-else class="empty-state">
@@ -100,6 +113,20 @@
           <div class="quick-settings-header">
             <h2>설정</h2>
             <div class="hint">ESC를 눌러 닫기</div>
+          </div>
+
+          <!-- [테마] 화면 테마 선택(바꾸면 바로 미리보기, Apply 시 저장, Close 시 원래대로) -->
+          <div class="quick-settings-section">
+            <h3>화면 테마</h3>
+            <div class="settings-row">
+              <label for="themeSelect">테마</label>
+              <div class="slider-wrap">
+                <select id="themeSelect" v-model.number="quickGameSt.theme" @change="previewTheme">
+                  <option v-for="t in themeList" :key="t.id" :value="t.id">{{ t.id }}. {{ t.name }}</option>
+                </select>
+              </div>
+              <strong>{{ quickGameSt.theme }}</strong>
+            </div>
           </div>
 
           <div class="quick-settings-section">
@@ -156,6 +183,77 @@
             <KeyMappings v-model="quickPreference.keyMap"></KeyMappings>
           </div>
 
+          <!-- [설정] 플레이 설정(새 항목). 기본값은 전부 기존 동작과 동일 -->
+          <div class="quick-settings-section">
+            <h3>플레이 설정</h3>
+            <div class="settings-row">
+              <label>오디오 오프셋</label>
+              <div class="slider-wrap">
+                <vue-slider
+                  :value="quickGameSt.audioOffsetMs"
+                  :interval="1"
+                  :min="-200"
+                  :max="200"
+                  :contained="true"
+                  :tooltip-formatter="(val) => formatOffset(val)"
+                  @change="(v) => (quickGameSt.audioOffsetMs = Number(v))"
+                ></vue-slider>
+              </div>
+              <strong>{{ formatOffset(quickGameSt.audioOffsetMs) }}</strong>
+            </div>
+            <div class="settings-row">
+              <label></label>
+              <div class="calib-box">
+                <template v-if="calib.state === 'running'">
+                  <span class="calib-live">삑 소리에 맞춰 아무 키나 누르세요 ({{ calib.taps.length }})</span>
+                </template>
+                <template v-else>
+                  <button class="settings-btn calib-btn" @click="startCalibration">자동 측정</button>
+                  <span class="calib-msg">{{ calib.message || "소리가 늦게 들리면 + (노트가 늦게 내려옴)" }}</span>
+                </template>
+              </div>
+              <span></span>
+            </div>
+            <div class="settings-row">
+              <label>레인 커버</label>
+              <div class="slider-wrap">
+                <vue-slider
+                  :value="quickGameSt.laneCover"
+                  :interval="0.01"
+                  :min="0"
+                  :max="0.6"
+                  :contained="true"
+                  :tooltip-formatter="(val) => `${Math.round(Number(val) * 100)}%`"
+                  @change="(v) => (quickGameSt.laneCover = Number(v))"
+                ></vue-slider>
+              </div>
+              <strong>{{ Math.round(quickGameSt.laneCover * 100) }}%</strong>
+            </div>
+            <div class="settings-row">
+              <label>배경 어둡게</label>
+              <div class="slider-wrap">
+                <vue-slider
+                  :value="quickGameSt.bgaDim"
+                  :interval="0.01"
+                  :min="0"
+                  :max="0.95"
+                  :contained="true"
+                  :tooltip-formatter="(val) => `${Math.round(Number(val) * 100)}%`"
+                  @change="(v) => (quickGameSt.bgaDim = Number(v))"
+                ></vue-slider>
+              </div>
+              <strong>{{ Math.round(quickGameSt.bgaDim * 100) }}%</strong>
+            </div>
+            <div class="settings-grid">
+              <Checkbox label="FAST/SLOW 표시" :model="quickGameSt" modelKey="showFastSlow" cbStyle="form"></Checkbox>
+              <Checkbox label="미러 (좌우 반전)" :model="quickGameSt" modelKey="mirror" cbStyle="form"></Checkbox>
+              <Checkbox label="No Fail (게임오버 없음)" :model="quickGameSt" modelKey="noFail" cbStyle="form"></Checkbox>
+              <Checkbox label="오토플레이 (이번 실행만)" :model="quickGameSt" modelKey="autoPlay" cbStyle="form"></Checkbox>
+              <Checkbox label="채보 연출 효과 (섬광/암전 등)" :model="quickGameSt" modelKey="fxEnabled" cbStyle="form"></Checkbox>
+              <Checkbox label="대기 화면 (방치 시 타이틀 → SAMPLE PLAY)" :model="quickGameSt" modelKey="attractMode" cbStyle="form"></Checkbox>
+            </div>
+          </div>
+
           <div class="quick-settings-section">
             <h3>사운드 설정</h3>
             <div class="settings-row">
@@ -190,6 +288,51 @@
             </div>
           </div>
 
+          <!-- [LAN] 여러 PC 연결: 통합 랭킹 / 대전. 기본 = 사용 안 함 -->
+          <div class="quick-settings-section">
+            <h3>LAN (여러 PC 연결)</h3>
+            <div v-if="!lan.available" class="calib-msg">설치된 앱(exe)에서만 사용할 수 있어요. (지금은 브라우저 개발 모드)</div>
+            <template v-else>
+              <div class="settings-row">
+                <label for="lanRole">역할</label>
+                <div class="slider-wrap">
+                  <select id="lanRole" v-model="quickLan.role">
+                    <option value="off">사용 안 함</option>
+                    <option value="host">호스트 (이 PC가 서버 · 랭킹 보드용 PC 추천)</option>
+                    <option value="client">참가 (호스트에 연결)</option>
+                  </select>
+                </div>
+                <strong></strong>
+              </div>
+              <div class="settings-row" v-if="quickLan.role !== 'off'">
+                <label for="pcName">PC 이름</label>
+                <div class="slider-wrap">
+                  <input id="pcName" class="lan-input" v-model="quickLan.pcName" maxlength="12" placeholder="예: 1번 PC" />
+                </div>
+                <strong></strong>
+              </div>
+              <div class="settings-row" v-if="quickLan.role === 'client'">
+                <label for="lanHost">호스트 주소</label>
+                <div class="calib-box">
+                  <input id="lanHost" class="lan-input" v-model="quickLan.host" maxlength="64" placeholder="예: 192.168.0.10" />
+                  <button class="settings-btn calib-btn" :disabled="lan.busy" @click="findLanHosts">찾기</button>
+                  <button class="settings-btn calib-btn" :disabled="lan.busy || !quickLan.host" @click="testLanHost">연결 확인</button>
+                </div>
+                <strong></strong>
+              </div>
+              <div class="lan-found" v-if="quickLan.role === 'client' && lan.found.length">
+                <button v-for="h in lan.found" :key="h.address" class="settings-btn calib-btn" @click="quickLan.host = h.address">
+                  {{ h.name }} · {{ h.address }}
+                </button>
+              </div>
+              <div class="calib-msg" v-if="quickLan.role === 'host'">
+                다른 PC에서 "찾기"를 누르거나 이 주소를 입력하세요:
+                <strong class="lan-ip">{{ lan.ips.length ? lan.ips.join(" / ") : "(네트워크 연결 없음)" }}</strong>
+              </div>
+              <div class="calib-msg" v-if="lan.message">{{ lan.message }}</div>
+            </template>
+          </div>
+
           <div class="quick-settings-actions">
             <button class="settings-btn save" @click="saveQuickSettings">Apply</button>
             <button class="settings-btn" @click="closeQuickSettings">Close</button>
@@ -208,6 +351,15 @@ import VueSlider from "vue-slider-component";
 import { getSheetList, getSongListCached, updateUserProfile } from "../javascript/db";
 import { logEvent } from "../helpers/analytics";
 import { resolveSongPreviewRange } from "../javascript/localCatalog";
+import { saveSettings, loadSettings, DEFAULT_SETTINGS } from "../helpers/settings";
+import { THEMES, applyTheme } from "../helpers/theme";
+import { loadRecords, topBySheet } from "../helpers/records";
+import { isLanAvailable, getLanConfig, applyLanRole, lanStatus, discoverHosts, pingHost } from "../helpers/lan";
+
+// [설정] 오프셋 자동 측정: 메트로놈 간격/횟수
+const CALIB_INTERVAL_SEC = 0.6;
+const CALIB_BEATS = 12;
+const CALIB_LEAD_SEC = 1.0;
 
 const DEFAULT_KEY_MAP = {
   a: "a",
@@ -232,6 +384,7 @@ export default {
       sheetList: null,
       selectedSong: null,
       selectedIndex: 0,
+      records: [], // [축제 랭킹] 이 PC 기록(화면 진입 시 1번 읽음)
       previewStopTimer: null,
       previewFadeOutTimer: null,
       previewToken: 0,
@@ -241,7 +394,24 @@ export default {
         randomGimmickMode: "off",
         keyBeamEnabled: true,
         noteEffectEnabled: true,
+        // [설정] 새 항목(기본값 = 기존 동작)
+        audioOffsetMs: DEFAULT_SETTINGS.audioOffsetMs,
+        laneCover: DEFAULT_SETTINGS.laneCover,
+        bgaDim: DEFAULT_SETTINGS.bgaDim,
+        mirror: DEFAULT_SETTINGS.mirror,
+        noFail: DEFAULT_SETTINGS.noFail,
+        showFastSlow: DEFAULT_SETTINGS.showFastSlow,
+        autoPlay: false,
+        fxEnabled: DEFAULT_SETTINGS.fxEnabled, // [연출]
+        attractMode: DEFAULT_SETTINGS.attractMode, // [대기 화면]
+        theme: DEFAULT_SETTINGS.theme, // [테마]
       },
+      themeList: THEMES,
+      // [LAN] 설정 화면 상태
+      quickLan: { role: "off", host: "", pcName: "" },
+      lan: { available: isLanAvailable(), busy: false, found: [], ips: [], message: "" },
+      // [설정] 오프셋 자동 측정 상태
+      calib: { state: "idle", taps: [], beats: [], message: "" },
       quickPreference: {
         keyMap: { ...DEFAULT_KEY_MAP },
       },
@@ -266,6 +436,11 @@ export default {
     },
     bgImage() {
       return this.coverImage ? `url(${this.coverImage})` : 'none';
+    },
+    // [축제 랭킹] 선택 곡의 오늘 TOP3
+    miniTop() {
+      const sheet = this.sheetList && this.sheetList[0];
+      return sheet ? topBySheet(this.records, sheet.id, 3, { todayOnly: true }) : [];
     },
     selectedSongBpm() {
       const bpm = this.selectedSong?.bpm;
@@ -303,13 +478,23 @@ export default {
     this.songList = this.allSongs || [];
     this.selectSong(0);
     this.initQuickSettings();
+  },
+  // [버그 수정] 이 화면은 keep-alive로 캐시돼서 다른 화면으로 가도 파괴되지 않음.
+  // 예전엔 mounted에서 건 keydown 리스너가 게임/결과 화면에서도 살아 있어서
+  // 결과 화면의 Enter → 곡 시작(speed-setup 이동), 게임 중 ESC → 숨은 설정창 토글 등이 발생했음.
+  // → 화면이 보일 때(activated)만 리스너를 걸고, 떠날 때(deactivated) 제거.
+  activated() {
+    this.records = loadRecords(); // [축제 랭킹] 결과 화면에서 등록한 기록 반영
+    window.removeEventListener('keydown', this.handleKeydown);
     window.addEventListener('keydown', this.handleKeydown);
   },
   beforeDestroy() {
+    this.stopCalibration();
     this.clearPreviewTimer();
     window.removeEventListener('keydown', this.handleKeydown);
   },
   deactivated() {
+    window.removeEventListener('keydown', this.handleKeydown);
     this.clearPreviewTimer();
   },
   methods: {
@@ -326,6 +511,16 @@ export default {
       );
       this.quickGameSt.keyBeamEnabled = gameSt.keyBeamEnabled ?? true;
       this.quickGameSt.noteEffectEnabled = gameSt.noteEffectEnabled ?? true;
+      this.quickGameSt.audioOffsetMs = this.clamp(gameSt.audioOffsetMs, -200, 200, 0);
+      this.quickGameSt.laneCover = this.clamp(gameSt.laneCover, 0, 0.6, 0);
+      this.quickGameSt.bgaDim = this.clamp(gameSt.bgaDim, 0, 0.95, DEFAULT_SETTINGS.bgaDim);
+      this.quickGameSt.mirror = gameSt.mirror === true;
+      this.quickGameSt.noFail = gameSt.noFail === true;
+      this.quickGameSt.showFastSlow = gameSt.showFastSlow === true;
+      this.quickGameSt.fxEnabled = gameSt.fxEnabled !== false;
+      this.quickGameSt.attractMode = loadSettings().attractMode; // [대기 화면]
+      this.quickGameSt.autoPlay = this.$store.state.autoPlay === true;
+      this.quickGameSt.theme = loadSettings().theme; // [테마] 저장된 테마
       this.quickPreference.keyMap = {
         ...DEFAULT_KEY_MAP,
         ...(preference.keyMap || {}),
@@ -343,10 +538,43 @@ export default {
     },
     openQuickSettings() {
       this.initQuickSettings();
+      this.initLanSettings();
       this.showQuickSettings = true;
       this.$store.state.audio.playEffect("ui/pop");
     },
+    // [LAN] 저장된 LAN 설정 불러오기 + 이 PC 주소 표시
+    async initLanSettings() {
+      this.quickLan = { ...getLanConfig() };
+      this.lan.found = [];
+      this.lan.message = "";
+      const st = await lanStatus();
+      if (st) {
+        this.lan.ips = st.ips.map((ip) => `${ip}:${st.port}`);
+        if (this.quickLan.role === "host") this.lan.message = st.hosting ? "호스트 실행 중" : "호스트가 꺼져 있어요(Apply로 다시 켜기)";
+      }
+    },
+    async findLanHosts() {
+      this.lan.busy = true;
+      this.lan.message = "같은 네트워크에서 호스트를 찾는 중...";
+      this.lan.found = await discoverHosts(1500);
+      this.lan.message = this.lan.found.length ? "찾은 호스트를 눌러 선택하세요" : "못 찾았어요. 호스트 PC 화면의 주소를 직접 입력하세요(방화벽/같은 공유기 확인)";
+      if (this.lan.found.length === 1) this.quickLan.host = this.lan.found[0].address;
+      this.lan.busy = false;
+    },
+    async testLanHost() {
+      this.lan.busy = true;
+      this.lan.message = "연결 확인 중...";
+      const r = await pingHost(this.quickLan.host.trim());
+      this.lan.message = r.ok ? `연결됨: ${r.name} · 기록 ${r.records}개 · ${r.rttMs}ms` : `연결 실패: ${r.error}`;
+      this.lan.busy = false;
+    },
+    // [테마] 선택 즉시 화면에 미리 적용
+    previewTheme() {
+      applyTheme(this.quickGameSt.theme);
+    },
     closeQuickSettings() {
+      this.stopCalibration();
+      applyTheme(loadSettings().theme); // [테마] Apply 안 하고 닫으면 저장된 테마로 되돌림
       this.showQuickSettings = false;
       this.$store.state.audio.playEffect("ui/loose");
     },
@@ -378,6 +606,7 @@ export default {
       if (!audio) return;
       audio.maxVolume = next;
       audio.setVolume(next);
+      saveSettings({ bgmVolume: next }); // [설정 저장] 볼륨은 즉시 적용되므로 즉시 저장
     },
     onEffectVolumeChange(value) {
       const next = this.clamp(value, 0, 1, 0.5);
@@ -386,6 +615,7 @@ export default {
       if (!audio) return;
       audio.effectVolume = next;
       audio.playEffect("ui/click2");
+      saveSettings({ effectVolume: next }); // [설정 저장]
     },
     async saveQuickSettings() {
       const profile = this.$store.state.userProfile || {};
@@ -394,6 +624,13 @@ export default {
         noteSpeed: this.quickGameSt.noteSpeed,
         keyBeamEnabled: this.quickGameSt.keyBeamEnabled,
         noteEffectEnabled: this.quickGameSt.noteEffectEnabled,
+        audioOffsetMs: this.quickGameSt.audioOffsetMs,
+        laneCover: this.quickGameSt.laneCover,
+        bgaDim: this.quickGameSt.bgaDim,
+        mirror: this.quickGameSt.mirror,
+        noFail: this.quickGameSt.noFail,
+        showFastSlow: this.quickGameSt.showFastSlow,
+        fxEnabled: this.quickGameSt.fxEnabled,
       };
       const preference = {
         ...(profile.preference || {}),
@@ -410,6 +647,27 @@ export default {
         gameSt,
         preference,
       });
+      this.$store.commit("setAutoPlay", this.quickGameSt.autoPlay);
+
+      // [설정 저장] 재시작 후에도 유지되도록 로컬에 저장(오토플레이/랜덤 기믹 테스트는 저장 안 함)
+      saveSettings({
+        ...gameSt,
+        keyMap: preference.keyMap,
+        bgmVolume: this.quickSound.bgmVolume,
+        effectVolume: this.quickSound.effectVolume,
+        theme: applyTheme(this.quickGameSt.theme), // [테마] 적용 + 저장
+        attractMode: this.quickGameSt.attractMode, // [대기 화면]
+        // [LAN]
+        lanRole: this.quickLan.role,
+        lanHost: this.quickLan.host.trim(),
+        pcName: this.quickLan.pcName.trim(),
+      });
+      // [LAN] 역할에 맞게 호스트 서버 켜기/끄기(LAN을 안 쓰면 꺼진 상태 유지)
+      if (this.lan.available) {
+        applyLanRole().then((r) => {
+          if (r && !r.ok) this.$store.state.alert.error(`LAN 호스트 시작 실패: ${r.error}`);
+        });
+      }
 
       try {
         await updateUserProfile({ gameSt, preference });
@@ -419,6 +677,81 @@ export default {
 
       this.$store.state.audio.playEffect("ui/slide2");
       this.showQuickSettings = false;
+    },
+    formatOffset(val) {
+      const n = Math.round(Number(val) || 0);
+      return `${n > 0 ? "+" : ""}${n}ms`;
+    },
+    // [설정] 오프셋 자동 측정: 일정 간격 클릭음에 맞춰 키를 누르게 하고,
+    // (누른 시각 - 소리 예정 시각)의 중앙값을 오프셋으로 제안한다.
+    // 소리 출력 지연 + 입력 지연이 합쳐서 측정되므로 게임 오프셋과 같은 의미.
+    startCalibration() {
+      this.stopCalibration();
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) {
+        this.calib.message = "이 환경에서는 측정할 수 없습니다";
+        return;
+      }
+      const ctx = new Ctx();
+      this.calibCtx = ctx;
+      const audio = this.$store.state.audio;
+      if (audio) audio.pause(); // 프리뷰 음악 정지(측정 방해 방지)
+      ctx.resume().catch(() => {});
+      const baseCtx = ctx.currentTime;
+      const basePerf = performance.now();
+      const beats = [];
+      for (let i = 0; i < CALIB_BEATS; i += 1) {
+        const when = baseCtx + CALIB_LEAD_SEC + i * CALIB_INTERVAL_SEC;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = i % 4 === 0 ? 1500 : 1000;
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(0.5, when + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.06);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(when);
+        osc.stop(when + 0.08);
+        beats.push(basePerf + (when - baseCtx) * 1000);
+      }
+      this.calib = { state: "running", taps: [], beats, message: "" };
+      this.calibTimer = setTimeout(
+        () => this.finishCalibration(),
+        (CALIB_LEAD_SEC + CALIB_BEATS * CALIB_INTERVAL_SEC + 0.4) * 1000
+      );
+    },
+    onCalibrationTap(e) {
+      this.calib.taps.push(e.timeStamp || performance.now());
+    },
+    finishCalibration() {
+      const { taps, beats } = this.calib;
+      const diffs = [];
+      taps.forEach((t) => {
+        let best = null;
+        beats.forEach((b, idx) => {
+          if (idx < 2) return; // 처음 두 박은 박자 잡는 용도라 제외
+          const d = t - b;
+          if (best === null || Math.abs(d) < Math.abs(best)) best = d;
+        });
+        if (best !== null && Math.abs(best) <= 250) diffs.push(best);
+      });
+      this.stopCalibration();
+      if (diffs.length < 4) {
+        this.calib.message = "입력이 부족합니다. 다시 측정해 주세요";
+        return;
+      }
+      diffs.sort((a, b) => a - b);
+      const median = diffs[Math.floor(diffs.length / 2)];
+      const value = Math.round(Math.min(200, Math.max(-200, median)));
+      this.quickGameSt.audioOffsetMs = value;
+      this.calib.message = `측정 결과 ${this.formatOffset(value)} (입력 ${diffs.length}회). Apply를 눌러 저장`;
+    },
+    stopCalibration() {
+      clearTimeout(this.calibTimer);
+      if (this.calibCtx) {
+        this.calibCtx.close().catch(() => {});
+        this.calibCtx = null;
+      }
+      this.calib.state = "idle";
     },
     clearPreviewTimer() {
       if (this.previewStopTimer) {
@@ -504,6 +837,18 @@ export default {
       }
     },
     handleKeydown(e) {
+      // [설정] 오프셋 측정 중엔 모든 키를 탭 입력으로 사용(ESC는 측정 취소)
+      if (this.calib.state === "running") {
+        e.preventDefault();
+        if (e.key === "Escape") {
+          this.stopCalibration();
+          this.calib.message = "측정을 취소했습니다";
+        } else if (!e.repeat) {
+          this.onCalibrationTap(e);
+        }
+        return;
+      }
+
       if (e.key === "Escape") {
         e.preventDefault();
         if (this.showQuickSettings) {
@@ -536,6 +881,15 @@ export default {
         if (this.sheetList && this.sheetList.length > 0) {
           this.playGame(this.sheetList[0].id);
         }
+      } else if ((e.key === 'v' || e.key === 'V') && !e.repeat) {
+        // [LAN 대전] 대전 로비로
+        e.preventDefault();
+        this.$router.push('/vs');
+      } else if ((e.key === 'r' || e.key === 'R') && !e.repeat) {
+        // [축제 랭킹] 선택 곡 랭킹 화면으로
+        e.preventDefault();
+        const sheet = this.sheetList && this.sheetList[0];
+        this.$router.push(sheet ? `/rankings?sheet=${encodeURIComponent(sheet.id)}` : '/rankings');
       }
     },
     scrollToSelected() {
@@ -600,8 +954,8 @@ export default {
   z-index: 0;
   background: repeating-linear-gradient(
     115deg,
-    rgba(25, 211, 255, 0.05) 0,
-    rgba(25, 211, 255, 0.05) 1px,
+    rgba(var(--dm-cyan-rgb), 0.05) 0,
+    rgba(var(--dm-cyan-rgb), 0.05) 1px,
     transparent 1px,
     transparent 16px
   );
@@ -706,7 +1060,7 @@ export default {
   /* width / aspect-ratio come from the image's real size (see jacketStyle) */
   width: min(100%, 44vh);
   padding: 2px;
-  background: linear-gradient(135deg, var(--dm-cyan) 0%, rgba(25, 211, 255, 0.15) 45%, var(--dm-cyan) 100%);
+  background: linear-gradient(135deg, var(--dm-cyan) 0%, rgba(var(--dm-cyan-rgb), 0.15) 45%, var(--dm-cyan) 100%);
   clip-path: polygon(0 0, calc(100% - 34px) 0, 100% 34px, 100% 100%, 34px 100%, 0 calc(100% - 34px));
 }
 
@@ -798,6 +1152,55 @@ export default {
   margin-top: 4px;
 }
 
+/* [축제 랭킹] 선택 곡 TOP3 */
+.mini-rank {
+  box-sizing: border-box;
+  max-width: 560px;
+  padding: 8px 14px;
+  background: rgba(5, 10, 20, 0.7);
+  border-left: 3px solid var(--dm-cyan);
+}
+.mini-rank-head {
+  font-family: var(--dm-font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  color: var(--dm-cyan);
+  margin-bottom: 4px;
+}
+.mini-rank-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  height: 26px;
+  font-size: 16px;
+}
+.mini-rank-pos {
+  width: 16px;
+  font-family: var(--dm-font-display);
+  font-style: italic;
+  font-weight: 800;
+  color: var(--dm-cyan);
+}
+.mini-rank-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mini-rank-group {
+  color: var(--dm-muted);
+  font-size: 14px;
+}
+.mini-rank-score {
+  width: 96px;
+  text-align: right;
+  font-family: var(--dm-font-display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
 .play-action {
   display: flex;
   align-items: stretch;
@@ -839,7 +1242,7 @@ export default {
   padding: 0 34px 0 22px;
   color: var(--dm-amber);
   gap: 6px;
-  border-left: 1px solid rgba(25, 211, 255, 0.25);
+  border-left: 1px solid rgba(var(--dm-cyan-rgb), 0.25);
   clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
   margin-right: -14px;
 }
@@ -943,7 +1346,7 @@ export default {
   top: 0;
   bottom: 0;
   width: 5px;
-  background: rgba(25, 211, 255, 0.22);
+  background: rgba(var(--dm-cyan-rgb), 0.22);
   transition: background 0.18s;
 }
 
@@ -1133,6 +1536,44 @@ export default {
   min-width: 0;
 }
 
+/* [설정] 체크박스 2열 배치(모바일에선 1열) */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.calib-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.calib-btn {
+  padding: 6px 14px;
+  white-space: nowrap;
+}
+
+.calib-msg {
+  color: var(--dm-muted);
+  font-size: 13px;
+}
+
+.calib-live {
+  color: var(--dm-cyan);
+  font-weight: 700;
+  animation: calib-blink 0.6s steps(2) infinite;
+}
+
+@keyframes calib-blink {
+  50% {
+    opacity: 0.5;
+  }
+}
+
 .slider-wrap select {
   width: 100%;
   padding: 8px 10px;
@@ -1141,6 +1582,36 @@ export default {
   border: 1px solid var(--dm-cyan-dim);
   border-radius: 0;
   font-family: var(--dm-font-body);
+}
+
+/* [LAN] */
+.lan-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  color: var(--dm-text);
+  background: #071a2b;
+  border: 1px solid var(--dm-cyan-dim);
+  font-family: var(--dm-font-body);
+  font-size: 15px;
+  outline: none;
+}
+.lan-input:focus {
+  border-color: var(--dm-cyan);
+}
+.lan-found {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 10px 176px;
+}
+.lan-ip {
+  color: var(--dm-cyan);
+  font-family: var(--dm-font-display);
+  font-size: 16px;
+  margin-left: 6px;
 }
 
 .quick-settings-actions {
@@ -1173,21 +1644,5 @@ export default {
   color: #04121c;
   background: var(--dm-cyan);
   border-color: var(--dm-cyan);
-}
-
-@media only screen and (max-width: 1000px) {
-  .layout-container {
-    flex-direction: column;
-    overflow-y: auto;
-    gap: 28px;
-  }
-
-  .left-panel {
-    flex: none;
-  }
-
-  .top-hint {
-    display: none;
-  }
 }
 </style>

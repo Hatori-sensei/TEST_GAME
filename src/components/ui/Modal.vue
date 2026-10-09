@@ -154,7 +154,7 @@ export default {
 }
 
 .modal-darker {
-  background: rgba(25, 211, 255, 0.07);
+  background: rgba(var(--dm-cyan-rgb), 0.07);
   border-bottom: 1px solid var(--dm-cyan-dim);
 }
 

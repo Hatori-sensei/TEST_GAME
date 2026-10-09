@@ -141,23 +141,6 @@ export default {
   pointer-events: none;
 }
 
-@media only screen and (max-width: 1000px) {
-  /* mobile */
-  .score {
-    top: 10px;
-    right: 10px;
-    bottom: auto;
-    left: auto;
-    font-size: 2em;
-    font-family: "Nova Mono", monospace;
-    flex-direction: column-reverse;
-    text-align: right;
-  }
-  .health_bar_wrapper {
-    width: 100vw;
-  }
-}
-
 @keyframes health_low {
   0% {
     opacity: 0.8;

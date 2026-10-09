@@ -12,6 +12,7 @@
   --dm-bg: #04060c;
   --dm-panel: rgba(5, 10, 20, 0.88);
   --dm-cyan: #19d3ff;
+  --dm-cyan-rgb: 25, 211, 255; /* [테마] rgba(var(--dm-cyan-rgb), a)용 */
   --dm-cyan-dim: rgba(25, 211, 255, 0.3);
   --dm-cyan-faint: rgba(25, 211, 255, 0.1);
   --dm-amber: #ffb400;
@@ -226,7 +227,7 @@ img {
 .btn-action {
   cursor: pointer;
   color: var(--dm-text);
-  background: rgba(25, 211, 255, 0.08);
+  background: rgba(var(--dm-cyan-rgb), 0.08); /* [테마] */
   padding: 10px 22px;
   min-width: 80px;
   margin: 0 10px;
@@ -568,16 +569,5 @@ input::placeholder {
   }
   to {
     opacity: 1;
-  }
-}
-
-@media only screen and (max-width: 1000px) {
-  .ytPlayerMobileExtend {
-    width: 249vh !important;
-    transform: translateX(calc(50vw - 124.5vh));
-  }
-
-  .slide-in-leave-to {
-    margin-top: -100px;
   }
 }

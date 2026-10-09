@@ -4,6 +4,8 @@ const RELEASE_MAX_ONE_EARLY_MS = 150;
 const RELEASE_MAX_ONE_LATE_MS = 250;
 const SHIFT_SPEED_MULTIPLIER = 1.8;
 const NOTE_INSET_PX = 4;
+// 판정선(Game.vue .judgment-line) 높이. 캔버스 checkHitLineY = 판정선 아래 가장자리.
+const JUDGE_LINE_HEIGHT_PX = 18;
 
 // Outer lanes ice-white, inner lanes cyan, gimmick (shift) notes amber.
 const NOTE_PALETTES = {
@@ -108,6 +110,8 @@ export default class Note {
     }
     this.missed = true;
     this.vm.result.marks.miss += 1;
+    // [미션] 롱노트를 아예 못 친 경우 실패로 집계(표시/판정 불변)
+    if (this.isLong && this.vm.result.longStats) this.vm.result.longStats.failed += 1;
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(0);
     }
@@ -157,6 +161,12 @@ export default class Note {
   }
 
   _applyLongReleaseJudge(judgeText, judgePercent) {
+    // [미션] 롱노트 끝 판정: BREAK면 실패, 그 외(MAX 100% / MAX 1%)는 성공으로 집계
+    const longStats = this.vm.result.longStats;
+    if (longStats) {
+      if (judgeText === "BREAK") longStats.failed += 1;
+      else longStats.cleared += 1;
+    }
     if (typeof this.vm.registerJudgePercent === "function") {
       this.vm.registerJudgePercent(judgePercent);
     }
@@ -277,11 +287,19 @@ export default class Note {
   }
 
   _getPalette(isShiftNote, isFailed) {
-    if (this.missed) return NOTE_PALETTES.missed;
-    if (isFailed) return NOTE_PALETTES.failedSingle;
-    if (isShiftNote) return NOTE_PALETTES.shift;
-    const outer = this.key === "d" || this.key === "k";
-    return outer ? NOTE_PALETTES.outer : NOTE_PALETTES.inner;
+    // [테마] 노트 색은 현재 테마 팔레트(테마1 = 아래 NOTE_PALETTES와 동일 값)
+    const palettes = (this.game.theme && this.game.theme.notes) || NOTE_PALETTES;
+    if (this.missed) return palettes.missed;
+    if (isFailed) return palettes.failedSingle;
+    if (isShiftNote) return palettes.shift;
+    // [버그수정] 예전엔 키 이름("d"/"k")으로 바깥 레인을 판별해서, 키 배치를 바꾸면
+    // (예: d→s) 바깥 레인 노트도 안쪽 색(청록)으로 그려졌음 → 실제 레인 위치로 판별.
+    if (this.isOuterLane === undefined) {
+      const binds = this.game.trackKeyBind || ["d", "f", "j", "k"];
+      const lane = binds.indexOf(this.key);
+      this.isOuterLane = lane === 0 || lane === binds.length - 1;
+    }
+    return this.isOuterLane ? palettes.outer : palettes.inner;
   }
 
   _drawNoteHead(pal, yTop = this.y) {
@@ -300,12 +318,22 @@ export default class Note {
     ctx.fillRect(x + w - 2, y + 5, 2, h - 8);
   }
 
-  _drawLongBody(pal, bodyTop, bodyHeight) {
+  // [롱노트] 색 선택: 놓침(회색) > 누르는 중(밝은 색) > 롱노트 전용 색.
+  // 테마에 long 색이 없으면 기존처럼 레인 색을 씀.
+  _getLongPalette(isShiftNote) {
+    const palettes = (this.game.theme && this.game.theme.notes) || NOTE_PALETTES;
+    if (this.missed) return palettes.missed;
+    if (this.holding && palettes.longHold) return palettes.longHold;
+    if (palettes.long) return palettes.long;
+    return this._getPalette(isShiftNote, false);
+  }
+
+  _drawLongBody(pal, bodyTop, bodyHeight, alpha = 0.4) {
     const ctx = this.ctx;
     const x = this.x + NOTE_INSET_PX;
     const w = this.width - NOTE_INSET_PX * 2;
     ctx.fillStyle = pal.main;
-    ctx.globalAlpha = 0.4;
+    ctx.globalAlpha = alpha;
     ctx.fillRect(x, bodyTop, w, bodyHeight);
     ctx.globalAlpha = 1;
     ctx.fillRect(x, bodyTop, 3, bodyHeight);
@@ -313,19 +341,29 @@ export default class Note {
   }
 
   update() {
-    if (this.game.paused) return;
+    // [개선] 예전엔 일시정지 중 여기서 바로 return해서 노트가 그려지지 않았음 → 일시정지/재개
+    // 카운트다운 동안 노트가 전부 사라졌다가 재개 순간 판정선 근처에 갑자기 나타났음.
+    // 일시정지 중에도 (멈춘 위치 그대로) 그리기는 하고, 판정/미스/홀드 처리만 건너뛴다.
+    const paused = !!this.game.paused;
 
     const speed = this.game.noteSpeedPxPerSec || 1;
     const distance = this.visualPos - (this.game.currentGlobalVisualPos || 0);
     const baseY = this.game.checkHitLineY - distance * speed;
+    // [판정 기준 변경] judgeY = 채보 시간 기준점. 채보 시간에 정확히 판정선(checkHitLineY)에 옴.
+    // 예전엔 노트 위 끝이 이 점이고 판정은 "아래 끝"(+30px) 기준이라, MAX 100% 타이밍이
+    // 채보 시간보다 30px/속도(1.0배속 75ms, 3.0배속 25ms)만큼 빨라 배속마다 달랐음.
     this.judgeY = baseY;
+    // 그림 위치: 채보 시간(=정타)에 "노트 중앙"이 "판정선 중앙"에 오도록 그린다.
+    // 판정선 중앙 = checkHitLineY - 9, 노트 중앙 = y + 15 → y = baseY - 9 - 15 = baseY - 24.
+    // (판정은 시간 기준이라 그림 위치만 바뀌고 판정 타이밍/범위는 그대로)
+    const drawBaseY = baseY - JUDGE_LINE_HEIGHT_PX / 2 - this.singleNoteHeight / 2;
 
     const reverseBlend = Number(this.game.reverseBlend) || 0;
     if (reverseBlend > 0) {
-      const mirroredY = this.game.canvas.height - baseY;
-      this.y = baseY + (mirroredY - baseY) * reverseBlend;
+      const mirroredY = this.game.canvas.height - drawBaseY;
+      this.y = drawBaseY + (mirroredY - drawBaseY) * reverseBlend;
     } else {
-      this.y = baseY;
+      this.y = drawBaseY;
     }
 
     const shift = !this.isLong && this.keyObj && this.keyObj.shift;
@@ -368,7 +406,9 @@ export default class Note {
       this.x = this.baseX;
     }
 
-    if (this.isLong) {
+    if (paused) {
+      // 판정/미스/홀드 틱 처리 생략(위치는 currentTime이 멈춰 있으므로 그대로)
+    } else if (this.isLong) {
       if (this.holding) {
         this._processHoldTicks();
 
@@ -389,7 +429,7 @@ export default class Note {
         }
       }
     } else {
-      const judgeReferenceY = this.judgeY + this.singleNoteHeight;
+      const judgeReferenceY = this.judgeY; // [판정 기준 변경] 채보 시간 기준점
       const passedPx = judgeReferenceY - this.game.checkHitLineY;
       const passedMs = (passedPx / speed) * 1000;
 
@@ -407,10 +447,11 @@ export default class Note {
       }
       const isVisible = bodyTop <= canvasHeight + 150 && this.y >= -150;
       if (isVisible) {
-        const pal = this._getPalette(isShiftNote, false);
-        this._drawLongBody(pal, bodyTop, bodyHeight);
-        // Release marker: a second note block at the tail. Its bottom edge reaches
-        // the judgment line exactly at endTime, i.e. when the key should be let go.
+        // [롱노트] 전용 색 + 누르는 동안 밝게(몸통도 더 진하게) → 잡고 있는지 바로 보임
+        const pal = this._getLongPalette(isShiftNote);
+        this._drawLongBody(pal, bodyTop, bodyHeight, this.holding ? 0.72 : 0.4);
+        // Release marker: a second note block at the tail. Its center reaches the
+        // judgment line's center exactly at endTime, i.e. when the key should be let go.
         this._drawNoteHead(pal, bodyTop);
         this._drawNoteHead(pal);
       }

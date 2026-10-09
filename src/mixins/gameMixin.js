@@ -24,6 +24,11 @@ const createJudgeDetails = () => ({
   BREAK: 0,
 });
 
+// [UI] 결과 화면용 타이밍 통계(FAST/SLOW 개수, 평균 오차). 점수/판정 계산과는 무관.
+const createTimingStats = () => ({ fast: 0, slow: 0, sumMs: 0, count: 0 });
+// [미션] 롱노트 성공/실패 개수(미션 "롱노트 전부 성공" 평가용). 판정/점수와 무관.
+const createLongStats = () => ({ cleared: 0, failed: 0 });
+
 export default {
   data() {
     return {
@@ -46,6 +51,8 @@ export default {
         marks: { perfect: 0, good: 0, offbeat: 0, miss: 0 },
         judgeSummary: createJudgeSummary(),
         judgeDetails: createJudgeDetails(),
+        timing: createTimingStats(),
+        longStats: createLongStats(),
       },
       fever: { value: 1, time: 0, percent: 0 },
       health: 100,
@@ -67,6 +74,14 @@ export default {
       keyMap: null,
       keyBeamEnabled: true,
       noteEffectEnabled: true,
+      // [설정] 새 설정 항목(기본값 = 기존 동작)
+      audioOffsetMs: 0,
+      laneCover: 0,
+      bgaDim: 0.35,
+      mirror: false,
+      autoPlay: false,
+      showFastSlow: false,
+      fxEnabled: true, // [연출] 채보 연출 효과
       totalNoteCount: 0,
       scorePerJudge: 0,
       scoreAccRaw: 0,
@@ -128,7 +143,17 @@ export default {
       this.fps = gameSettings.fps;
       this.keyBeamEnabled = gameSettings.keyBeamEnabled ?? true;
       this.noteEffectEnabled = gameSettings.noteEffectEnabled ?? true;
+      // [설정] 값이 없으면 기본값(기존 동작) 유지
+      this.audioOffsetMs = Number(gameSettings.audioOffsetMs) || 0;
+      this.laneCover = Number(gameSettings.laneCover) || 0;
+      const dim = Number(gameSettings.bgaDim ?? 0.35);
+      this.bgaDim = Number.isFinite(dim) ? dim : 0.35;
+      this.mirror = gameSettings.mirror === true;
+      this.showFastSlow = gameSettings.showFastSlow === true;
+      this.fxEnabled = gameSettings.fxEnabled !== false;
     }
+    // 오토플레이는 저장하지 않는 이번 실행 한정 설정(store)
+    this.autoPlay = this.$store.state.autoPlay === true;
     const preference = this.$store.state?.userProfile?.preference;
     if (preference) {
       this.keyMap = preference.keyMap;
@@ -194,6 +219,17 @@ export default {
       this.scoreAccRaw += perJudge * (safePercent / 100);
       this.result.score = Math.max(0, Math.min(1000000, Math.floor(this.scoreAccRaw)));
     },
+    // [UI] 누른 타이밍 기록(+ 늦음 / - 빠름, ms). FAST/SLOW는 MAX 100% 미만만 셈(IIDX 방식)
+    registerTiming(signedMs, displayPercent) {
+      if (!Number.isFinite(signedMs)) return;
+      const t = this.result.timing || (this.result.timing = createTimingStats());
+      t.sumMs += signedMs;
+      t.count += 1;
+      if (displayPercent < 100) {
+        if (signedMs < 0) t.fast += 1;
+        else t.slow += 1;
+      }
+    },
     registerJudgeLabel(judgeText) {
       const label = String(judgeText || "BREAK");
       if (!this.result.judgeSummary) {
@@ -231,6 +267,8 @@ export default {
         marks: { perfect: 0, good: 0, offbeat: 0, miss: 0 },
         judgeSummary: createJudgeSummary(),
         judgeDetails: createJudgeDetails(),
+        timing: createTimingStats(),
+        longStats: createLongStats(),
       };
       this.scoreAccRaw = 0;
       this.scorePerJudge =

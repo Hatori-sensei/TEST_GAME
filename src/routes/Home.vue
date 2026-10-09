@@ -59,11 +59,11 @@ export default {
       115deg,
       transparent 0%,
       transparent 38%,
-      rgba(25, 211, 255, 0.1) 38%,
-      rgba(25, 211, 255, 0.03) 62%,
+      rgba(var(--dm-cyan-rgb), 0.1) 38%,
+      rgba(var(--dm-cyan-rgb), 0.03) 62%,
       transparent 62%
     ),
-    radial-gradient(ellipse at 50% 50%, rgba(25, 211, 255, 0.1) 0%, transparent 55%);
+    radial-gradient(ellipse at 50% 50%, rgba(var(--dm-cyan-rgb), 0.1) 0%, transparent 55%);
 }
 
 .grid-lines {
@@ -71,8 +71,8 @@ export default {
   inset: 0;
   background: repeating-linear-gradient(
     115deg,
-    rgba(25, 211, 255, 0.06) 0,
-    rgba(25, 211, 255, 0.06) 1px,
+    rgba(var(--dm-cyan-rgb), 0.06) 0,
+    rgba(var(--dm-cyan-rgb), 0.06) 1px,
     transparent 1px,
     transparent 18px
   );
@@ -168,7 +168,7 @@ export default {
   line-height: 0.9;
   letter-spacing: 0.02em;
   color: #ffffff;
-  text-shadow: 0 0 34px rgba(25, 211, 255, 0.35);
+  text-shadow: 0 0 34px rgba(var(--dm-cyan-rgb), 0.35);
 }
 
 .hero-logo h1 .at {

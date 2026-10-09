@@ -52,6 +52,9 @@ import FloatingAlert from "./components/ui/FloatingAlert.vue";
 import PageBackground from "./components/common/PageBackground.vue";
 import { logEvent } from "./helpers/analytics";
 import semver from "semver";
+import { hasSavedSettings, loadSettings } from "./helpers/settings";
+import { applyTheme } from "./helpers/theme";
+import { installAttract, uninstallAttract } from "./helpers/attract";
 import "vue-awesome/icons/volume-up";
 import "vue-awesome/icons/volume-mute";
 import "vue-awesome/icons/expand";
@@ -72,15 +75,26 @@ export default {
     PageBackground,
   },
   mounted() {
-    this.$store.commit("setAudio", new Audio());
+    const audio = new Audio();
+    // [설정 저장] 저장된 BGM/효과음 볼륨 복원(저장값이 없으면 Audio 기본값 그대로)
+    if (hasSavedSettings()) {
+      const saved = loadSettings();
+      audio.maxVolume = saved.bgmVolume;
+      audio.effectVolume = saved.effectVolume;
+    }
+    // [테마] 저장된 테마 적용(저장값 없으면 1 = 기존 디자인)
+    applyTheme(loadSettings().theme);
+    this.$store.commit("setAudio", audio);
     this.$store.commit("setGlobalModal", this.$refs.gm);
     this.$store.commit("setFloatingAlert", this.$refs.alert);
     this.listenToUpdates();
     window.addEventListener("online", this.updateOnlineStatus);
     window.addEventListener("offline", this.updateOnlineStatus);
     this.updateOnlineStatus();
+    installAttract(this.$router, this.$store); // [대기 화면] 방치 시 타이틀/SAMPLE PLAY
   },
   beforeDestroy() {
+    uninstallAttract();
     window.removeEventListener("online", this.updateOnlineStatus);
     window.removeEventListener("offline", this.updateOnlineStatus);
   },

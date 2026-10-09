@@ -207,10 +207,10 @@ export default class Audio {
   playEffect(name) {
     const url = `/audio/effects/${name}.mp3`;
     const effectPlayer = new window.Audio(url);
-    effectPlayer.volume = Math.min(
-      1,
-      Math.max(0, Number(this.effectVolume) || 0.5)
-    );
+    // [버그수정] 예전엔 `Number(effectVolume) || 0.5`라서 효과음 볼륨을 0%로 내리면
+    // 0이 거짓으로 취급돼 오히려 50%로 재생됐음(효과음 끄기 불가). 숫자일 때만 그 값을 사용.
+    const vol = Number(this.effectVolume);
+    effectPlayer.volume = Math.min(1, Math.max(0, Number.isFinite(vol) ? vol : 0.5));
     this.safePlay(effectPlayer, "Effect audio play blocked");
   }
 
