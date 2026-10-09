@@ -152,6 +152,7 @@ export default class DropTrack {
         note.beginLongHold(judgeString);
         this.isHolding = true;
         this.holdingNote = note;
+        this.holdFxAt = this.game.currentTime; // [이펙트] 첫 타격 이펙트 직후부터 HOLD_FX_INTERVAL_SEC 간격으로 반복
         return;
       }
 
@@ -317,48 +318,63 @@ export default class DropTrack {
       }
     }
 
+    // [이펙트] 롱노트를 누르고 있는 동안 계속 터짐(게임 시간 기준이라 일시정지 중엔 멈춤, 판정과 무관)
+    const held = this.holdingNote;
+    if (held && held.holding && this.isKeyDown && this.particleEffect && this.vm.noteEffectEnabled !== false) {
+      const t = this.game.currentTime;
+      if (this.holdFxAt == null || t < this.holdFxAt) this.holdFxAt = t; // 시간이 되감기면(재시작) 기준 재설정
+      if (t - this.holdFxAt >= HOLD_FX_INTERVAL_SEC) {
+        this.holdFxAt = t;
+        this.particleEffect.create(this.x, this.game.checkHitLineY, this.width, held.initialJudgeString || "MAX 100%");
+      }
+    }
+
     if (this.particleEffect) this.particleEffect.update();
   }
 }
 
 // =================================================================
-// 🚨 디맥 하드코어 "퐝!!!!" 폭발 이펙트 엔진 🚨
+// 🚨 타격 이펙트(퐝!) 🚨
+// 최대 지름 = 레인 폭(= 노트 한 줄 폭). 어떤 요소도 반지름 R(레인 폭/2)을 넘지 않는다.
+// 구성: 코어 플래시 + 메인 링 + 서브 링 + 스파크. 롱노트를 누르는 동안엔 HOLD_FX_INTERVAL_SEC마다 반복.
+// 조정은 아래 상수만 바꾸면 됨.
 // =================================================================
+const FX_DURATION_MS = 240; // 이펙트 한 번이 지속되는 시간
+const FX_SPARK_COUNT = 8; // 스파크(방사형 짧은 선) 개수
+const FX_POOL_SIZE = 32; // 동시에 존재할 수 있는 이펙트 수(풀 재사용, 가득 차면 가장 오래된 것부터 덮어씀)
+const FX_CENTER_OFFSET_Y = 9; // 판정선(높이 18px) 중앙. 정타 시 노트 중앙이 여기 옴
+const FX_RING_MAX_WIDTH = 10; // 메인 링 시작 굵기(px)
+const HOLD_FX_INTERVAL_SEC = 0.1; // 롱노트 누르는 동안 이펙트 반복 간격(노트 틱 간격과 동일)
+
+const easeOutCubic = (p) => 1 - Math.pow(1 - p, 3);
 
 export class HitEffect {
   constructor(vm, game) {
-    this.rings = [];
     this.game = game;
+    // 고정 크기 풀: 타격마다 새 객체를 만들지 않고 재사용
+    this.pool = [];
+    for (let i = 0; i < FX_POOL_SIZE; i += 1) {
+      this.pool.push({ active: false, x: 0, y: 0, r: 0, color: "#fff", accent: "#fff", t0: 0, spin: 0 });
+    }
+    this.next = 0;
+    this.count = 0; // 지금 활성 이펙트 수(0이면 update에서 바로 반환)
   }
 
   create(mX, mY, mWidth, judge) {
-    const x = mX + mWidth / 2;
-    const y = mY;
-    const color = this.getColor(judge);
-    const accent = judge === "MAX 100%" ? "#7af4ff" : "#ffffff";
-
-    this.rings.push({
-      x,
-      y,
-      radius: 10,
-      thickness: 22,
-      color,
-      alpha: 1,
-      speed: 10,
-    });
-    this.rings.push({
-      x,
-      y,
-      radius: 18,
-      thickness: 8,
-      color: accent,
-      alpha: 0.9,
-      speed: 14,
-    });
-
+    const e = this.pool[this.next];
+    this.next = (this.next + 1) % FX_POOL_SIZE;
+    if (!e.active) this.count += 1;
+    e.active = true;
+    e.x = mX + mWidth / 2;
+    e.y = mY - FX_CENTER_OFFSET_Y;
+    e.r = mWidth / 2; // 최대 반지름 = 레인 폭의 절반
+    e.color = this.getColor(judge);
+    e.accent = judge === "MAX 100%" ? "#7af4ff" : "#ffffff";
+    e.t0 = performance.now();
+    e.spin = (this.next * 0.37) % (Math.PI / FX_SPARK_COUNT); // 연속으로 터질 때 스파크 각도가 매번 조금씩 달라지게
   }
 
-  // HitEffect 클래스 내부
+  // 판정별 색(테마와 무관하게 고정)
   getColor(judge) {
     if (judge === "MAX 100%") return "#00f0ff"; // 100%: 시안색 (Perfect)
 
@@ -373,42 +389,77 @@ export class HitEffect {
   }
 
   update() {
-    if (this.rings.length === 0) {
-      // [성능] 링이 없으면 save/restore도 생략. 다음 링은 첫 프레임을 1단계로 시작
-      this.lastUpdateAt = null;
-      return;
-    }
-    // [성능] 예전엔 링이 "프레임 수" 기준으로 줄어들어(알파 -0.08/프레임) FPS가 떨어지면
-    // 링이 화면에 더 오래 남아 쌓이고 → 더 느려지는 악순환이 있었음(소프트웨어 렌더링에서
-    // 60fps → 2fps까지 측정). 60fps 기준 1프레임 = 1단계로 경과 시간에 비례해 진행시킨다.
-    // 60fps에선 기존과 같은 모양/속도, 프레임이 낮아도 같은 시간(약 0.2초) 안에 사라짐.
+    if (this.count === 0) return; // 활성 이펙트가 없으면 save/restore도 생략
     const now = performance.now();
-    const step = this.lastUpdateAt
-      ? Math.min(6, Math.max(0.25, (now - this.lastUpdateAt) / (1000 / 60)))
-      : 1;
-    this.lastUpdateAt = now;
-    const thicknessDecay = Math.pow(0.9, step);
     const ctx = this.game.ctx;
     ctx.save();
-
+    // 겹치는 부분이 밝아지는 빛 번짐 느낌. shadowBlur는 소프트웨어 렌더링에서 FPS를 크게 깎아서 쓰지 않음
     ctx.globalCompositeOperation = "lighter";
+    ctx.lineCap = "round";
 
-    for (let i = this.rings.length - 1; i >= 0; i--) {
-      let r = this.rings[i];
-      ctx.globalAlpha = r.alpha;
-      ctx.strokeStyle = r.color;
-      ctx.lineWidth = r.thickness;
-      ctx.shadowBlur = 14;
-      ctx.shadowColor = r.color;
+    for (let i = 0; i < FX_POOL_SIZE; i += 1) {
+      const e = this.pool[i];
+      if (!e.active) continue;
+      // 경과 시간 기준 진행도(프레임 수와 무관 → 저FPS에서도 같은 시간에 끝남)
+      const p = (now - e.t0) / FX_DURATION_MS;
+      if (p >= 1) {
+        e.active = false;
+        this.count -= 1;
+        continue;
+      }
+      const R = e.r;
+      const ease = easeOutCubic(p);
+      const fade = 1 - p;
 
+      // 1) 코어 플래시: 중심이 확 밝아졌다 빠르게 꺼짐
+      const coreAlpha = fade * fade;
+      const coreR = R * (0.35 + 0.35 * ease);
+      ctx.globalAlpha = coreAlpha * 0.4;
+      ctx.fillStyle = e.color;
       ctx.beginPath();
-      ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+      ctx.arc(e.x, e.y, coreR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = coreAlpha * 0.6;
+      ctx.fillStyle = e.accent;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, coreR * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2) 메인 링: 안쪽에서 R까지 퍼지며 점점 얇아짐(바깥 가장자리가 R을 넘지 않게 보정)
+      const mainWidth = Math.max(1, FX_RING_MAX_WIDTH * fade);
+      const mainR = Math.min(R * (0.25 + 0.75 * ease), R - mainWidth / 2);
+      ctx.globalAlpha = fade;
+      ctx.strokeStyle = e.color;
+      ctx.lineWidth = mainWidth;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, Math.max(1, mainR), 0, Math.PI * 2);
       ctx.stroke();
 
-      r.radius += r.speed * step;
-      r.thickness *= thicknessDecay;
-      r.alpha -= 0.08 * step;
-      if (r.alpha <= 0) this.rings.splice(i, 1);
+      // 3) 서브 링: 더 빠르고 밝고 얇게(0.8R까지)
+      const subP = Math.min(1, p * 1.5);
+      const subWidth = Math.max(1, 3 * (1 - subP));
+      ctx.globalAlpha = 1 - subP;
+      ctx.strokeStyle = e.accent;
+      ctx.lineWidth = subWidth;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, R * (0.15 + 0.65 * easeOutCubic(subP)), 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 4) 스파크: 중심에서 바깥으로 날아가는 짧은 선(바깥 끝은 R 이내)
+      ctx.globalAlpha = fade;
+      ctx.strokeStyle = e.accent;
+      ctx.lineWidth = Math.max(1, 2.5 * fade);
+      const inner = R * (0.3 + 0.45 * ease);
+      const outer = Math.min(R, R * (0.5 + 0.5 * ease));
+      ctx.beginPath();
+      for (let k = 0; k < FX_SPARK_COUNT; k += 1) {
+        const a = e.spin + (k * Math.PI * 2) / FX_SPARK_COUNT;
+        const cos = Math.cos(a);
+        const sin = Math.sin(a);
+        ctx.moveTo(e.x + cos * inner, e.y + sin * inner);
+        ctx.lineTo(e.x + cos * outer, e.y + sin * outer);
+      }
+      ctx.stroke();
     }
 
     ctx.restore();
