@@ -472,6 +472,7 @@ export default {
     async playWithId(sheetId) {
       try {
         let song = await getGameSheet(sheetId);
+        if (this.isGone()) return;
         // [대기 화면] 재생 목록에서 시작 위치를 지정한 경우(?from=초)
         if (this.isDemo && Number(this.$route.query.from) > 0) song = { ...song, startAt: Number(this.$route.query.from) };
         const pendingOptions = this.$store.state.pendingGameOptions;
@@ -494,6 +495,11 @@ export default {
         logError("song_load_error_" + sheetId);
       }
     },
+    // [버그수정] 로딩 중에 화면을 떠나면(데모 중 키 입력, 곡 선택으로 이동 등) 이 화면이 파괴된 뒤에도
+    // 로딩/대기 콜백이 늦게 도착해 $refs.zoom(undefined).show 등에서 오류가 났음 → 파괴됐으면 무시
+    isGone() {
+      return this._isDestroyed || this._isBeingDestroyed || !this.instance;
+    },
     handleHover() {
       this.$store.state.audio.playHoverEffect("ui/ta");
     },
@@ -503,6 +509,7 @@ export default {
         LOADING_SCREEN_MIN_MS - (Date.now() - this.loadingScreenSince)
       );
       setTimeout(() => {
+        if (this.isGone()) return;
         this.loadingScreen = false;
         if (callback) callback();
       }, wait);
@@ -533,6 +540,7 @@ export default {
       this.gameEnded(false);
     },
     songLoaded() {
+      if (this.isGone()) return;
       Logger.log("playing");
       this.instance.loading = false;
       this.youtubeBuffering = false;
@@ -563,6 +571,7 @@ export default {
       }
     },
     onAudioLoaded(audioPath) {
+      if (this.isGone()) return;
       Logger.log("audio loaded", audioPath);
       this.instance.loading = false;
       this.youtubeBuffering = false;
@@ -572,6 +581,7 @@ export default {
       }
     },
     handleAudioLoadError(error, audioPath) {
+      if (this.isGone()) return;
       Logger.error("audio load error", audioPath, error);
       this.loadingScreen = false;
       this.instance.loading = false;
@@ -617,11 +627,13 @@ export default {
         this.$refs.zoom.show("Get Ready...");
         // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
         await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
+        if (this.isGone()) return;
         this.instance.startSong();
       } else {
         if (!this.tutorial) this.$refs.zoom.show("Get Ready...");
         // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
         await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
+        if (this.isGone()) return;
         this.instance.startSong();
       }
       if (isDev) return;
@@ -631,6 +643,7 @@ export default {
       );
     },
     async startGameDirect() {
+      if (this.isGone()) return;
       logEvent("start_game", { songId: this.currentSong.songId });
       this.health = 100;
       if (this.isDemo) {
@@ -647,6 +660,7 @@ export default {
       this.$refs.zoom.show("Get Ready...");
       // 스타트 후 4초 쿨타임 뒤에 음악/BGA 시작
       await new Promise((resolve) => setTimeout(resolve, GAME_START_DELAY_MS));
+      if (this.isGone()) return;
       this.instance.startSong();
       if (isDev) return;
       this.playId = await createPlay(
