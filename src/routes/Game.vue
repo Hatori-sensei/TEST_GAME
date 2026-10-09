@@ -1012,8 +1012,11 @@ export default {
   pointer-events: none;
 }
 
+/* [이펙트] 타격 이펙트 전용. 판정선(.gear-overlay z-index 4 안의 흰색 띠)에 가려지지 않도록 그 위에 둠.
+   판정선 위치/크기는 그대로이고 쌓이는 순서만 다름. 클릭은 통과. */
 #effectCanvas {
-  z-index: 2;
+  z-index: 5;
+  pointer-events: none;
 }
 
 #gameCanvas {

@@ -77,7 +77,7 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - 확인: Node 단독 서버 테스트, 실제 Electron 25(Linux, Xvfb) 호스트 + 브라우저 참가 PC로 통합 랭킹/2인 대전/끊김 처리. **Windows exe·실제 여러 PC·방화벽은 미확인**(가이드의 체크리스트).
 - 대기 화면: `src/helpers/attract.js`(IDLE_TO_TITLE_SEC 60 / TITLE_TO_DEMO_SEC 10). 메뉴·배속·결과·게임오버·일시정지 방치 → 타이틀 → SAMPLE PLAY(`/game/<채보>?demo=1`, 오토+No Fail, 기본 곡 끝까지, 아무 키나 클릭 시 타이틀, 결과/기록 없음) → 끝나면 타이틀 → 10초 뒤 다음 곡. 화면이 바뀌면 대기 시간 리셋. 재생 목록은 localCatalog `DEMO_PLAYLIST`({chartId, from?, lengthSec?}, 차례로 반복). 랭킹·대전·플레이 중엔 동작 안 함. 설정 attractMode(기본 켜짐).
 - 샘플 채보 `public/charts/Doit.sample.json`(Doit.json과 별개, BPM 129/첫 박 0.028s 분석값). localCatalog `DEMO_CHARTS`에만 있어 목록엔 안 나옴.
-- 타격 이펙트: `track.js` `HitEffect`(코어 플래시+메인/서브 링+스파크, 최대 지름 = 레인 폭, 풀 재사용, shadowBlur 없음). 롱노트 누르는 동안 `HOLD_FX_INTERVAL_SEC`(0.1초)마다 반복. 크기/시간/개수는 track.js 이펙트 상수(FX_*)에서 조정. 판정별 색은 테마와 무관하게 고정. **실제 모양/동작은 코드 검토만 했고 직접 확인하지 못함(사용자 확인 예정).**
+- 타격 이펙트: `track.js` `HitEffect`(코어 3겹 후광+이중 선 메인 링+서브 링+스파크, 최대 지름 = 레인 폭 x `FX_SCALE`, 풀 재사용, shadowBlur 없음). 판정선(DOM 흰 띠, z-index 4 안)에 가려지지 않게 `#effectCanvas`(Game.vue z-index 5)에 그림. 롱노트 누르는 동안 `HOLD_FX_INTERVAL_SEC`(0.1초)마다 반복. 크기/시간/개수는 track.js FX_* 상수에서 조정. 판정별 색은 테마와 무관하게 고정. **실제 모양/동작은 코드 검토만 했고 직접 확인하지 못함(사용자 확인 예정).**
 - 곡 선택 화면은 keep-alive라 키 리스너는 activated/deactivated에서 붙이고 뗌(예전엔 결과 화면 Enter가 곡 시작으로 새던 버그).
 
 ## 작업 메모

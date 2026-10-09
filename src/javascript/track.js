@@ -335,15 +335,18 @@ export default class DropTrack {
 
 // =================================================================
 // 🚨 타격 이펙트(퐝!) 🚨
-// 최대 지름 = 레인 폭(= 노트 한 줄 폭). 어떤 요소도 반지름 R(레인 폭/2)을 넘지 않는다.
-// 구성: 코어 플래시 + 메인 링 + 서브 링 + 스파크. 롱노트를 누르는 동안엔 HOLD_FX_INTERVAL_SEC마다 반복.
+// 최대 지름 = 레인 폭(= 노트 한 줄 폭) x FX_SCALE. 어떤 요소도 반지름 R을 넘지 않는다.
+// 구성: 코어(흰색 + 3겹 후광) + 메인 링(이중 선) + 서브 링 + 스파크. 롱노트를 누르는 동안엔 HOLD_FX_INTERVAL_SEC마다 반복.
+// 판정선(DOM, 흰색 띠)에 가려지지 않도록 판정선 위에 쌓인 전용 캔버스(effectCanvas)에 그림.
 // 조정은 아래 상수만 바꾸면 됨.
 // =================================================================
-const FX_DURATION_MS = 240; // 이펙트 한 번이 지속되는 시간
-const FX_SPARK_COUNT = 8; // 스파크(방사형 짧은 선) 개수
+const FX_SCALE = 1.0; // 1.0 = 최대 지름이 레인 폭. 더 크게 보고 싶으면 1.2~1.5(레인 밖으로 나감)
+const FX_DURATION_MS = 320; // 이펙트 한 번이 지속되는 시간
+const FX_SPARK_COUNT = 10; // 스파크(방사형 짧은 선) 개수
 const FX_POOL_SIZE = 32; // 동시에 존재할 수 있는 이펙트 수(풀 재사용, 가득 차면 가장 오래된 것부터 덮어씀)
 const FX_CENTER_OFFSET_Y = 9; // 판정선(높이 18px) 중앙. 정타 시 노트 중앙이 여기 옴
-const FX_RING_MAX_WIDTH = 10; // 메인 링 시작 굵기(px)
+const FX_RING_MAX_WIDTH = 16; // 메인 링 시작 굵기(px)
+const FX_HOLD_UNTIL = 0.4; // 진행도가 이 값에 도달할 때까지는 최대 밝기 유지, 이후 사라짐
 const HOLD_FX_INTERVAL_SEC = 0.1; // 롱노트 누르는 동안 이펙트 반복 간격(노트 틱 간격과 동일)
 
 const easeOutCubic = (p) => 1 - Math.pow(1 - p, 3);
@@ -367,7 +370,7 @@ export class HitEffect {
     e.active = true;
     e.x = mX + mWidth / 2;
     e.y = mY - FX_CENTER_OFFSET_Y;
-    e.r = mWidth / 2; // 최대 반지름 = 레인 폭의 절반
+    e.r = (mWidth / 2) * FX_SCALE; // 최대 반지름 = 레인 폭의 절반
     e.color = this.getColor(judge);
     e.accent = judge === "MAX 100%" ? "#7af4ff" : "#ffffff";
     e.t0 = performance.now();
@@ -390,8 +393,9 @@ export class HitEffect {
 
   update() {
     if (this.count === 0) return; // 활성 이펙트가 없으면 save/restore도 생략
+    // 판정선(DOM) 위에 쌓인 전용 캔버스. 없으면(에디터 등) 메인 캔버스로
+    const ctx = this.game.effectCtx || this.game.ctx;
     const now = performance.now();
-    const ctx = this.game.ctx;
     ctx.save();
     // 겹치는 부분이 밝아지는 빛 번짐 느낌. shadowBlur는 소프트웨어 렌더링에서 FPS를 크게 깎아서 쓰지 않음
     ctx.globalCompositeOperation = "lighter";
@@ -409,48 +413,58 @@ export class HitEffect {
       }
       const R = e.r;
       const ease = easeOutCubic(p);
-      const fade = 1 - p;
+      // 앞부분은 최대 밝기를 유지하다가 뒤에서 사라짐(눈에 오래 남도록)
+      const tail = Math.max(0, (p - FX_HOLD_UNTIL) / (1 - FX_HOLD_UNTIL));
+      const bright = 1 - tail * tail;
+      const shrink = Math.pow(1 - p, 0.6); // 굵기는 완만하게 줄어듦
 
-      // 1) 코어 플래시: 중심이 확 밝아졌다 빠르게 꺼짐
-      const coreAlpha = fade * fade;
-      const coreR = R * (0.35 + 0.35 * ease);
-      ctx.globalAlpha = coreAlpha * 0.4;
+      // 1) 코어: 판정 색 후광 3겹 + 흰색 중심(shadowBlur 없이 빛 번짐 표현)
+      const coreGrow = 0.75 + 0.25 * ease;
       ctx.fillStyle = e.color;
+      ctx.globalAlpha = bright * 0.25;
       ctx.beginPath();
-      ctx.arc(e.x, e.y, coreR, 0, Math.PI * 2);
+      ctx.arc(e.x, e.y, R * 0.9 * coreGrow, 0, Math.PI * 2);
       ctx.fill();
-      ctx.globalAlpha = coreAlpha * 0.6;
-      ctx.fillStyle = e.accent;
+      ctx.globalAlpha = bright * 0.5;
       ctx.beginPath();
-      ctx.arc(e.x, e.y, coreR * 0.6, 0, Math.PI * 2);
+      ctx.arc(e.x, e.y, R * 0.6 * coreGrow, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = e.accent;
+      ctx.globalAlpha = bright * 0.9 * (1 - p);
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, R * 0.35 * coreGrow, 0, Math.PI * 2);
       ctx.fill();
 
-      // 2) 메인 링: 안쪽에서 R까지 퍼지며 점점 얇아짐(바깥 가장자리가 R을 넘지 않게 보정)
-      const mainWidth = Math.max(1, FX_RING_MAX_WIDTH * fade);
-      const mainR = Math.min(R * (0.25 + 0.75 * ease), R - mainWidth / 2);
-      ctx.globalAlpha = fade;
+      // 2) 메인 링(이중 선): 넓고 옅은 바깥 선 + 좁고 밝은 안쪽 선. 바깥 가장자리가 R을 넘지 않게 보정
+      const mainWidth = Math.max(2, FX_RING_MAX_WIDTH * shrink);
+      const mainR = Math.max(1, Math.min(R * (0.25 + 0.75 * ease), R - mainWidth / 2));
       ctx.strokeStyle = e.color;
+      ctx.globalAlpha = bright * 0.45;
       ctx.lineWidth = mainWidth;
       ctx.beginPath();
-      ctx.arc(e.x, e.y, Math.max(1, mainR), 0, Math.PI * 2);
+      ctx.arc(e.x, e.y, mainR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = bright;
+      ctx.lineWidth = Math.max(1.5, mainWidth * 0.45);
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, mainR, 0, Math.PI * 2);
       ctx.stroke();
 
-      // 3) 서브 링: 더 빠르고 밝고 얇게(0.8R까지)
+      // 3) 서브 링: 더 빠르고 밝게(0.8R까지)
       const subP = Math.min(1, p * 1.5);
-      const subWidth = Math.max(1, 3 * (1 - subP));
-      ctx.globalAlpha = 1 - subP;
       ctx.strokeStyle = e.accent;
-      ctx.lineWidth = subWidth;
+      ctx.globalAlpha = 1 - subP * subP;
+      ctx.lineWidth = Math.max(1.5, 5 * (1 - subP));
       ctx.beginPath();
       ctx.arc(e.x, e.y, R * (0.15 + 0.65 * easeOutCubic(subP)), 0, Math.PI * 2);
       ctx.stroke();
 
-      // 4) 스파크: 중심에서 바깥으로 날아가는 짧은 선(바깥 끝은 R 이내)
-      ctx.globalAlpha = fade;
+      // 4) 스파크: 중심에서 바깥으로 날아가는 굵은 선(바깥 끝은 R 이내)
       ctx.strokeStyle = e.accent;
-      ctx.lineWidth = Math.max(1, 2.5 * fade);
-      const inner = R * (0.3 + 0.45 * ease);
-      const outer = Math.min(R, R * (0.5 + 0.5 * ease));
+      ctx.globalAlpha = bright;
+      ctx.lineWidth = Math.max(1.5, 4 * shrink);
+      const inner = R * (0.3 + 0.4 * ease);
+      const outer = Math.min(R, R * (0.55 + 0.45 * ease));
       ctx.beginPath();
       for (let k = 0; k < FX_SPARK_COUNT; k += 1) {
         const a = e.spin + (k * Math.PI * 2) / FX_SPARK_COUNT;
