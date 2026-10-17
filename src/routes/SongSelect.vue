@@ -8,12 +8,20 @@
       <div class="top-title">
         <span class="slashes">///</span>
         <span>MUSIC SELECT</span>
+        <!-- [모드] 진행 중인 모드/스테이지 -->
+        <span class="mode-badge" v-if="session">{{ modeBadge }}</span>
       </div>
       <div class="top-hint">
         <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> SELECT</span>
-        <span><kbd>ENTER</kbd> START</span>
-        <span><kbd>R</kbd> RANKING</span>
-        <span><kbd>V</kbd> VS</span>
+        <template v-if="isArcadePick">
+          <span><kbd>ENTER</kbd> {{ arcadePicks.length >= 3 ? "START" : "ADD" }}</span>
+          <span><kbd>BACKSPACE</kbd> REMOVE</span>
+        </template>
+        <span v-else><kbd>ENTER</kbd> START</span>
+        <template v-if="!session">
+          <span><kbd>R</kbd> RANKING</span>
+          <span><kbd>V</kbd> VS</span>
+        </template>
         <span><kbd>ESC</kbd> OPTIONS</span>
       </div>
     </header>
@@ -45,7 +53,19 @@
               </div>
             </div>
 
-            <div class="play-panel" v-if="sheetList && sheetList.length > 0">
+            <!-- [모드] Arcade: 3곡을 순서대로 담고 START (같은 곡 중복 불가) -->
+            <div class="arcade-pick" v-if="isArcadePick">
+              <div class="arcade-slot" v-for="i in 3" :key="i" :class="{ filled: arcadePicks[i - 1] }">
+                <span class="slot-no">STAGE {{ i }}</span>
+                <span class="slot-title">{{ arcadePicks[i - 1] ? arcadePicks[i - 1].title : "—" }}</span>
+                <span class="slot-lv" v-if="arcadePicks[i - 1]">LV {{ arcadePicks[i - 1].level }}</span>
+              </div>
+              <button class="play-action" @click="addCurrentPick">
+                <span class="play-go">{{ arcadePickLabel }}<i class="chev"></i></span>
+              </button>
+              <div class="arcade-msg" v-if="arcadeMsg">{{ arcadeMsg }}</div>
+            </div>
+            <div class="play-panel" v-else-if="sheetList && sheetList.length > 0">
               <button class="play-action" @click="playGame(sheetList[0].id)">
                 <span class="play-mode">{{ String(sheetList[0].keys).replace(/\D/g, '') }}B</span>
                 <span class="play-lv"><small>LV</small>{{ sheetList[0].difficulty }}</span>
@@ -88,6 +108,7 @@
             @mouseenter="hoverSong(index)"
           >
             <span class="song-index">{{ String(index + 1).padStart(2, '0') }}</span>
+            <span class="pick-no" v-if="isArcadePick && pickNo(song) > 0">{{ pickNo(song) }}</span>
             <div class="song-item-content">
               <span class="song-name">{{ song.title }}</span>
               <span class="song-subtitle">{{ song.subtitle || song.artist || 'Unknown' }}</span>
@@ -288,6 +309,21 @@
             </div>
           </div>
 
+          <!-- [외부 곡 폴더] DJON-data 불러오기 결과. 코드가 PC마다 같아야 곡 목록·채보가 같음 -->
+          <div class="quick-settings-section">
+            <h3>곡 폴더 (DJON-data)</h3>
+            <div class="calib-msg">
+              <template v-if="catalogStatus.loaded">외부 곡 {{ catalogStatus.external }}개<span v-if="catalogStatus.hidden"> (히든 {{ catalogStatus.hidden }}개)</span></template>
+              <template v-else>곡 폴더 없음 · 내장 곡만 사용</template>
+              · 곡 목록 코드 <strong class="lan-ip">{{ catalogStatus.hash || "-" }}</strong>
+            </div>
+            <div class="calib-msg catalog-error" v-if="catalogStatus.error">{{ catalogStatus.error }}</div>
+            <div class="calib-msg catalog-error" v-for="m in catalogStatus.missing" :key="m.id + m.path">
+              파일 없음{{ m.required ? "" : "(선택)" }}: {{ m.path }} ({{ m.id }})
+            </div>
+            <div class="calib-msg catalog-error" v-for="(w, i) in catalogStatus.warnings" :key="'w' + i">{{ w }}</div>
+          </div>
+
           <!-- [LAN] 여러 PC 연결: 통합 랭킹 / 대전. 기본 = 사용 안 함 -->
           <div class="quick-settings-section">
             <h3>LAN (여러 PC 연결)</h3>
@@ -350,7 +386,8 @@ import Checkbox from "../components/ui/Checkbox.vue";
 import VueSlider from "vue-slider-component";
 import { getSheetList, getSongListCached, updateUserProfile } from "../javascript/db";
 import { logEvent } from "../helpers/analytics";
-import { resolveSongPreviewRange } from "../javascript/localCatalog";
+import { resolveSongPreviewRange, catalogStatus, getChartForSong } from "../javascript/localCatalog";
+import { MODES, MODE_LABELS, currentStageNo, isSessionDone, nextRoute, setArcadeQueue } from "../helpers/session";
 import { saveSettings, loadSettings, DEFAULT_SETTINGS } from "../helpers/settings";
 import { THEMES, applyTheme } from "../helpers/theme";
 import { loadRecords, topBySheet } from "../helpers/records";
@@ -407,6 +444,10 @@ export default {
         theme: DEFAULT_SETTINGS.theme, // [테마]
       },
       themeList: THEMES,
+      catalogStatus, // [외부 곡 폴더] 불러오기 결과(설정 화면 표시용)
+      arcadePicks: [], // [모드] Arcade에서 담은 곡 [{ sheetId, songId, title, level }]
+      pickSessionId: "", // 담은 곡이 어느 세션 것인지(새 크레딧이면 비움)
+      arcadeMsg: "",
       // [LAN] 설정 화면 상태
       quickLan: { role: "off", host: "", pcName: "" },
       lan: { available: isLanAvailable(), busy: false, found: [], ips: [], message: "" },
@@ -422,6 +463,22 @@ export default {
     };
   },
   computed: {
+    // [모드] 진행 중인 세션(없으면 null)
+    session() {
+      return this.$store.state.session;
+    },
+    isArcadePick() {
+      return !!this.session && this.session.mode === MODES.arcade && !this.session.queue.length;
+    },
+    modeBadge() {
+      if (!this.session) return "";
+      const label = MODE_LABELS[this.session.mode] || "";
+      if (this.isArcadePick) return `${label} · 곡 고르기 ${this.arcadePicks.length}/3`;
+      return `${label} · STAGE ${currentStageNo()}/3`;
+    },
+    arcadePickLabel() {
+      return this.arcadePicks.length >= 3 ? "START" : `STAGE ${this.arcadePicks.length + 1} 담기`;
+    },
     jacketStyle() {
       const r = this.artRatio > 0 ? this.artRatio : 1;
       return { width: `min(100%, calc(44vh * ${r}))`, aspectRatio: String(r) };
@@ -484,6 +541,25 @@ export default {
   // 결과 화면의 Enter → 곡 시작(speed-setup 이동), 게임 중 ESC → 숨은 설정창 토글 등이 발생했음.
   // → 화면이 보일 때(activated)만 리스너를 걸고, 떠날 때(deactivated) 제거.
   activated() {
+    // [모드] 모드를 고르지 않고 들어오면 모드 선택으로, 이미 3곡을 다 쳤으면 다음 화면으로
+    const session = this.$store.state.session;
+    if (!session) {
+      this.$router.replace("/mode");
+      return;
+    }
+    if (isSessionDone() || (session.mode === MODES.arcade && session.queue.length)) {
+      this.$router.replace(nextRoute());
+      return;
+    }
+    if (session.mode === MODES.vs) {
+      this.$router.replace("/vs");
+      return;
+    }
+    if (this.pickSessionId !== session.id) {
+      this.pickSessionId = session.id;
+      this.arcadePicks = [];
+      this.arcadeMsg = "";
+    }
     this.records = loadRecords(); // [축제 랭킹] 결과 화면에서 등록한 기록 반영
     window.removeEventListener('keydown', this.handleKeydown);
     window.addEventListener('keydown', this.handleKeydown);
@@ -878,9 +954,17 @@ export default {
         this.$store.state.audio.playHoverEffect("ui/ta");
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (this.sheetList && this.sheetList.length > 0) {
+        if (this.isArcadePick) {
+          this.addCurrentPick();
+        } else if (this.sheetList && this.sheetList.length > 0) {
           this.playGame(this.sheetList[0].id);
         }
+      } else if (e.key === 'Backspace' && this.isArcadePick) {
+        e.preventDefault();
+        this.removeLastPick();
+      } else if (this.session) {
+        // [모드] 진행 중엔 랭킹(R)/대전(V) 이동 막음
+        return;
       } else if ((e.key === 'v' || e.key === 'V') && !e.repeat) {
         // [LAN 대전] 대전 로비로
         e.preventDefault();
@@ -901,6 +985,44 @@ export default {
           activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
         }
       });
+    },
+    // [모드] 담은 순서(1~3). 없으면 0
+    pickNo(song) {
+      return this.arcadePicks.findIndex((p) => p.songId === song.id) + 1;
+    },
+    addCurrentPick() {
+      if (this.arcadePicks.length >= 3) {
+        this.startArcade();
+        return;
+      }
+      const song = this.selectedSong;
+      const chart = (this.sheetList && this.sheetList[0]) || (song && getChartForSong(song.id));
+      if (!song || !chart) return;
+      if (this.arcadePicks.some((p) => p.sheetId === chart.id)) {
+        this.arcadeMsg = "이미 담은 곡이에요. 다른 곡을 골라 주세요";
+        this.$store.state.audio.playEffect("error");
+        return;
+      }
+      this.arcadePicks.push({ sheetId: chart.id, songId: song.id, title: song.title, level: chart.difficulty });
+      this.arcadeMsg = this.arcadePicks.length >= 3 ? "ENTER를 누르면 시작해요 (BACKSPACE로 빼기)" : "";
+      this.$store.state.audio.playEffect("ui/slide2");
+    },
+    removeLastPick() {
+      if (!this.arcadePicks.length) return;
+      this.arcadePicks.pop();
+      this.arcadeMsg = "";
+      this.$store.state.audio.playHoverEffect("ui/ta");
+    },
+    startArcade() {
+      if (this.arcadePicks.length < 3) return;
+      setArcadeQueue(this.arcadePicks.map((p) => p.sheetId));
+      this.$store.commit('setPendingGameOptions', {
+        randomGimmickMode: this.normalizeRandomGimmickMode(
+          this.quickGameSt.randomGimmickMode || this.$store.state.randomGimmickMode
+        ),
+      });
+      this.$store.state.audio.playEffect("ui/slide2");
+      this.$router.push(nextRoute());
     },
     playGame(sheetId) {
       // Route to speed setup step before actual game start
@@ -1606,6 +1728,69 @@ export default {
   flex-wrap: wrap;
   gap: 8px;
   margin: -4px 0 10px 176px;
+}
+/* [모드] 모드 배지 / Arcade 곡 담기 (색은 변수만) */
+.mode-badge {
+  margin-left: 18px;
+  padding: 2px 14px;
+  font-size: 18px;
+  letter-spacing: 0.14em;
+  color: var(--dm-bg);
+  background: var(--dm-cyan);
+}
+.arcade-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 560px;
+}
+.arcade-slot {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 8px 16px;
+  background: var(--dm-panel);
+  border-left: 4px solid var(--dm-cyan-dim);
+  font-family: var(--dm-font-display);
+}
+.arcade-slot.filled {
+  border-left-color: var(--dm-cyan);
+}
+.slot-no {
+  width: 80px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  color: var(--dm-muted);
+}
+.slot-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 24px;
+}
+.slot-lv {
+  font-weight: 700;
+  color: var(--dm-amber);
+}
+.arcade-msg {
+  font-size: 15px;
+  color: var(--dm-amber);
+}
+.pick-no {
+  flex: 0 0 auto;
+  padding: 0 9px;
+  font-family: var(--dm-font-display);
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--dm-bg);
+  background: var(--dm-cyan);
+}
+.catalog-error {
+  color: var(--dm-red);
 }
 .lan-ip {
   color: var(--dm-cyan);

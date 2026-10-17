@@ -11,6 +11,8 @@ import { auth, remoteConfig } from "./helpers/firebaseConfig";
 import Icon from "vue-awesome/components/Icon";
 import { logEvent, logError } from "./helpers/analytics";
 import { getLanConfig, applyLanRole } from "./helpers/lan";
+import { loadCatalog } from "./javascript/localCatalog";
+import { refreshCatalogData } from "./javascript/db";
 
 import "animate.css";
 
@@ -54,45 +56,55 @@ if (getLanConfig().role === "host") {
   applyLanRole().then((r) => r && !r.ok && Logger.warn("LAN host start failed", r.error));
 }
 
-new Vue({
-  router,
-  store,
-  created() {
-    auth.onAuthStateChanged(async (user) => {
-      if (this.$store.state.redirecting) {
-        Logger.warn("User state change discarded", user);
-        return;
-      }
-      Logger.log("User state changed", user);
-      await this.$store.commit("setCurrentUser", user);
-      if (!user && !this.$store.state.redirecting) {
-        Logger.warn("User not logged in, creating anonymous profile...");
-        auth.signInAnonymously().catch((error) => {
-          Logger.error(error.message);
-        });
-        logEvent("anonymous_signin");
-      }
-      // log jwt, dev purpose only
-      if (isDev) {
-        user.getIdToken().then((jwt) => {
-          Logger.log("JWT", jwt);
-        });
-      }
-    });
-    remoteConfig
-      .fetchAndActivate()
-      .then(() => {
-        const config =
-          typeof remoteConfig?.getAll === "function" ? remoteConfig.getAll() : {};
-        this.$store.commit("setRemoteConfig", config);
-        Logger.log("got config", config);
-      })
-      .catch((err) => {
-        Logger.error(err);
+function startApp() {
+  new Vue({
+    router,
+    store,
+    created() {
+      auth.onAuthStateChanged(async (user) => {
+        if (this.$store.state.redirecting) {
+          Logger.warn("User state change discarded", user);
+          return;
+        }
+        Logger.log("User state changed", user);
+        await this.$store.commit("setCurrentUser", user);
+        if (!user && !this.$store.state.redirecting) {
+          Logger.warn("User not logged in, creating anonymous profile...");
+          auth.signInAnonymously().catch((error) => {
+            Logger.error(error.message);
+          });
+          logEvent("anonymous_signin");
+        }
+        // log jwt, dev purpose only
+        if (isDev) {
+          user.getIdToken().then((jwt) => {
+            Logger.log("JWT", jwt);
+          });
+        }
       });
-  },
-  render: (h) => h(App),
-}).$mount("#app");
+      remoteConfig
+        .fetchAndActivate()
+        .then(() => {
+          const config =
+            typeof remoteConfig?.getAll === "function" ? remoteConfig.getAll() : {};
+          this.$store.commit("setRemoteConfig", config);
+          Logger.log("got config", config);
+        })
+        .catch((err) => {
+          Logger.error(err);
+        });
+    },
+    render: (h) => h(App),
+  }).$mount("#app");
+}
+
+// [외부 곡 폴더] DJON-data/catalog.json을 먼저 읽고 앱을 띄운다. 실패해도 내장 곡 목록으로 시작한다.
+loadCatalog()
+  .catch((error) => console.error("[catalog]", error))
+  .finally(() => {
+    refreshCatalogData();
+    startApp();
+  });
 
 console.log(
   "%cThank you for playing Rhythm Plus! This game is still under active development, if you have spotted a bug or have feedback, please don't hesitate to submit an issue on GitHub linked below. This is a free open source project, a star is always appreciated, thank you for your support :) https://github.com/henryz00/Rhythm-Plus-Music-Game",

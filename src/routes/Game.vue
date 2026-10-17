@@ -36,6 +36,9 @@
 
     <ZoomText class="zoom" ref="zoom"></ZoomText>
 
+    <!-- [풀콤보] 곡 끝 풀콤보 연출(테마별 색, 효과음 없음) -->
+    <FullComboBanner ref="fullCombo"></FullComboBanner>
+
     <transition name="modal-fade">
       <Tutorial
         v-if="tutorial"
@@ -213,13 +216,14 @@
               <v-icon name="play" />
               <span>Resume</span>
             </div>
-            <div class="btn-action btn-dark" @click="restartGame">
+            <!-- [모드] 크레딧(3곡) 진행 중엔 다시 하기 없음, 나가기 = 지금 점수로 이 곡 마감 -->
+            <div class="btn-action btn-dark" @click="restartGame" v-if="!$store.state.session">
               <v-icon name="redo" />
               <span>Restart</span>
             </div>
             <div class="btn-action btn-dark" @click="exitGame">
               <v-icon name="sign-out-alt" />
-              <span>Exit Game</span>
+              <span>{{ $store.state.session ? "End Song" : "Exit Game" }}</span>
             </div>
           </div>
 
@@ -275,12 +279,17 @@ import SheetDetailLine from "../components/menus/SheetDetailLine.vue";
 import ProgressBar from "../components/game/ProgressBar.vue";
 import Countdown from "../components/game/Countdown.vue";
 import MarkComboJudge from "../components/game/MarkComboJudge.vue";
+import FullComboBanner from "../components/game/FullComboBanner.vue";
 import Tutorial from "../components/game/Tutorial.vue";
 import ScorePanel from "../components/game/ScorePanel.vue";
 import HealthBar from "../components/game/HealthBar.vue";
 import VsHud from "../components/game/VsHud.vue";
 import { vsLoaded, vsFinish, waitForStartAt } from "../helpers/vs";
 import { setGameIdleCheck } from "../helpers/attract";
+import { MODES, recordStage, nextRoute } from "../helpers/session";
+import { addRecord } from "../helpers/records";
+import { evaluateMissions } from "../helpers/missions";
+import { postSharedRecord, getLanConfig } from "../helpers/lan";
 import GameMixin from "../mixins/gameMixin";
 import { Youtube } from "vue-youtube";
 import {
@@ -317,6 +326,7 @@ export default {
     Countdown,
     SheetDetailLine,
     MarkComboJudge,
+    FullComboBanner,
     Tutorial,
     ScorePanel,
     HealthBar,
@@ -794,10 +804,81 @@ export default {
       this.instance.startSong();
     },
     exitGame(e, reason) {
+      // [모드] Free Play/Arcade 진행 중: 나가기 = 지금 점수로 이 곡을 마감(게임오버와 같은 처리)
+      const session = this.$store.state.session;
+      if (session && reason === undefined && (session.mode === MODES.free || session.mode === MODES.arcade)) {
+        if (this.started && !this.isGameEnded) {
+          this.hideMenu();
+          this.fadeOutMusic();
+          this.gameEnded(true);
+          return;
+        }
+        if (!this.isGameEnded && session.mode === MODES.arcade) {
+          // 곡을 못 불러온 경우 등: 0점(실패)으로 마감하고 다음 곡으로
+          this.isGameEnded = true;
+          this.recordSessionStage(true);
+          this.hideMenu();
+          this.$router.push(nextRoute());
+          return;
+        }
+      }
       this.reportExit(reason ?? "exited");
       this.playId = null;
       this.hideMenu();
       this.$router.push("/menu");
+    },
+    // [모드] 끝난 곡을 세션에 기록. Arcade는 곡 기록을 랭킹(곡별 TOP10/미션)에 자동 등록
+    // (오토플레이는 등록 안 함). 데모/튜토리얼/세션 없음/모드에 안 맞는 플레이는 무시.
+    recordSessionStage(failed, resultId = "") {
+      const session = this.$store.state.session;
+      if (!session || this.isDemo || this.tutorial || !this.currentSong) return null;
+      if (session.mode === MODES.vs ? !this.vs : !!this.vs) return null;
+      // 게임 화면 1번 = 곡 1개(모드 중엔 Restart 없음). 같은 화면에서 두 번 기록되지 않게
+      // (오프라인 createPlay()는 항상 같은 playId를 돌려줘서 playId로는 구분 못 함)
+      if (this.stageRecorded) return null;
+      this.stageRecorded = true;
+      const r = this.result || {};
+      const sheetId = this.currentSong.sheetId;
+      const autoPlay = !!(this.instance && this.instance.autoPlay);
+      const accuracy = Math.floor(Number(r.accuracy || 0) * 100) / 100; // 결과 화면과 같은 값
+      const isFullCombo = !failed && !!r.marks && r.marks.miss === 0;
+      const missions = failed
+        ? []
+        : evaluateMissions(sheetId, { ...r, percentage: accuracy, autoPlay })
+            .filter((m) => m.achieved)
+            .map((m) => m.id);
+      const hidden =
+        session.mode === MODES.arcade && !!session.hiddenRuleId && session.stages.length === 2 && session.queue[2] === sheetId;
+      const stage = recordStage({
+        playId: `${sheetId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        sheetId,
+        score: r.score,
+        accuracy,
+        maxCombo: r.maxCombo,
+        isFullCombo,
+        failed: !!failed,
+        missions,
+        hidden,
+        autoPlay,
+        resultId,
+      });
+      if (stage && session.mode === MODES.arcade && session.player && !autoPlay) {
+        const entry = addRecord({
+          kind: "song",
+          name: session.player.name,
+          group: session.player.group,
+          sheetId,
+          title: stage.title,
+          score: stage.score,
+          accuracy,
+          maxCombo: stage.maxCombo,
+          isFullCombo,
+          missions,
+          pc: getLanConfig().pcName,
+        });
+        if (entry) postSharedRecord(entry); // LAN 통합 랭킹(미사용이면 아무것도 안 함)
+      }
+      return stage;
     },
     updatePlay(data) {
       if (!this.playId) return;
@@ -827,6 +908,7 @@ export default {
       }
       let achievementPromise = Promise.resolve();
       if (isGameOver === true) {
+        this.recordSessionStage(true); // [모드] 게임오버도 그 시점 점수로 곡 마감
         this.$router.push("/game-over/" + this.currentSong.sheetId);
         this.reportExit("failed");
         logEvent("game_failed");
@@ -838,9 +920,8 @@ export default {
       }
       if (this.result.marks.miss == 0) {
         this.showingAchievement = true;
-        this.$refs.zoom.show("Full Combo");
-        this.$confetti.start();
-        this.$store.state.audio.playEffect("wow");
+        // [풀콤보] 예전 "Full Combo" 확대 글자 + 꽃가루 + wow 효과음 → 테마별 배너 연출만(소리 없음)
+        if (this.$refs.fullCombo) this.$refs.fullCombo.play();
         achievementPromise = new Promise((resolve) => {
           setTimeout(() => {
             this.showingAchievement = false;
@@ -871,11 +952,12 @@ export default {
             isFullCombo: r.marks.miss === 0,
             breaks: r.marks.miss,
           });
+          this.recordSessionStage(false, res.data.resultId); // [모드] VS 판 수
           this.$router.push({ path: "/vs", query: { result: res.data.resultId } });
         } else {
+          this.recordSessionStage(false, res.data.resultId);
           this.$router.push("/result/" + res.data.resultId);
         }
-        this.$confetti.stop();
         this.updatePlay({ status: "finished", resultId: res.data.resultId });
         logEvent("result_uploaded", {
           resultId: res.data.resultId,

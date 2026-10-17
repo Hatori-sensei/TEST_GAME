@@ -11,7 +11,8 @@ export const IDLE_TO_TITLE_SEC = 60; // 메뉴/결과 화면 방치 → 타이�
 export const TITLE_TO_DEMO_SEC = 10; // 타이틀 방치 → SAMPLE PLAY
 // SAMPLE PLAY 곡 순서/길이는 localCatalog.js의 DEMO_PLAYLIST에서 설정(기본: 곡 처음부터 끝까지)
 
-const RETURN_PREFIXES = ["/menu", "/speed-setup", "/result", "/game-over"];
+// [모드] 모드 선택/Arcade 이름 입력/최종 결과도 방치되면 타이틀로(타이틀이 세션을 지움)
+const RETURN_PREFIXES = ["/menu", "/speed-setup", "/result", "/game-over", "/mode", "/arcade-entry", "/final"];
 const INPUT_EVENTS = ["keydown", "mousedown", "mousemove", "wheel", "touchstart"];
 
 let lastInput = Date.now();

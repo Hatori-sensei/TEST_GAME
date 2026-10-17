@@ -24,11 +24,17 @@
 </template>
 
 <script>
+import { clearSession } from "../helpers/session";
+
 export default {
   name: "Home",
+  mounted() {
+    // [모드] 타이틀로 돌아오면(대기 화면 포함) 진행 중이던 크레딧을 끝냄
+    clearSession();
+  },
   methods: {
     goToGame() {
-      this.$router.push("/menu");
+      this.$router.push("/mode");
     },
   },
 };

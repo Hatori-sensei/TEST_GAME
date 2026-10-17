@@ -351,6 +351,14 @@ const HOLD_FX_INTERVAL_SEC = 0.1; // 롱노트 누르는 동안 이펙트 반복
 
 const easeOutCubic = (p) => 1 - Math.pow(1 - p, 3);
 
+// [테마] 테마에 hitFx가 없을 때 쓰는 판정별 색(= 테마 1, 변경 전 고정값)
+const DEFAULT_HIT_FX = {
+  max: { color: "#00f0ff", accent: "#7af4ff" },
+  high: { color: "#55ff00", accent: "#ffffff" },
+  mid: { color: "#ffff00", accent: "#ffffff" },
+  low: { color: "#ff003c", accent: "#ffffff" },
+};
+
 export class HitEffect {
   constructor(vm, game) {
     this.game = game;
@@ -371,24 +379,38 @@ export class HitEffect {
     e.x = mX + mWidth / 2;
     e.y = mY - FX_CENTER_OFFSET_Y;
     e.r = (mWidth / 2) * FX_SCALE; // 최대 반지름 = 레인 폭의 절반
-    e.color = this.getColor(judge);
-    e.accent = judge === "MAX 100%" ? "#7af4ff" : "#ffffff";
+    const c = this.getColors(judge);
+    e.color = c.color;
+    e.accent = c.accent;
     e.t0 = performance.now();
     e.spin = (this.next * 0.37) % (Math.PI / FX_SPARK_COUNT); // 연속으로 터질 때 스파크 각도가 매번 조금씩 달라지게
   }
 
-  // 판정별 색(테마와 무관하게 고정)
-  getColor(judge) {
-    if (judge === "MAX 100%") return "#00f0ff"; // 100%: 시안색 (Perfect)
-
+  // [테마] 판정별 색: 현재 테마의 hitFx(테마 1 = 변경 전 고정값과 동일)
+  getColors(judge) {
+    const fx = (this.game.theme && this.game.theme.hitFx) || DEFAULT_HIT_FX;
+    if (judge === "MAX 100%") return fx.max; // 100%
     if (judge.startsWith("MAX")) {
       const percent = parseInt(judge.replace(/[^0-9]/g, ""));
-      if (percent >= 80) return "#55ff00"; // 90%, 80%: 초록색
-      if (percent >= 50) return "#ffff00"; // 70%, 60%, 50%: 노란색
-      return "#ff003c"; // 40% 이하 (40~1): 빨간색
+      if (percent >= 80) return fx.high; // 90%, 80%
+      if (percent >= 50) return fx.mid; // 70%, 60%, 50%
+      return fx.low; // 40% 이하 (40~1)
     }
+    return fx.low;
+  }
 
-    return "#ff003c";
+  // [테마] 원(기본) 또는 마름모(테마 3) 경로. 둘 다 반지름 r 안에 들어감
+  _shape(ctx, x, y, r, diamond) {
+    ctx.beginPath();
+    if (diamond) {
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r, y);
+      ctx.lineTo(x, y + r);
+      ctx.lineTo(x - r, y);
+      ctx.closePath();
+    } else {
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+    }
   }
 
   update() {
@@ -396,6 +418,7 @@ export class HitEffect {
     // 판정선(DOM) 위에 쌓인 전용 캔버스. 없으면(에디터 등) 메인 캔버스로
     const ctx = this.game.effectCtx || this.game.ctx;
     const now = performance.now();
+    const diamond = !!(this.game.theme && this.game.theme.hitFx && this.game.theme.hitFx.shape === "diamond");
     ctx.save();
     // 겹치는 부분이 밝아지는 빛 번짐 느낌. shadowBlur는 소프트웨어 렌더링에서 FPS를 크게 깎아서 쓰지 않음
     ctx.globalCompositeOperation = "lighter";
@@ -422,17 +445,14 @@ export class HitEffect {
       const coreGrow = 0.75 + 0.25 * ease;
       ctx.fillStyle = e.color;
       ctx.globalAlpha = bright * 0.25;
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, R * 0.9 * coreGrow, 0, Math.PI * 2);
+      this._shape(ctx, e.x, e.y, R * 0.9 * coreGrow, diamond);
       ctx.fill();
       ctx.globalAlpha = bright * 0.5;
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, R * 0.6 * coreGrow, 0, Math.PI * 2);
+      this._shape(ctx, e.x, e.y, R * 0.6 * coreGrow, diamond);
       ctx.fill();
       ctx.fillStyle = e.accent;
       ctx.globalAlpha = bright * 0.9 * (1 - p);
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, R * 0.35 * coreGrow, 0, Math.PI * 2);
+      this._shape(ctx, e.x, e.y, R * 0.35 * coreGrow, diamond);
       ctx.fill();
 
       // 2) 메인 링(이중 선): 넓고 옅은 바깥 선 + 좁고 밝은 안쪽 선. 바깥 가장자리가 R을 넘지 않게 보정
@@ -441,13 +461,11 @@ export class HitEffect {
       ctx.strokeStyle = e.color;
       ctx.globalAlpha = bright * 0.45;
       ctx.lineWidth = mainWidth;
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, mainR, 0, Math.PI * 2);
+      this._shape(ctx, e.x, e.y, mainR, diamond);
       ctx.stroke();
       ctx.globalAlpha = bright;
       ctx.lineWidth = Math.max(1.5, mainWidth * 0.45);
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, mainR, 0, Math.PI * 2);
+      this._shape(ctx, e.x, e.y, mainR, diamond);
       ctx.stroke();
 
       // 3) 서브 링: 더 빠르고 밝게(0.8R까지)
@@ -455,8 +473,7 @@ export class HitEffect {
       ctx.strokeStyle = e.accent;
       ctx.globalAlpha = 1 - subP * subP;
       ctx.lineWidth = Math.max(1.5, 5 * (1 - subP));
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, R * (0.15 + 0.65 * easeOutCubic(subP)), 0, Math.PI * 2);
+      this._shape(ctx, e.x, e.y, R * (0.15 + 0.65 * easeOutCubic(subP)), diamond);
       ctx.stroke();
 
       // 4) 스파크: 중심에서 바깥으로 날아가는 굵은 선(바깥 끝은 R 이내)

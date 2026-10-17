@@ -28,7 +28,53 @@ const MEDIA_DIR = app.isPackaged
   : path.join(app.getAppPath(), "public");
 // /charts/ is served from here too so chart JSON can be swapped in an
 // installed copy without rebuilding the app.
-const MEDIA_PREFIXES = ["/songs/", "/videos/", "/charts/"];
+const MEDIA_PREFIXES = ["/songs/", "/videos/", "/charts/", "/covers/"];
+// Single files served the same way. catalog.json only exists in the data
+// folder; without it the game uses the built-in song list.
+const MEDIA_FILES = ["/catalog.json"];
+
+// [외부 곡 폴더] DJON-data: exe 옆 폴더의 songs/charts/videos/covers/catalog.json을
+// 내장 파일보다 먼저 찾는다 → 설치본/포터블에서도 재빌드 없이 곡 추가·교체.
+// 찾는 순서: --data-dir=<경로>, 환경변수 DJON_DATA_DIR, exe 옆 "DJON-data"
+// (포터블은 임시 압축 해제 폴더가 아니라 포터블 exe가 있는 폴더). 개발 실행은 프로젝트 루트.
+const DATA_DIR_NAME = "DJON-data";
+
+function resolveDataDir() {
+  const flag = ARGS.find((arg) => arg.startsWith("--data-dir="));
+  const exeDir = process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
+  const candidates = [
+    flag && flag.slice("--data-dir=".length),
+    process.env.DJON_DATA_DIR,
+    app.isPackaged ? path.join(exeDir, DATA_DIR_NAME) : path.join(app.getAppPath(), DATA_DIR_NAME),
+  ];
+  return (
+    candidates.find((dir) => {
+      try {
+        return dir && fs.existsSync(dir) && fs.statSync(dir).isDirectory();
+      } catch (e) {
+        return false;
+      }
+    }) || null
+  );
+}
+
+const DATA_DIR = resolveDataDir();
+const MEDIA_ROOTS = [DATA_DIR, MEDIA_DIR].filter(Boolean);
+
+// 파일이 있는 첫 위치를 쓴다(데이터 폴더 → 내장). 폴더 밖 경로는 위치마다 막는다. 없으면 null
+function findMediaFile(pathname) {
+  for (const root of MEDIA_ROOTS) {
+    const filePath = path.join(root, pathname);
+    try {
+      if (isInside(root, filePath) && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        return filePath;
+      }
+    } catch (e) {
+      // 읽을 수 없는 파일은 없는 것으로 취급
+    }
+  }
+  return null;
+}
 
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 app.commandLine.appendSwitch("ignore-gpu-blocklist");
@@ -129,11 +175,12 @@ function registerAppProtocol() {
     try {
       const pathname = decodeURIComponent(new URL(request.url).pathname);
 
-      if (MEDIA_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-        const mediaPath = path.join(MEDIA_DIR, pathname);
-        if (!isInside(MEDIA_DIR, mediaPath) || !fs.existsSync(mediaPath)) {
-          return new Response("Not found", { status: 404 });
-        }
+      const isMedia =
+        MEDIA_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
+        MEDIA_FILES.includes(pathname);
+      if (isMedia) {
+        const mediaPath = findMediaFile(pathname);
+        if (!mediaPath) return new Response("Not found", { status: 404 });
         return serveFileWithRange(request, mediaPath);
       }
 
@@ -245,6 +292,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     if (!isDev) registerAppProtocol();
+    if (DEBUG) console.log("[data dir]", DATA_DIR || "(none, built-in songs only)");
     // [LAN] 호스트 서버/참가 통신(설정에서 켜기 전에는 아무것도 열지 않음)
     registerLan({
       ipcMain,

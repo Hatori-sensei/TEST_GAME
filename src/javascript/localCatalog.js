@@ -77,6 +77,233 @@ export async function fetchChartFile(sheetFile) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// [외부 곡 폴더] DJON-data/catalog.json
+// exe 옆 DJON-data 폴더의 catalog.json에 적힌 곡·차트를 내장 목록 "뒤에 더한다".
+// 같은 id면 catalog.json 쪽이 내장 항목을 덮어쓴다. 파일이 없으면 내장 목록만 쓴다.
+//   { "version": 1, "songs": [ {곡}, ... ], "charts": [ {차트}, ... ], "hiddenRules": [ ... ] }
+//   곡:   id, title, audioPath 필수. 나머지는 createSongTemplate 필드와 같다.
+//         영상·표지가 없으면 bgaPath / customCoverUrl을 null로(빼면 템플릿 기본 경로가 들어감)
+//         "hidden": true 이면 히든곡(일반 목록에서 빠지고 Arcade 히든 규칙으로만 등장)
+//   차트: id, songId, sheetFile 필수. 나머지는 createChartTemplate 필드와 같다.
+//   hiddenRules: [{ id, picks: [1번째 차트 id, 2번째 차트 id], minAccuracy, hiddenChartId }]
+// 곡 id는 영문자를 하나 이상 포함해야 함(숫자로만 된 id는 객체 키 정렬 때문에 목록 맨 앞으로 감).
+// main.js가 앱을 띄우기 전에 loadCatalog()를 한 번 부른다. 형식은 차트매니저와 공유하므로
+// 바꿀 때는 매니저 쪽(src/core/game/catalogFormat.js)도 맞춰야 한다.
+// ---------------------------------------------------------------------------
+
+// 히든곡: 일반 목록(localCatalog.songs/charts)에 넣지 않고 id로만 찾는다
+export const HIDDEN_SONGS = {};
+export const HIDDEN_CHARTS = {};
+// 히든 규칙 기본값(코드). catalog.json에 hiddenRules가 있으면 그걸로 바뀐다
+export const HIDDEN_RULES = [];
+let hiddenRules = HIDDEN_RULES;
+export function getHiddenRules() {
+  return hiddenRules;
+}
+
+// 불러오기 결과(모드 선택 화면/설정에 표시). hash = PC끼리 곡 목록·채보가 같은지 비교용 코드
+export const catalogStatus = {
+  loaded: false, // catalog.json을 읽었는지
+  external: 0, // catalog.json에서 추가/교체한 곡 수
+  hidden: 0, // 히든곡 수
+  error: "", // catalog.json을 읽지 못한 이유
+  warnings: [], // 건너뛴 항목 등
+  missing: [], // 없는 파일 [{ id, path, required }]
+  hash: "",
+};
+
+const HAS_LETTER = /[A-Za-z]/;
+
+export async function loadCatalog() {
+  const url = resolveMediaUrl("catalog.json");
+  let data = null;
+  try {
+    const response = await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
+    // 데이터 폴더나 catalog.json이 없음: 내장 목록만 사용
+    // (개발 서버는 없는 파일에 index.html을 돌려주므로 JSON이 아니면 없는 것으로 본다)
+    const isJson = (response.headers.get("content-type") || "").includes("json");
+    if (response.status === 404 || (response.ok && !isJson)) {
+      data = null;
+    } else if (!response.ok) {
+      throw new Error(`HTTP ${response.status} (${url})`);
+    } else {
+      data = await response.json();
+    }
+  } catch (error) {
+    console.error("[catalog] catalog.json을 읽을 수 없어 내장 곡 목록만 사용합니다.", error);
+    catalogStatus.error = `catalog.json 오류: ${error && error.message ? error.message : error}`;
+    data = null;
+  }
+  if (data) {
+    applyCatalog(data);
+    catalogStatus.loaded = true;
+    await checkMissingFiles(data);
+  }
+  catalogStatus.hash = await computeCatalogHash();
+}
+
+function warn(message, entry) {
+  console.warn(`[catalog] ${message}`, entry);
+  catalogStatus.warnings.push(message);
+}
+
+export function applyCatalog(data) {
+  const songs = Array.isArray(data?.songs) ? data.songs : [];
+  const charts = Array.isArray(data?.charts) ? data.charts : [];
+
+  for (const entry of songs) {
+    if (!entry?.id || !entry.title || !entry.audioPath) {
+      warn("id/title/audioPath가 없는 곡을 건너뜁니다.", entry);
+      continue;
+    }
+    if (!HAS_LETTER.test(String(entry.id))) {
+      warn(`곡 id "${entry.id}"에 영문자가 없어 건너뜁니다(예: song-17).`, entry);
+      continue;
+    }
+    const song = createSongTemplate({ ...entry, bgaPath: entry.bgaPath ?? null });
+    if (entry.hidden === true) {
+      delete localCatalog.songs[entry.id];
+      HIDDEN_SONGS[entry.id] = song;
+      catalogStatus.hidden += 1;
+    } else {
+      delete HIDDEN_SONGS[entry.id];
+      localCatalog.songs[entry.id] = song;
+    }
+    catalogStatus.external += 1;
+  }
+
+  for (const entry of charts) {
+    if (!entry?.id || !entry.songId || !entry.sheetFile) {
+      warn("id/songId/sheetFile이 없는 차트를 건너뜁니다.", entry);
+      continue;
+    }
+    if (!getSongById(entry.songId)) {
+      warn(`곡 "${entry.songId}"이 없어 차트를 건너뜁니다.`, entry);
+      continue;
+    }
+    const chart = createChartTemplate(entry);
+    if (entry.hidden === true || HIDDEN_SONGS[entry.songId]) {
+      delete localCatalog.charts[entry.id];
+      HIDDEN_CHARTS[entry.id] = chart;
+    } else {
+      delete HIDDEN_CHARTS[entry.id];
+      localCatalog.charts[entry.id] = chart;
+    }
+  }
+
+  // 히든으로 바뀐 내장 곡의 차트도 일반 목록에서 뺀다
+  Object.values(localCatalog.charts).forEach((chart) => {
+    if (HIDDEN_SONGS[chart.songId]) {
+      delete localCatalog.charts[chart.id];
+      HIDDEN_CHARTS[chart.id] = chart;
+    }
+  });
+
+  if (Array.isArray(data?.hiddenRules)) {
+    hiddenRules = data.hiddenRules.filter((rule) => {
+      const ok =
+        !!rule &&
+        !!rule.id &&
+        Array.isArray(rule.picks) &&
+        rule.picks.length === 2 &&
+        rule.picks.every((id) => getChartById(id)) &&
+        !!getChartById(rule.hiddenChartId);
+      if (!ok) warn("잘못된 히든 규칙을 건너뜁니다(picks 2개와 hiddenChartId가 실제 차트여야 함).", rule);
+      return ok;
+    });
+  }
+}
+
+// 외부 곡의 필수 파일(음원·채보)과 선택 파일(영상·표지)이 실제로 있는지 확인.
+// 1바이트만 요청(Range)해서 로컬 파일이면 빠르다. 실패해도 게임은 계속 뜬다.
+async function checkMissingFiles(data) {
+  const targets = [];
+  (Array.isArray(data?.songs) ? data.songs : []).forEach((s) => {
+    if (!s || !s.id) return;
+    if (s.audioPath) targets.push({ id: s.id, path: s.audioPath, required: true });
+    if (s.bgaPath) targets.push({ id: s.id, path: s.bgaPath, required: false });
+    if (s.customCoverUrl) targets.push({ id: s.id, path: s.customCoverUrl, required: false });
+  });
+  (Array.isArray(data?.charts) ? data.charts : []).forEach((c) => {
+    if (c && c.id && c.sheetFile) targets.push({ id: c.id, path: `charts/${c.sheetFile}`, required: true });
+  });
+  await Promise.all(
+    targets.map(async (t) => {
+      try {
+        const res = await fetch(resolveMediaUrl(t.path), { headers: { Range: "bytes=0-0" }, cache: "no-store" });
+        const type = res.headers.get("content-type") || "";
+        // 개발 서버는 없는 파일에 index.html(200)을 돌려줌 → html이면 없는 것으로 봄
+        if (!res.ok || type.includes("text/html")) catalogStatus.missing.push(t);
+      } catch (e) {
+        catalogStatus.missing.push(t);
+      }
+    })
+  );
+  if (catalogStatus.missing.length) console.warn("[catalog] 없는 파일", catalogStatus.missing);
+
+  // 필수 파일(음원·채보)이 없는 곡/차트는 목록에서 뺀다(축제 중에 고르면 재생이 안 되므로).
+  // 내장 파일로 대체되는 경우는 위 검사에서 이미 "있음"으로 나온다.
+  const required = catalogStatus.missing.filter((m) => m.required);
+  const missingChart = new Set(required.filter((m) => m.path.startsWith("charts/")).map((m) => m.id));
+  const affectedSongs = new Set(required.filter((m) => !m.path.startsWith("charts/")).map((m) => m.id));
+  const missingAudio = new Set(affectedSongs);
+  [localCatalog.charts, HIDDEN_CHARTS].forEach((map) => {
+    Object.values(map).forEach((chart) => {
+      if (missingChart.has(chart.id) || missingAudio.has(chart.songId)) {
+        delete map[chart.id];
+        affectedSongs.add(chart.songId);
+      }
+    });
+  });
+  const hasChart = (songId) =>
+    [localCatalog.charts, HIDDEN_CHARTS].some((map) => Object.values(map).some((c) => c.songId === songId));
+  affectedSongs.forEach((id) => {
+    if (!missingAudio.has(id) && hasChart(id)) return; // 다른 차트가 남아 있으면 곡은 유지
+    if (localCatalog.songs[id] || HIDDEN_SONGS[id]) {
+      delete localCatalog.songs[id];
+      delete HIDDEN_SONGS[id];
+      catalogStatus.warnings.push(`필수 파일이 없어 "${id}"을(를) 곡 목록에서 뺐습니다.`);
+    }
+  });
+}
+
+// FNV-1a 32비트(간단한 비교용, 보안용 아님)
+function fnv1a(text, hash = 0x811c9dc5) {
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+// PC끼리 곡 목록이 같은지 보는 짧은 코드. 곡/차트 id·음원 경로·난이도와 채보 파일 내용으로 만든다.
+// (음원·영상 내용은 크기 때문에 넣지 않음)
+async function computeCatalogHash() {
+  const songs = { ...localCatalog.songs, ...HIDDEN_SONGS };
+  const charts = { ...localCatalog.charts, ...HIDDEN_CHARTS };
+  let hash = fnv1a(
+    Object.keys(songs)
+      .sort()
+      .map((id) => `${id}|${songs[id].audioPath}|${HIDDEN_SONGS[id] ? 1 : 0}`)
+      .join(";")
+  );
+  const chartIds = Object.keys(charts).sort();
+  for (const id of chartIds) {
+    const c = charts[id];
+    hash = fnv1a(`${id}|${c.songId}|${c.difficulty}|${c.sheetFile}`, hash);
+    if (c.sheetFile) {
+      try {
+        const res = await fetch(resolveMediaUrl(`charts/${c.sheetFile}`), { cache: "no-store" });
+        hash = fnv1a(res.ok ? await res.text() : "missing", hash);
+      } catch (e) {
+        hash = fnv1a("missing", hash);
+      }
+    }
+  }
+  return hash.toString(16).padStart(8, "0").slice(0, 6).toUpperCase();
+}
+
 function createNoteSequence(durationSec = 60, stepSec = 0.4) {
   const notes = [];
   for (let time = 1.0; time <= durationSec; time += stepSec) {
@@ -247,7 +474,7 @@ export function getSongListCatalog() {
 export function getSongById(songId) {
   if (!songId) return null;
 
-  const byKey = localCatalog.songs[songId];
+  const byKey = localCatalog.songs[songId] ?? HIDDEN_SONGS[songId];
   if (byKey) return byKey;
 
   return (
@@ -276,12 +503,13 @@ export const DEMO_CHARTS = {
 export const DEMO_PLAYLIST = [{ chartId: "Doit-sample" }];
 
 export function getChartById(chartId) {
-  return localCatalog.charts[chartId] ?? DEMO_CHARTS[chartId] ?? null;
+  return localCatalog.charts[chartId] ?? HIDDEN_CHARTS[chartId] ?? DEMO_CHARTS[chartId] ?? null;
 }
 
 export function getChartForSong(songId) {
   return (
     Object.values(localCatalog.charts).find((chart) => chart.songId === songId) ??
+    Object.values(HIDDEN_CHARTS).find((chart) => chart.songId === songId) ??
     null
   );
 }

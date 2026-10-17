@@ -59,17 +59,19 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - 미해결 질문/수치 불일치(배속 8.0 상한, 체력 회복량 문서 불일치)는 보고서 [C] 참고.
 
 ## 테마 (2026-10)
-- 설정(곡 선택 ESC) → 화면 테마: 1 = 기존 DJMAX 스타일(기본), 2 = AFTERGLOW(해 질 녘 시티팝, Claude가 자유 디자인). localStorage `djon.settings.theme`.
+- 설정(곡 선택 ESC) → 화면 테마: 1 = 기존 DJMAX 스타일(기본), 2 = AFTERGLOW(해 질 녘 시티팝, Claude가 자유 디자인), 3 = MONOCHROME(화이트/블랙, MUSYNX RETURN 스크린샷 참고). localStorage `djon.settings.theme`.
+- 테마 3: `public/theme-monochrome.css`(흰 도면 격자+십자, 검은 라벨 상자, 경고 줄무늬, 포인트 주황 #ff5a1f, 정자체·사선 없음). 화면 배치는 테마 1과 같고 색/선/장식만 다름. 노트는 CANVAS_THEMES[3].noteStyle "bracket"(note.js `_drawNoteHead`, 같은 30px 사각형 안에 검은 테두리+흰 모서리 꺾쇠). BGA는 흑백 55%, 배경 어둡게 막은 CSS invert로 흰 막(설정값 그대로). 고정 판정 색(밝은 색)은 결과 화면에서 검은 상자/검은 행 안에 둠.
 - 구조: `<html data-theme="N">`. CSS는 `public/theme-afterglow.css`(테마 2 전용, 변수 덮어쓰기+장식+화면 구성 변경), 캔버스 색은 `src/helpers/theme.js` CANVAS_THEMES(곡 시작 시 고정).
 - 화면 CSS의 청록은 `var(--dm-cyan)` / `rgba(var(--dm-cyan-rgb), a)`로 씀. 새 색을 넣을 때도 이 변수 사용.
-- 판정 표시(MarkComboJudge, 타격 이펙트 판정색, 결과 판정 행/랭크 색)는 테마와 무관하게 고정. 테마 2에서도 변수를 테마 1 값으로 재지정해 유지.
+- 판정 표시도 테마별(사용자 요청으로 2026-10 변경, 예전엔 고정): MarkComboJudge는 CSS 변수(--j-*, --combo-*, --fs-*, --fever-*, 기본값 = 테마 1 원래 값)를 테마 CSS의 `html[data-theme] .judge`에서 덮어씀. 타격 이펙트는 CANVAS_THEMES[n].hitFx(색 + shape circle/diamond, 테마 3 = 마름모), 결과 랭크 색은 theme.js RANK_COLORS, 결과 판정 행은 테마 변수.
+- 피버 표시: 콤보 아래 "FEVER xN + 게이지"(MarkComboJudge, result.feverMultiplier/feverGauge를 judge 때 복사. 반응형 아님). 옛 fever(gameMixin fever.percent, FeverEffect.js)는 게이지가 안 오르는 죽은 코드라 손대지 않음.
+- 풀콤보 연출: `components/game/FullComboBanner.vue`(섬광 → 띠 열림 → FULL COMBO 글자, 2초, 테마 변수 --fc-*). 예전 ZoomText "Full Combo" + confetti + wow 효과음은 제거(소리 없음).
 - 테마 2는 화면 배치도 다름(곡 선택 좌우 반전, 점수 카드 기어 오른쪽 위, 일시정지 오른쪽 패널, 결과 2단). 단 판정선/기어 기하는 테마 1과 동일해야 함.
 - 모바일은 지원 안 함(사용 중 화면의 모바일 CSS 삭제).
 - 롱노트: 테마 팔레트의 long(전용 색)/longHold(누르는 중) 사용. 보류 중: 강조색 직접 지정 기능.
 
 ## 차별화 기능 (2026-10, 운영 방법: docs/축제_LAN_운영가이드.md)
-- 축제 랭킹: `src/helpers/records.js`(localStorage `djon.records` {version:1, entries}, 이름 8자/소속 10자, 빈 소속=GUEST). 결과 화면 등록 패널, `/rankings` 보드(곡별 TOP10, 오늘/전체 T, 소속 대항전/미션 도장 TAB, Ctrl+Shift+Delete 초기화), 곡 선택 TOP3 + `R`.
-- 소속 대항전 점수 = 사람(이름+소속)별·곡별 최고점/10000 합계.
+- 축제 랭킹: `src/helpers/records.js`(localStorage `djon.records` {version:1, entries}, 이름 8자/소속 10자, 빈 소속=GUEST). 항목 `kind` "song"(곡 기록, 예전 기록 포함)/"final"(Arcade 최종 점수, 상한 500만, songs 배열). `/rankings` 보드 = 왼쪽 Arcade 최종 점수 TOP10, 오른쪽 TAB 곡별 TOP10/미션 도장(오늘/전체 T, Ctrl+Shift+Delete 초기화). 곡 선택 TOP3 유지. **소속 대항전은 삭제**(2026-10, 사용자 요청). `electron/lan-server.js` sanitizeRecord도 같은 kind 규칙.
 - 미션: `src/helpers/missions.js`(결과만 보고 평가). 기본 5개, 차트에 `missions` 배열로 교체 가능. `result.longStats`(롱노트 성공/실패)는 note.js에서 집계만 함. 오토플레이 결과는 등록/미션 불가(`result.autoPlay`).
 - 연출 기믹: `src/javascript/fx.js`(flash/blackout/tint/pulse/beat). 판정·노트·판정선/기어 기하 불변. 설정 `fxEnabled`(기본 켜짐). 작성법 docs/채보_연출기믹.md.
 - LAN: `electron/lan-server.js`(호스트 HTTP+SSE 서버, TCP 41235, 기록은 userData/djon-festival-records.json), `electron/lan-main.js`(IPC, UDP 41234 찾기, 요청 대행), `electron/preload.js`(window.djonLan). app://는 http LAN fetch가 mixed content로 막혀서 통신은 전부 메인 프로세스가 함. 설정 lanRole(off/host/client)/lanHost/pcName, 기본 off.
@@ -79,6 +81,24 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - 샘플 채보 `public/charts/Doit.sample.json`(Doit.json과 별개, BPM 129/첫 박 0.028s 분석값). localCatalog `DEMO_CHARTS`에만 있어 목록엔 안 나옴.
 - 타격 이펙트: `track.js` `HitEffect`(코어 3겹 후광+이중 선 메인 링+서브 링+스파크, 최대 지름 = 레인 폭 x `FX_SCALE`, 풀 재사용, shadowBlur 없음). 판정선(DOM 흰 띠, z-index 4 안)에 가려지지 않게 `#effectCanvas`(Game.vue z-index 5)에 그림. 롱노트 누르는 동안 `HOLD_FX_INTERVAL_SEC`(0.1초)마다 반복. 크기/시간/개수는 track.js FX_* 상수에서 조정. 판정별 색은 테마와 무관하게 고정. **실제 모양/동작은 코드 검토만 했고 직접 확인하지 못함(사용자 확인 예정).**
 - 곡 선택 화면은 keep-alive라 키 리스너는 activated/deactivated에서 붙이고 뗌(예전엔 결과 화면 Enter가 곡 시작으로 새던 버그).
+
+## 축제 모드 (2026-10)
+- 타이틀 → `/mode`(ModeSelect.vue) → Free Play / Arcade / VS Match. 어느 모드든 한 크레딧 최대 3곡(판). 세션은 `src/helpers/session.js` + store `session`(메모리만), 타이틀(Home mounted)·모드 선택 진입 시 삭제. 세션 없이 `/menu`에 오면 `/mode`로.
+- Free Play: 곡 선택 → … → 결과 NEXT → 3곡 후 `/final`(FinalResult.vue) 요약. 랭킹 등록 없음.
+- Arcade: `/arcade-entry`(이름/소속) → 곡 선택에서 3곡 담기(ENTER 담기, BACKSPACE 빼기, 중복 불가) → START → 곡마다 배속 설정(ENTER 시작, Cancel 없음) → 결과 NEXT STAGE. 곡 기록은 자동 등록(kind song, 오토플레이 제외). 게임오버·일시정지 "End Song"은 그 시점 점수로 곡 마감(failed)하고 다음 곡. 3곡 후 `/final`에서 최종 점수 자동 등록 + 오늘 순위.
+- 최종 점수 = Σ 곡 점수 × (1 + 레벨 × 0.02), 레벨 1~30으로 자름(`src/helpers/finalScore.js` BONUS_PER_LEVEL/LEVEL_MAX). 곡별 점수 계산은 그대로.
+- 히든곡: Arcade 1·2번째 곡이 규칙 `picks`(순서 포함)와 같고 두 곡 모두 `minAccuracy` 이상·게임오버 없음이면 3번째 곡이 `hiddenChartId`로 바뀜(결과 화면에 HIDDEN STAGE UNLOCKED). 규칙/히든곡은 DJON-data `catalog.json`(`hiddenRules`, `"hidden": true`) 또는 localCatalog `HIDDEN_RULES`. 지금은 히든곡 없음(사용자가 나중에 추가).
+- VS Match: 기존 `/vs` 로비, 판 수 표시(MATCH n/3), 3판 후 ENTER → 방 나가기 → `/final`. 다음 대전에 끌려가지 않게 3판 완료면 시작 안 함. LAN 꺼짐이면 모드 카드 비활성. 로비 슬롯에 PC별 곡 목록 코드가 다르면 "곡 목록 다름"(join에 catalogHash, 서버가 중계).
+- 모드 진행 중: 일시정지 Restart·결과/게임오버 Replay 숨김, 곡 선택 R/V 막음(R은 모드 선택 화면에서). attract는 `/mode`, `/arcade-entry`, `/final`도 방치 시 타이틀로.
+- 새 화면 3개는 테마가 아직 하나로 정해지지 않아 색을 `--dm-*` 변수로만 씀(테마별 CSS 없음). 테마 확정 후 그 테마만 다듬고 나머지 테마 삭제 예정.
+- 확인: `RP_PROD=1 electron . --data-dir=…` + CDP로 Free 3곡, Arcade(중복 막힘·히든 열림·LV99→30·게임오버 곡 진행·합계 손계산 일치·랭킹 표시), End Song, 테마 1/2/3 화면. **VS 3판 제한은 실제 LAN 대전으로 확인 못 함(코드만).**
+
+## 외부 곡 폴더 DJON-data (2026-10, 외부 제안 패치를 우리 코드에 직접 옮김)
+- exe 옆 `DJON-data/`(songs/charts/videos/covers/catalog.json)를 내장 파일보다 먼저 찾음. 없으면 기존과 동일. 찾는 순서: `--data-dir=` → `DJON_DATA_DIR` → exe 옆(포터블은 PORTABLE_EXECUTABLE_DIR) → 개발 실행은 프로젝트 루트. `background.js` `findMediaFile`, 폴더 밖 경로 차단.
+- `catalog.json`은 내장 곡 뒤에 추가(같은 id면 덮어씀). `localCatalog.js` `loadCatalog/applyCatalog`, `main.js`가 앱 시작 전에 부르고 `db.js refreshCatalogData()`. 형식은 차트매니저(별도 웹 도구, Chrome/Edge)와 공유 → 바꾸면 매니저도 고쳐야 함.
+- 추가한 것: `"hidden": true` 곡/차트는 목록에서 빠지고 id로만 찾음(HIDDEN_SONGS/CHARTS), 최상위 `hiddenRules`(Arcade용, 모드 작업에서 사용). 숫자로만 된 곡 id 건너뜀. 필수 파일(mp3/채보) 없는 외부 곡은 목록에서 뺌. `catalogStatus`(외부 곡 수/오류/없는 파일/곡 목록 코드 hash)를 설정(ESC) "곡 폴더" 칸에 표시. hash는 곡·차트 id·난이도·채보 내용으로 만든 6자리 → PC 4대가 같아야 함.
+- 차트매니저 주의: 채보를 매니저로 다시 저장하면 연출 기믹(flash 등, `time` 필드)과 채보 최상위 `missions` 등이 사라짐(변속/정지/레인 이동/노트는 유지). 덮어쓴 파일은 `DJON-data/.backup/`.
+- 확인: `RP_PROD=1 electron . --data-dir=...`로 곡 추가·플레이·표지·히든·숫자 id·파일 누락·깨진 json·폴더 없음·경로 탈출. **포터블/설치형 exe는 미확인.**
 
 ## 작업 메모
 - 파일 줄바꿈이 CRLF인 파일이 많음. 스크립트로 수정할 땐 보존할 것.

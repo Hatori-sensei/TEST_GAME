@@ -7,6 +7,8 @@
     <header class="rs-top">
       <span class="slashes">///</span>
       <span>RESULT</span>
+      <!-- [모드] 진행 중인 크레딧 표시 -->
+      <span class="rs-stage" v-if="session">{{ stageLabel }}</span>
     </header>
 
     <div class="rs-layout" v-if="sheet && result">
@@ -29,12 +31,24 @@
           </span>
         </div>
 
-        <!-- [축제 랭킹] 기록 등록: 이름/소속 입력 → 랭킹·소속 대항전에 반영 -->
-        <div class="rs-register" v-if="isAutoPlay">
+        <!-- [모드] Arcade는 곡 기록이 자동 등록됨 / 히든곡이 열리면 안내 -->
+        <div class="rs-register" v-if="session && hiddenNotice">
+          <div class="rs-register-head">HIDDEN STAGE UNLOCKED</div>
+          <div class="rs-register-done">조건 달성! 3번째 곡이 <strong>히든곡</strong>으로 바뀌었어요</div>
+        </div>
+        <div class="rs-register" v-if="session && session.mode === 'arcade'">
+          <div class="rs-register-head">RANKING</div>
+          <div class="rs-register-hint" v-if="isAutoPlay">AUTO PLAY 결과는 랭킹에 등록되지 않습니다</div>
+          <div class="rs-register-done" v-else>
+            <strong>{{ session.player && session.player.name }}</strong> 기록 자동 등록 · 최종 점수는 3곡 후 계산
+          </div>
+        </div>
+        <!-- [축제 랭킹] 기록 등록: 이름/소속 입력 → 랭킹에 반영 (모드 진행 중엔 표시 안 함) -->
+        <div class="rs-register" v-if="!session && isAutoPlay">
           <div class="rs-register-head">RANKING ENTRY</div>
           <div class="rs-register-hint">AUTO PLAY 결과는 랭킹에 등록되지 않습니다</div>
         </div>
-        <div class="rs-register" v-else-if="reg.state !== 'skipped'">
+        <div class="rs-register" v-else-if="!session && reg.state !== 'skipped'">
           <div class="rs-register-head">RANKING ENTRY</div>
           <template v-if="reg.state === 'form'">
             <div class="rs-register-row">
@@ -166,13 +180,13 @@
         </div>
 
         <div class="btn_sec">
-          <div class="btn-action btn-dark rs-btn rs-btn-main" @click="replay">
+          <div class="btn-action btn-dark rs-btn rs-btn-main" @click="replay" v-if="!session">
             <v-icon name="redo" />
             <span>Replay</span>
           </div>
-          <div class="btn-action btn-dark rs-btn" @click="toMenu">
+          <div class="btn-action btn-dark rs-btn" :class="{ 'rs-btn-main': session }" @click="toMenu">
             <v-icon name="arrow-right" />
-            <span>Continue</span>
+            <span>{{ nextLabel }}</span>
           </div>
         </div>
       </section>
@@ -231,6 +245,8 @@ import {
 } from "../helpers/records";
 import { postSharedRecord, getLanConfig } from "../helpers/lan";
 import { evaluateMissions } from "../helpers/missions";
+import { getRankColor } from "../helpers/theme";
+import { nextRoute, isSessionDone, nextIsHidden, markHiddenRevealed, MODE_LABELS } from "../helpers/session";
 
 export default {
   name: "Result",
@@ -256,6 +272,23 @@ export default {
     };
   },
   computed: {
+    // [모드] 진행 중인 세션(없으면 null)
+    session() {
+      return this.$store.state.session;
+    },
+    stageLabel() {
+      const s = this.session;
+      if (!s) return "";
+      return `${MODE_LABELS[s.mode] || ""} · ${s.mode === "vs" ? "MATCH" : "STAGE"} ${s.stages.length}/${s.maxStages}`;
+    },
+    nextLabel() {
+      if (!this.session) return "Continue";
+      if (isSessionDone()) return "Final Result";
+      return this.session.mode === "vs" ? "Back to Lobby" : "Next Stage";
+    },
+    hiddenNotice() {
+      return nextIsHidden();
+    },
     // [미션] 이 결과의 미션 목록과 달성 여부
     missions() {
       if (!this.result || !this.result.result) return [];
@@ -347,15 +380,8 @@ export default {
       return out;
     },
     rankColor() {
-      const colors = {
-        S: "#ffb400",
-        A: "#19d3ff",
-        B: "#7ee8b0",
-        C: "#c4f5ff",
-        D: "#ff7a2f",
-        F: "#ff3b5c",
-      };
-      return colors[this.result && this.result.rank] || "#ffffff";
+      // [테마] 랭크 색은 테마별(theme.js RANK_COLORS, 테마 1 = 기존 값)
+      return getRankColor(this.result && this.result.rank);
     },
     rankGlow() {
       return `0 0 40px ${this.rankColor}66`;
@@ -363,6 +389,8 @@ export default {
   },
   watch: {},
   async mounted() {
+    // [모드] 진행 중엔 ENTER로 다음 곡/최종 결과
+    window.addEventListener("keydown", this.onSessionKey);
     //FIXME add id and route validation
     if (this.$route.params.resultId && this.$route.params.resultId != "null") {
       try {
@@ -410,6 +438,7 @@ export default {
     }
   },
   beforeDestroy() {
+    window.removeEventListener("keydown", this.onSessionKey);
     this.$store.state.audio.stop();
   },
   methods: {
@@ -463,7 +492,22 @@ export default {
       this.$router.push("/game/" + this.sheet.sheetId);
     },
     toMenu() {
+      // [모드] 진행 중이면 다음 곡(Arcade는 다음 곡 배속 설정)/로비/최종 결과로
+      if (this.session) {
+        if (nextIsHidden()) markHiddenRevealed();
+        this.$router.push(nextRoute());
+        return;
+      }
       this.$router.push("/menu/");
+    },
+    onSessionKey(e) {
+      if (!this.session || e.repeat) return;
+      const tag = (document.activeElement && document.activeElement.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this.toMenu();
+      }
     },
   },
 };
@@ -527,6 +571,13 @@ export default {
   font-weight: 800;
   font-size: 26px;
   letter-spacing: 0.08em;
+}
+
+.rs-stage {
+  margin-left: auto;
+  font-size: 20px;
+  letter-spacing: 0.14em;
+  color: var(--dm-cyan);
 }
 
 .rs-top .slashes {

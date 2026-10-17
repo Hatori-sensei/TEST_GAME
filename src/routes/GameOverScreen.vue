@@ -14,14 +14,14 @@
         <div
           class="btn-action btn-dark go-btn go-btn-main"
           @click="replay"
-          v-if="$route.params.sheetId"
+          v-if="$route.params.sheetId && !$store.state.session"
         >
           <v-icon name="redo" />
           <span>Replay</span>
         </div>
-        <div class="btn-action btn-dark go-btn" @click="toMenu">
+        <div class="btn-action btn-dark go-btn" :class="{ 'go-btn-main': $store.state.session }" @click="toMenu">
           <v-icon name="arrow-right" />
-          <span>Continue</span>
+          <span>{{ $store.state.session ? "Next" : "Continue" }}</span>
         </div>
       </div>
     </div>
@@ -29,17 +29,35 @@
 </template>
 
 <script>
+import { nextRoute } from "../helpers/session";
+
 export default {
   name: "GameOverScreen",
   mounted() {
     this.$store.state.audio.playEffect("whoosh");
+    window.addEventListener("keydown", this.onKey);
+  },
+  beforeDestroy() {
+    window.removeEventListener("keydown", this.onKey);
   },
   methods: {
     replay() {
       this.$router.push("/game/" + this.$route.params.sheetId);
     },
     toMenu() {
+      // [모드] 진행 중이면 게임오버 곡은 그 점수로 마감됐으니 다음 곡/최종 결과로
+      if (this.$store.state.session) {
+        this.$router.push(nextRoute());
+        return;
+      }
       this.$router.push("/menu/");
+    },
+    onKey(e) {
+      if (!this.$store.state.session || e.repeat) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this.toMenu();
+      }
     },
   },
 };

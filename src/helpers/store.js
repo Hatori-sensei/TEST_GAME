@@ -59,6 +59,8 @@ export const store = new Vuex.Store({
     autoPlay: false,
     // [LAN 대전] 대전 중일 때만 { pcId, sheetId, offsetMs, roomId } (평소엔 null → 기존 동작)
     vs: null,
+    // [모드] 플레이 세션(Free Play/Arcade/VS, 최대 3곡). helpers/session.js가 관리. 없으면 null
+    session: null,
   },
   actions: {
     async fetchUserProfile() {
@@ -230,6 +232,9 @@ export const store = new Vuex.Store({
     },
     setVs(state, val) {
       state.vs = val && typeof val === "object" ? { ...val } : null;
+    },
+    setSession(state, val) {
+      state.session = val && typeof val === "object" ? { ...val } : null;
     },
     setRandomGimmickMode(state, val) {
       const mode = String(val || "off").toLowerCase();

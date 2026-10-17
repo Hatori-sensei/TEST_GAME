@@ -12,7 +12,7 @@
 
           <div class="actions">
             <button @click="startGame">Start Game</button>
-            <button @click="cancel">Cancel</button>
+            <button @click="cancel" v-if="!arcadeRunning">Cancel</button>
           </div>
 
           <div class="hint">1 / 2 키로 배속 조절 (최소 1.0, 최대 9.9)</div>
@@ -47,6 +47,11 @@ export default {
     return { speed: Math.min(9.9, Math.max(1.0, initialSpeed)) };
   },
   computed: {
+    // [모드] Arcade 진행 중엔 곡을 바꿀 수 없으므로 Cancel 없음
+    arcadeRunning() {
+      const s = this.$store.state.session;
+      return !!s && s.mode === "arcade" && s.queue.length > 0;
+    },
     formattedSpeed() {
       // Ensure one decimal string but keep numeric value in data
       return parseFloat(this.speed).toFixed(1);
@@ -103,6 +108,12 @@ export default {
       const tag = (document.activeElement && document.activeElement.tagName) || '';
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
+      // [모드] 키보드만으로 진행할 수 있게 ENTER = Start Game
+      if (e.key === 'Enter' && !e.repeat) {
+        e.preventDefault();
+        this.startGame();
+        return;
+      }
       if (e.key === '1') {
         // decrease by 0.1
         let next = parseFloat((parseFloat(this.speed) - 0.1).toFixed(1));

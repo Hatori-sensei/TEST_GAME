@@ -41,8 +41,15 @@ const mockDate = {
 
 const { songs: localSongs, charts: localCharts } = createLocalCatalogData(mockDate);
 
-const MOCK_SONGS = localSongs;
-const MOCK_SHEETS = localCharts;
+let MOCK_SONGS = localSongs;
+let MOCK_SHEETS = localCharts;
+
+// [외부 곡 폴더] loadCatalog()가 DJON-data/catalog.json을 더한 뒤 main.js가 부른다.
+export function refreshCatalogData() {
+  const data = createLocalCatalogData(mockDate);
+  MOCK_SONGS = data.songs;
+  MOCK_SHEETS = data.charts;
+}
 
 const LOCAL_RESULTS = {};
 
@@ -70,7 +77,8 @@ export function getSheetList(songId) {
   return Promise.resolve(sheets.length ? sheets : [MOCK_SHEETS["local-sheet-1"]]);
 }
 export function getSheet(sheetId = "local-sheet-1") {
-  return Promise.resolve(MOCK_SHEETS[sheetId] || MOCK_SHEETS["local-sheet-1"] || null);
+  // [히든곡] 히든 차트는 MOCK_SHEETS(일반 목록)에 없으므로 getChartById로도 찾는다
+  return Promise.resolve(MOCK_SHEETS[sheetId] || getChartById(sheetId) || MOCK_SHEETS["local-sheet-1"] || null);
 }
 
 export async function getGameSheet(sheetId) {

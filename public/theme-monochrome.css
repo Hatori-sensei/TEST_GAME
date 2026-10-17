@@ -1,0 +1,1038 @@
+/* =====================================================================
+   테마 3: MONOCHROME (화이트/블랙, 리듬게임 "도면" 스타일)
+   - 흰 종이 + 설계 도면 격자 + 십자 표시, 검은 라벨 상자, 얇은 검은 선, 경고 줄무늬.
+   - 정자체 Barlow Condensed, 각진 사각형(사선 clip-path 제거). 포인트 색은 주황 1개.
+   - <html data-theme="3">일 때만 적용. 테마 1/2는 이 파일의 영향을 받지 않음.
+   - 위치/크기(판정선 bottom 320px·18px, 기어 500px)는 건드리지 않고 색/선/모양/장식만 바꾼다.
+   - 판정 글자/콤보/피버/FAST·SLOW는 흰색·은회색·주황·빨강의 무채색 팔레트 + 검은 외곽선.
+     타격 이펙트(마름모)와 랭크 색은 src/helpers/theme.js. 결과 판정 행/랭크는 검은 상자 안에 둔다.
+   ===================================================================== */
+
+html[data-theme="3"] {
+  --dm-bg: #ecece9;
+  --dm-panel: rgba(250, 250, 248, 0.96);
+  --dm-cyan: #111111; /* 주 강조색: 검정 */
+  --dm-cyan-rgb: 17, 17, 17;
+  --dm-cyan-dim: rgba(17, 17, 17, 0.26);
+  --dm-cyan-faint: rgba(17, 17, 17, 0.07);
+  --dm-amber: #ff5a1f; /* 포인트: 주황 */
+  --dm-red: #e0243a;
+  --dm-text: #111111;
+  --dm-muted: #6e6e6c;
+  --t3-ink: #111111;
+  --t3-paper-color: #ecece9;
+  --t3-white: #fafaf8;
+  --t3-orange: #ff5a1f;
+  /* 도면 격자(큰 칸 88px + 작은 칸 22px) + 큰 칸 교차점마다 십자 표시 */
+  --t3-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='264' height='264'%3E%3Cpath d='M176 167v18M167 176h18' stroke='%23222' stroke-width='1.6'/%3E%3C/svg%3E") 0 0 / 264px 264px,
+    linear-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px) 0 0 / 88px 88px,
+    linear-gradient(90deg, rgba(0, 0, 0, 0.06) 1px, transparent 1px) 0 0 / 88px 88px,
+    linear-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, rgba(0, 0, 0, 0.025) 1px, transparent 1px) 0 0 / 22px 22px,
+    #ecece9;
+  /* 패널용 아주 옅은 사선 */
+  --t3-hatch: repeating-linear-gradient(120deg, rgba(0, 0, 0, 0.045) 0 1px, transparent 1px 9px);
+  /* 경고 줄무늬 */
+  --t3-hazard: repeating-linear-gradient(135deg, #111 0 12px, transparent 12px 24px);
+}
+
+/* ---------- 판정 글자/콤보/피버/FAST·SLOW (MarkComboJudge 변수) ---------- */
+html[data-theme="3"] .judge {
+  --judge-font-style: normal;
+  --combo-label-color: #ffffff;
+  --combo-num-color: #ffffff;
+  /* 검은 외곽선 + 오른쪽 아래 그림자(도장 찍은 듯한 단단한 숫자) */
+  --combo-num-shadow: -3px 0 0 #111, 3px 0 0 #111, 0 -3px 0 #111, 0 3px 0 #111, 7px 7px 0 rgba(0, 0, 0, 0.45);
+  --combo-glow-rgb: 255, 255, 255;
+  --combo-mega-rgb: 255, 106, 43;
+  --j-max-text: #ffffff;
+  --j-max-shadow: #ffffff;
+  --j-high-text: #d6dade;
+  --j-high-shadow: #8a9096;
+  --j-mid-text: #ff6a2b;
+  --j-mid-shadow: #ff6a2b;
+  --j-low-text: #ff9a7a;
+  --j-low-shadow: #b8461f;
+  --j-break-text: #ff3347;
+  --j-break-shadow: #6b0010;
+  --fs-fast-color: #ffffff;
+  --fs-fast-shadow: -2px 0 0 #111, 2px 0 0 #111, 0 -2px 0 #111, 0 2px 0 #111;
+  --fs-slow-color: #ff6a2b;
+  --fs-slow-shadow: -2px 0 0 #111, 2px 0 0 #111, 0 -2px 0 #111, 0 2px 0 #111;
+  --fever-label-color: #ffffff;
+  --fever-mult-color: #ff6a2b;
+  --fever-bar-bg: rgba(255, 255, 255, 0.1);
+  --fever-bar-border: #ffffff;
+  --fever-fill: #ffffff;
+  --fever-fill-on: repeating-linear-gradient(135deg, #ff6a2b 0 6px, #ffffff 6px 12px);
+  letter-spacing: 0.04em;
+}
+/* 팝 애니메이션(0.5초)이 끝난 뒤에도 판정 색 유지(안 그러면 본문색 = 검정으로 돌아감) */
+html[data-theme="3"] .judge {
+  color: #ffffff;
+}
+html[data-theme="3"] .judge .judgeTypeAnimation {
+  color: var(--judge-text-color);
+}
+/* "COMBO" 글자는 검은 라벨 상자 */
+html[data-theme="3"] .judge .combo > div:first-child {
+  display: inline-block;
+  padding: 0 14px 0 18px;
+  font-size: 0.7em;
+  line-height: 1.5;
+  letter-spacing: 0.4em;
+  background: #111;
+  text-shadow: none;
+}
+html[data-theme="3"] .judge .comboNum {
+  margin-top: 2px;
+}
+/* 판정 글자: 검은 외곽선(흰 레인 띠/이펙트 위에서도 읽히게) */
+html[data-theme="3"] .judge .center_judge {
+  -webkit-text-stroke: 2px #111;
+  paint-order: stroke fill;
+}
+html[data-theme="3"] .judge .fast-slow {
+  -webkit-text-stroke: 0;
+}
+html[data-theme="3"] .judge .fever-label {
+  padding: 0 8px;
+  background: #111;
+}
+html[data-theme="3"] .judge .fever-bar {
+  border-width: 2px;
+}
+
+/* 결과 판정 행: 무채색 테두리(MAX 100% 흰색, 1~90% 은회색, 1% 주황, BREAK 빨강) */
+html[data-theme="3"] .rs-row {
+  --dm-cyan: #aab2ba;
+  --dm-amber: #ff6a2b;
+  --dm-red: #ff3347;
+  --dm-text: #ffffff;
+  --dm-muted: #a8a8a6;
+}
+html[data-theme="3"] .rs-row-label.fs-fast {
+  color: #ffffff;
+}
+html[data-theme="3"] .rs-row-label.fs-slow {
+  color: #ff6a2b;
+}
+
+/* ---------- 공통: 이탤릭/사선 제거 ---------- */
+html[data-theme="3"] body * {
+  font-style: normal !important;
+  clip-path: none !important;
+}
+html[data-theme="3"] body {
+  background: var(--t3-paper);
+  color: var(--t3-ink);
+}
+html[data-theme="3"] a {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] ::-webkit-scrollbar-thumb {
+  background: rgba(17, 17, 17, 0.4);
+}
+
+/* 전역 버튼: 흰 바탕 + 검은 왼쪽 띠, 호버 시 흑백 반전 */
+html[data-theme="3"] .btn-action {
+  color: var(--t3-ink);
+  background: var(--t3-white);
+  border: 1px solid var(--t3-ink);
+  border-left: 6px solid var(--t3-ink);
+  letter-spacing: 0.16em;
+}
+html[data-theme="3"] .btn-action .fa-icon {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .btn-action:hover,
+html[data-theme="3"] .btn-dark:hover,
+html[data-theme="3"] .modal .btn-dark:hover {
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .btn-action:hover .fa-icon {
+  color: #ffffff;
+}
+html[data-theme="3"] .btn-dark,
+html[data-theme="3"] .modal .btn-dark {
+  background: var(--t3-white);
+}
+/* 주 버튼(REPLAY 등): 항상 검정 */
+html[data-theme="3"] .btn-action.rs-btn-main,
+html[data-theme="3"] .btn-action.go-btn-main {
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .btn-action.rs-btn-main .fa-icon,
+html[data-theme="3"] .btn-action.go-btn-main .fa-icon {
+  color: var(--t3-orange);
+}
+
+/* 전역 모달(일시정지 메뉴 등): 흰 카드 + 위쪽 굵은 검은 선 + 경고 줄무늬 꼬리 */
+html[data-theme="3"] .modal {
+  color: var(--t3-ink);
+  background: var(--t3-hatch), var(--t3-white);
+  border: 1px solid var(--t3-ink);
+  border-top: 6px solid var(--t3-ink);
+  box-shadow: 10px 10px 0 rgba(17, 17, 17, 0.18);
+}
+html[data-theme="3"] .modal-backdrop {
+  background-color: rgba(236, 236, 233, 0.8);
+}
+/* 모달 제목 줄: 검은 띠 + 흰 글자 */
+html[data-theme="3"] .modal-header {
+  color: #ffffff;
+  background: var(--t3-ink);
+  letter-spacing: 0.24em;
+}
+html[data-theme="3"] .modal-header .btn-action {
+  color: #ffffff;
+  background: transparent;
+  border: none;
+}
+html[data-theme="3"] .modal-body,
+html[data-theme="3"] .bodyText {
+  color: var(--t3-ink);
+}
+
+/* 입력 칸(전역) */
+html[data-theme="3"] input[type="text"],
+html[data-theme="3"] input[type="number"],
+html[data-theme="3"] select,
+html[data-theme="3"] .input {
+  color: var(--t3-ink);
+  background-color: #ffffff;
+  border: 1px solid var(--t3-ink);
+}
+html[data-theme="3"] input::placeholder {
+  color: var(--t3-ink);
+}
+/* 체크박스 */
+html[data-theme="3"] .checkmark {
+  background-color: #ffffff;
+  border: 1px solid var(--t3-ink);
+  box-sizing: border-box;
+}
+html[data-theme="3"] .cb_container:hover input ~ .checkmark {
+  background-color: #dcdcd8;
+}
+html[data-theme="3"] .cb_container input:checked ~ .checkmark {
+  background-color: var(--t3-ink);
+}
+/* 슬라이더(vue-slider) */
+html[data-theme="3"] .vue-slider-rail {
+  background-color: #cfcfcb;
+  border-radius: 0;
+}
+html[data-theme="3"] .vue-slider-process {
+  background-color: var(--t3-ink);
+  border-radius: 0;
+}
+html[data-theme="3"] .vue-slider-dot-handle {
+  border-radius: 0;
+  background: #ffffff;
+  border: 2px solid var(--t3-ink);
+  box-shadow: none;
+}
+html[data-theme="3"] .vue-slider-dot-tooltip-inner {
+  border-radius: 0;
+  border-color: var(--t3-ink);
+  background-color: var(--t3-ink);
+}
+
+/* ---------- 시작 화면: 도면 위의 로고 + 경고 줄무늬 기둥 ---------- */
+html[data-theme="3"] .home-page {
+  background: var(--t3-paper);
+}
+html[data-theme="3"] .hero-glow {
+  /* 화면을 가로지르는 회색 사선 띠 */
+  background: linear-gradient(115deg, transparent 0 36%, rgba(17, 17, 17, 0.06) 36% 58%, transparent 58%);
+}
+html[data-theme="3"] .grid-lines {
+  background: var(--t3-hatch);
+  opacity: 0.6;
+}
+html[data-theme="3"] .scanline {
+  background: rgba(17, 17, 17, 0.45);
+}
+html[data-theme="3"] .accent-bars span {
+  transform: none;
+  width: 30px;
+  background: var(--t3-hazard), var(--t3-white);
+  border: 2px solid var(--t3-ink);
+  opacity: 1;
+}
+html[data-theme="3"] .accent-bars span:nth-child(n) {
+  opacity: 1;
+}
+html[data-theme="3"] .accent-bars span:nth-child(2) {
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .logo-mark {
+  color: #ffffff;
+  background: var(--t3-ink);
+  box-shadow: 8px 8px 0 var(--t3-orange);
+}
+html[data-theme="3"] .hero-logo h1 {
+  color: var(--t3-ink);
+  letter-spacing: 0.04em;
+  text-shadow: none;
+}
+html[data-theme="3"] .hero-logo h1 .at {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .click-hint {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .click-hint::before,
+html[data-theme="3"] .click-hint::after {
+  height: 2px;
+  background: var(--t3-ink);
+}
+
+/* ---------- 공통 배경(곡 선택/결과/로딩/게임오버) ---------- */
+html[data-theme="3"] .song-select-page,
+html[data-theme="3"] .result-page,
+html[data-theme="3"] .loading-screen,
+html[data-theme="3"] .speed-setup,
+html[data-theme="3"] .rank-page,
+html[data-theme="3"] .vs-page {
+  background: var(--t3-paper);
+  color: var(--t3-ink);
+}
+/* 자켓을 흐리게 깐 배경: 흑백으로 아주 옅게 */
+html[data-theme="3"] .bg-blur,
+html[data-theme="3"] .rs-bg,
+html[data-theme="3"] .ls-bg {
+  filter: blur(30px) grayscale(1) brightness(1.4);
+  opacity: 0.18;
+}
+html[data-theme="3"] .bg-lines,
+html[data-theme="3"] .rs-lines,
+html[data-theme="3"] .ls-lines,
+html[data-theme="3"] .rk-lines,
+html[data-theme="3"] .vs-lines {
+  background: var(--t3-paper);
+  opacity: 0.85;
+}
+html[data-theme="3"] .bg-vignette,
+html[data-theme="3"] .rs-shade,
+html[data-theme="3"] .ls-shade {
+  background: linear-gradient(90deg, rgba(236, 236, 233, 0.55), transparent 50%, rgba(236, 236, 233, 0.4));
+}
+
+/* 상단 바(공통): 흰 바 + 아래 검은 선 + 맨 위 주황 줄 */
+html[data-theme="3"] .top-bar,
+html[data-theme="3"] .rs-top,
+html[data-theme="3"] .rk-top,
+html[data-theme="3"] .vs-top {
+  color: var(--t3-ink);
+  background: linear-gradient(var(--t3-orange), var(--t3-orange)) 0 0 / 100% 4px no-repeat, var(--t3-white);
+  border-bottom: 2px solid var(--t3-ink);
+  letter-spacing: 0.14em;
+}
+html[data-theme="3"] .top-title .slashes,
+html[data-theme="3"] .rs-top .slashes,
+html[data-theme="3"] .rk-top .slashes,
+html[data-theme="3"] .vs-top .slashes,
+html[data-theme="3"] .ls-label .slashes {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .top-hint,
+html[data-theme="3"] .rk-hint,
+html[data-theme="3"] .vs-hint {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .top-hint kbd,
+html[data-theme="3"] .rk-hint kbd,
+html[data-theme="3"] .vs-page kbd {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-color: var(--t3-ink);
+}
+
+/* ---------- 곡 선택 ---------- */
+html[data-theme="3"] .jacket-frame,
+html[data-theme="3"] .rs-jacket-frame,
+html[data-theme="3"] .ls-jacket-frame {
+  padding: 3px;
+  background: var(--t3-ink);
+  /* 자켓 아래에 한 겹 더 깔린 검은 막대 */
+  box-shadow: 0 16px 0 -10px var(--t3-ink);
+}
+html[data-theme="3"] .album-overlay {
+  background: none;
+}
+html[data-theme="3"] .title-block,
+html[data-theme="3"] .rs-title-block {
+  border-left: none;
+  padding-left: 0;
+}
+/* 제목 앞의 검은 "NAME" 라벨 상자 */
+html[data-theme="3"] .title-block::before,
+html[data-theme="3"] .rs-title-block::before {
+  content: "NAME";
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 1px 16px;
+  font-family: var(--dm-font-display);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .song-title,
+html[data-theme="3"] .rs-title,
+html[data-theme="3"] .ls-title {
+  color: var(--t3-ink);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+html[data-theme="3"] .song-artist,
+html[data-theme="3"] .rs-artist,
+html[data-theme="3"] .ls-artist {
+  color: var(--dm-muted);
+  text-transform: none;
+}
+html[data-theme="3"] .detail-card,
+html[data-theme="3"] .rs-chip,
+html[data-theme="3"] .ls-chip {
+  color: var(--t3-ink);
+  background: var(--t3-hatch), var(--t3-white);
+  border: 1px solid rgba(17, 17, 17, 0.35);
+  border-left: 6px solid var(--t3-ink);
+}
+html[data-theme="3"] .detail-card .label,
+html[data-theme="3"] .rs-chip small,
+html[data-theme="3"] .ls-chip small {
+  color: var(--dm-muted);
+}
+html[data-theme="3"] .detail-card strong,
+html[data-theme="3"] .song-index,
+html[data-theme="3"] .song-len,
+html[data-theme="3"] .list-count,
+html[data-theme="3"] .rs-figure-value,
+html[data-theme="3"] .score-num,
+html[data-theme="3"] .score-acc,
+html[data-theme="3"] .speed-value {
+  font-variant-numeric: tabular-nums;
+}
+/* START 버튼: 검은 막대, 모드/레벨은 흰 칸 */
+html[data-theme="3"] .play-action {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border: 2px solid var(--t3-ink);
+  box-shadow: 8px 8px 0 rgba(17, 17, 17, 0.18);
+}
+html[data-theme="3"] .play-action:hover {
+  filter: none;
+  box-shadow: 8px 8px 0 var(--t3-orange);
+}
+html[data-theme="3"] .play-mode,
+html[data-theme="3"] .play-lv {
+  color: var(--t3-ink);
+  background: var(--t3-white);
+  margin-right: 0;
+}
+html[data-theme="3"] .play-lv {
+  color: var(--t3-orange);
+  border-left: 1px solid var(--t3-ink);
+}
+html[data-theme="3"] .play-lv small {
+  color: var(--dm-muted);
+}
+html[data-theme="3"] .play-go {
+  letter-spacing: 0.24em;
+}
+html[data-theme="3"] .play-go .chev {
+  border-left-color: var(--t3-orange);
+}
+html[data-theme="3"] .mini-rank {
+  background: var(--t3-white);
+  border: 1px solid rgba(17, 17, 17, 0.35);
+  border-left: 6px solid var(--t3-ink);
+}
+html[data-theme="3"] .mini-rank-head,
+html[data-theme="3"] .mini-rank-pos {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .list-head {
+  color: var(--t3-ink);
+  border-bottom: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .list-count {
+  color: var(--t3-orange);
+}
+/* 곡 목록: 사선 무늬 흰 칸 + 왼쪽 검은 띠. 선택 곡은 흑백 반전 */
+html[data-theme="3"] .song-item {
+  color: var(--t3-ink);
+  background: var(--t3-hatch), rgba(250, 250, 248, 0.92);
+  border: 1px solid rgba(17, 17, 17, 0.28);
+  border-left: none;
+  box-sizing: border-box;
+}
+html[data-theme="3"] .song-item::before {
+  width: 4px;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .song-item:hover {
+  background: var(--t3-hatch), #e0e0dc;
+}
+html[data-theme="3"] .song-item.active {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-color: var(--t3-ink);
+  box-shadow: 8px 8px 0 rgba(17, 17, 17, 0.18);
+}
+html[data-theme="3"] .song-item.active::before {
+  width: 8px;
+  background: var(--t3-orange);
+}
+html[data-theme="3"] .song-index,
+html[data-theme="3"] .song-subtitle,
+html[data-theme="3"] .song-len {
+  color: var(--dm-muted);
+}
+html[data-theme="3"] .song-name {
+  text-transform: none;
+  font-weight: 700;
+}
+html[data-theme="3"] .song-lv {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .song-item.active .song-index,
+html[data-theme="3"] .song-item.active .song-subtitle {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .song-item.active .song-len {
+  color: #bdbdbd;
+}
+html[data-theme="3"] .empty-state {
+  color: var(--dm-muted);
+}
+
+/* 설정 팝업 */
+html[data-theme="3"] .quick-settings-backdrop {
+  background: rgba(236, 236, 233, 0.82);
+}
+html[data-theme="3"] .quick-settings-panel {
+  color: var(--t3-ink);
+  background: var(--t3-white);
+  border: 1px solid var(--t3-ink);
+  border-top: 6px solid var(--t3-ink);
+  box-shadow: 12px 12px 0 rgba(17, 17, 17, 0.18);
+}
+html[data-theme="3"] .quick-settings-header h2 {
+  letter-spacing: 0.14em;
+}
+html[data-theme="3"] .quick-settings-header h2::after {
+  content: "SETTINGS";
+  margin-left: 14px;
+  padding: 0 10px;
+  font-size: 15px;
+  letter-spacing: 0.2em;
+  color: #ffffff;
+  background: var(--t3-ink);
+  vertical-align: middle;
+}
+html[data-theme="3"] .quick-settings-section {
+  border-top: 1px solid var(--t3-ink);
+}
+html[data-theme="3"] .quick-settings-section h3 {
+  display: inline-block;
+  padding: 0 12px;
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .settings-row label,
+html[data-theme="3"] .quick-settings-header .hint,
+html[data-theme="3"] .calib-msg {
+  color: #4a4a48;
+}
+html[data-theme="3"] .slider-wrap select,
+html[data-theme="3"] .lan-input {
+  color: var(--t3-ink);
+  background: #ffffff;
+  border: 1px solid var(--t3-ink);
+}
+html[data-theme="3"] .lan-ip,
+html[data-theme="3"] .calib-live {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .settings-btn {
+  color: var(--t3-ink);
+  border: 1px solid var(--t3-ink);
+  background: #ffffff;
+}
+html[data-theme="3"] .settings-btn:hover {
+  background: #e0e0dc;
+}
+html[data-theme="3"] .settings-btn.save {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-color: var(--t3-ink);
+}
+
+/* ---------- 배속 설정 ---------- */
+html[data-theme="3"] .panel {
+  color: var(--t3-ink);
+  background: var(--t3-white);
+  border: 1px solid var(--t3-ink);
+  border-top: 6px solid var(--t3-ink);
+  box-shadow: 12px 12px 0 rgba(17, 17, 17, 0.18);
+}
+html[data-theme="3"] .panel h2 {
+  border-left-color: var(--t3-ink);
+}
+html[data-theme="3"] .speed-value {
+  color: var(--t3-ink);
+  text-shadow: none;
+}
+html[data-theme="3"] .actions button {
+  color: var(--t3-ink);
+  border: 1px solid var(--t3-ink);
+  background: #ffffff;
+}
+html[data-theme="3"] .actions button:hover {
+  background: #e0e0dc;
+}
+html[data-theme="3"] .actions button:first-child {
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .preview .lane {
+  background: #2e2e30;
+  border-left-color: #ffffff;
+  border-right-color: #ffffff;
+  outline: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .preview .note {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 4px var(--t3-ink);
+}
+
+/* ---------- 로딩 화면 ---------- */
+html[data-theme="3"] .ls-info {
+  border-left: 6px solid var(--t3-ink);
+}
+html[data-theme="3"] .ls-label {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .ls-keys .key {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .ls-keys .outer {
+  color: var(--t3-ink);
+  background: #ffffff;
+}
+html[data-theme="3"] .ls-progress {
+  height: 8px;
+  background: #d6d6d2;
+}
+html[data-theme="3"] .ls-progress-fill {
+  background: var(--t3-ink);
+  box-shadow: none;
+}
+html[data-theme="3"] .ls-art-empty,
+html[data-theme="3"] .rs-art-empty {
+  background: var(--t3-hazard), #2e2e30;
+}
+
+/* ---------- 플레이 화면 (위치/크기 변경 없음, 색/그림만) ---------- */
+/* 기어 바깥: 도면 배경. BGA 영상은 흑백으로 옅게 */
+html[data-theme="3"] .gameWrapper {
+  background: var(--t3-paper);
+}
+html[data-theme="3"] .bga-video {
+  filter: grayscale(1) contrast(1.05);
+  opacity: 0.55;
+}
+/* 배경 어둡게 막(인라인 검정 rgba)을 반전해서 같은 세기의 흰 막으로 사용 → 설정값 그대로 반영 */
+html[data-theme="3"] .bga-overlay {
+  filter: invert(1);
+}
+html[data-theme="3"] .game .gear-overlay {
+  /* 흰 레인 구분선 + 판정선 쪽으로 옅은 흰 빛 */
+  background: repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 124px,
+      rgba(255, 255, 255, 0.24) 124px,
+      rgba(255, 255, 255, 0.24) 125px
+    ),
+    linear-gradient(180deg, transparent 0%, transparent 65%, rgba(255, 255, 255, 0.07) 100%);
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #ffffff;
+  box-shadow: 0 0 0 2px var(--t3-ink), 14px 0 0 -6px rgba(17, 17, 17, 0.12);
+  overflow: visible;
+}
+/* 기어 왼쪽 바깥의 경고 줄무늬 기둥(장식, 기어 크기와 무관) */
+html[data-theme="3"] .game .gear-overlay::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -46px;
+  width: 32px;
+  background: repeating-linear-gradient(135deg, #111 0 16px, #fafaf8 16px 32px);
+  border: 2px solid var(--t3-ink);
+  box-sizing: border-box;
+}
+/* 기어 왼쪽 눈금자 */
+html[data-theme="3"] .game .gear-overlay::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -12px;
+  width: 8px;
+  background: repeating-linear-gradient(180deg, var(--t3-ink) 0 2px, transparent 2px 22px);
+}
+html[data-theme="3"] .judgment-line {
+  /* 18px 전체가 꽉 찬 흰 띠(모양/위치 동일) + 검은 테두리선 */
+  background: #ffffff;
+  box-shadow: 0 0 0 2px var(--t3-ink), 0 0 16px rgba(255, 255, 255, 0.7);
+}
+/* 하단 패널: 흰 계기판 + 검은 키캡, 아래쪽에 경고 줄무늬와 라벨 */
+html[data-theme="3"] .arcade-buttons {
+  background: var(--t3-hatch), var(--t3-white);
+  border-left: 2px solid var(--t3-ink);
+  border-right: 2px solid var(--t3-ink);
+  border-top: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .arcade-buttons::before {
+  content: "";
+  order: 2;
+  height: 22px;
+  margin: 14px 12px 0;
+  background: repeating-linear-gradient(135deg, #111 0 12px, transparent 12px 24px);
+  border: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .arcade-buttons::after {
+  content: "DJ@ON  ·  4 BUTTON  ·  MONOCHROME";
+  order: 3;
+  margin: 12px 12px 0;
+  padding: 6px 0;
+  font-family: var(--dm-font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .buttons-container {
+  order: 1;
+  gap: 2px;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .arcade-btn {
+  color: #6a6a6a;
+  background: linear-gradient(180deg, #2a2a2b 0%, #141414 100%);
+}
+html[data-theme="3"] .arcade-btn.d-key,
+html[data-theme="3"] .arcade-btn.k-key {
+  border-top-color: #ffffff;
+}
+html[data-theme="3"] .arcade-btn.f-key,
+html[data-theme="3"] .arcade-btn.j-key {
+  border-top-color: #c9cdd1;
+}
+/* 누르면 흑백 반전 */
+html[data-theme="3"] .arcade-btn.d-key.is-pressed,
+html[data-theme="3"] .arcade-btn.k-key.is-pressed,
+html[data-theme="3"] .arcade-btn.f-key.is-pressed,
+html[data-theme="3"] .arcade-btn.j-key.is-pressed {
+  color: var(--t3-ink);
+  background: linear-gradient(180deg, #ffffff 0%, #cfcfcb 100%);
+  box-shadow: inset 0 0 0 3px var(--t3-ink);
+}
+/* 진행 바(인라인 색 지정이라 !important) */
+html[data-theme="3"] .top-progress {
+  height: 5px !important;
+  background: var(--t3-ink) !important;
+  box-shadow: none !important;
+}
+/* 점수: 왼쪽 아래 흰 카드 + 검은 라벨 */
+html[data-theme="3"] .game .score {
+  color: var(--t3-ink);
+  padding: 10px 22px 12px 16px;
+  background: var(--t3-hatch), var(--t3-white);
+  border: 2px solid var(--t3-ink);
+  border-left: 8px solid var(--t3-ink);
+  box-shadow: 8px 8px 0 rgba(17, 17, 17, 0.18);
+}
+html[data-theme="3"] .score-acc {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .score-label {
+  align-self: flex-start;
+  padding: 0 10px;
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .score-num {
+  margin-top: 4px;
+  color: var(--t3-ink);
+}
+/* 체력 바: 흰 칸 + 검은 테두리, 정상 상태 채움은 검정(var(--dm-cyan)) */
+html[data-theme="3"] .health-bar {
+  background-color: var(--t3-white);
+  border: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .health-bar-segments {
+  background: repeating-linear-gradient(180deg, transparent 0, transparent 14px, var(--t3-white) 14px, var(--t3-white) 16px);
+}
+html[data-theme="3"] .pause_button {
+  color: var(--t3-ink);
+  opacity: 0.8;
+}
+html[data-theme="3"] .pause_button .fa-icon {
+  fill: var(--t3-ink);
+}
+/* 일시정지 메뉴는 기어 위라 흰 막을 약간 진하게 */
+html[data-theme="3"] .game .modal-backdrop {
+  background-color: rgba(236, 236, 233, 0.86);
+}
+html[data-theme="3"] .start_page_button .fa-icon {
+  fill: var(--t3-ink);
+}
+/* 재개 카운트다운 숫자 */
+html[data-theme="3"] .scoreCircle,
+html[data-theme="3"] .scoreCircle .num {
+  color: var(--t3-ink);
+}
+
+/* ---------- 결과 화면 ---------- */
+html[data-theme="3"] .rs-main {
+  border-bottom: 2px solid var(--t3-ink);
+}
+/* 랭크 글자(고정 색)는 검은 상자 안에 */
+html[data-theme="3"] .rs-rank {
+  padding: 18px 10px 10px;
+  background: var(--t3-ink);
+  box-shadow: 10px 10px 0 var(--t3-orange);
+}
+html[data-theme="3"] .rs-figure {
+  color: var(--t3-ink);
+  border-left: 8px solid var(--t3-ink);
+  background: var(--t3-hatch), var(--t3-white);
+  border-top: 1px solid rgba(17, 17, 17, 0.25);
+  border-bottom: 1px solid rgba(17, 17, 17, 0.25);
+  padding-right: 16px;
+}
+html[data-theme="3"] .rs-figure-label {
+  color: var(--dm-muted);
+}
+html[data-theme="3"] .rs-figure-value,
+html[data-theme="3"] .rs-figure-value.combo {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .rs-figure-value.acc {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .rs-tag {
+  color: #ffffff;
+}
+html[data-theme="3"] .rs-tag-record {
+  background: var(--t3-orange);
+}
+html[data-theme="3"] .rs-tag-combo {
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .rs-judge-head {
+  display: inline-block;
+  padding: 0 12px;
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+/* 판정 행(고정 색)은 검은 줄 */
+html[data-theme="3"] .rs-row {
+  color: #ffffff;
+  background: #1a1a1b;
+}
+html[data-theme="3"] .rs-timing .rs-judge-head {
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .rs-timing-hint {
+  color: #4a4a48;
+}
+html[data-theme="3"] .rs-register {
+  color: var(--t3-ink);
+  background: var(--t3-white);
+  border: 1px solid rgba(17, 17, 17, 0.35);
+  border-left: 6px solid var(--t3-ink);
+}
+html[data-theme="3"] .rs-register-head {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .rs-register-row input {
+  color: var(--t3-ink);
+  background: #ffffff;
+  border: 1px solid var(--t3-ink);
+}
+html[data-theme="3"] .rs-register-hint {
+  color: #4a4a48;
+}
+html[data-theme="3"] .rs-register-done,
+html[data-theme="3"] .rs-register-done strong {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .rs-stamp {
+  color: var(--dm-muted);
+  background: var(--t3-white);
+  border: 1px dashed rgba(17, 17, 17, 0.45);
+}
+html[data-theme="3"] .rs-stamp.on {
+  color: var(--t3-ink);
+  background: var(--t3-hatch), #ffffff;
+  border: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .rs-stamp-mark {
+  color: #ffffff;
+  background: var(--t3-orange);
+}
+
+/* ---------- 게임 오버: 흰 도면 + 빨강 ---------- */
+html[data-theme="3"] .gameover-container {
+  color: var(--t3-ink);
+  background: var(--t3-paper);
+}
+html[data-theme="3"] .go-shade {
+  background: none;
+}
+html[data-theme="3"] .go-beam {
+  opacity: 0.6;
+}
+html[data-theme="3"] .go-label {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .gameover {
+  color: var(--t3-ink);
+  text-shadow: none;
+}
+
+/* ---------- 축제 랭킹 ---------- */
+html[data-theme="3"] .rk-source,
+html[data-theme="3"] .rk-fc,
+html[data-theme="3"] .vs-host,
+html[data-theme="3"] .vs-res-fc,
+html[data-theme="3"] .vs-badge.ready,
+html[data-theme="3"] .vs-tag {
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .rk-song,
+html[data-theme="3"] .rk-row,
+html[data-theme="3"] .vs-card,
+html[data-theme="3"] .vs-song,
+html[data-theme="3"] .vs-slot,
+html[data-theme="3"] .vs-res-row {
+  color: var(--t3-ink);
+  background: var(--t3-hatch), var(--t3-white);
+  border-top: 1px solid rgba(17, 17, 17, 0.2);
+  border-bottom: 1px solid rgba(17, 17, 17, 0.2);
+  border-left-color: rgba(17, 17, 17, 0.4);
+}
+html[data-theme="3"] .rk-song.active,
+html[data-theme="3"] .vs-song.active,
+html[data-theme="3"] .vs-slot.me,
+html[data-theme="3"] .vs-res-row.me {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-left-color: var(--t3-orange);
+}
+html[data-theme="3"] .vs-slot.empty {
+  background: rgba(250, 250, 248, 0.5);
+}
+html[data-theme="3"] .rk-row.rank-1,
+html[data-theme="3"] .vs-res-row.win {
+  background: linear-gradient(90deg, rgba(255, 90, 31, 0.18), transparent 70%), var(--t3-white);
+  border-left-color: var(--t3-orange);
+}
+html[data-theme="3"] .rk-row.rank-2 {
+  border-left-color: #8a8a88;
+}
+html[data-theme="3"] .rk-row.rank-3 {
+  border-left-color: #c07a45;
+}
+html[data-theme="3"] .rk-pos,
+html[data-theme="3"] .rk-board-sub,
+html[data-theme="3"] .vs-res-pos,
+html[data-theme="3"] .vs-section-head {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .rk-tab.active {
+  color: var(--t3-ink);
+  border-bottom-color: var(--t3-ink);
+}
+html[data-theme="3"] .vs-bar {
+  background: rgba(17, 17, 17, 0.12);
+}
+html[data-theme="3"] .vs-bar-fill {
+  background: var(--t3-ink);
+}
+
+/* ---------- LAN 대전 ---------- */
+html[data-theme="3"] .vs-card {
+  border-left: 6px solid var(--t3-ink);
+}
+html[data-theme="3"] .vs-form input {
+  color: var(--t3-ink);
+  background: #ffffff;
+  border: 1px solid var(--t3-ink);
+}
+html[data-theme="3"] .vs-badge.leader {
+  color: #ffffff;
+  background: var(--t3-orange);
+}
+/* 플레이 중 대전 HUD(기어 바깥, 흰 배경 위) */
+html[data-theme="3"] .vs-hud .vs-row {
+  color: var(--t3-ink);
+  background: var(--t3-white);
+  border: 1px solid rgba(17, 17, 17, 0.3);
+  border-left: 4px solid rgba(17, 17, 17, 0.5);
+}
+html[data-theme="3"] .vs-hud .vs-row.me {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-left-color: var(--t3-orange);
+}
+html[data-theme="3"] .vs-hud .vs-name,
+html[data-theme="3"] .vs-hud .vs-score,
+html[data-theme="3"] .vs-hud .vs-count {
+  color: inherit;
+}
+html[data-theme="3"] .vs-pos,
+html[data-theme="3"] .vs-conn {
+  color: var(--t3-orange);
+}
+
+/* ---------- 대기 화면 SAMPLE PLAY ---------- */
+html[data-theme="3"] .demo-title {
+  color: #ffffff;
+  background: var(--t3-ink);
+  box-shadow: 6px 6px 0 var(--t3-orange);
+}
+html[data-theme="3"] .demo-sub {
+  color: var(--t3-ink);
+}
+
+/* ---------- 풀콤보 연출(FullComboBanner): 검은 띠 + 경고 줄무늬 테두리 ---------- */
+html[data-theme="3"] .fc {
+  --fc-flash: rgba(255, 255, 255, 0.75);
+  --fc-band-bg: #111111;
+  --fc-edge: repeating-linear-gradient(135deg, #fafaf8 0 14px, #111 14px 28px);
+  --fc-edge-height: 14px;
+  --fc-text: #ffffff;
+  --fc-text-shadow: 6px 6px 0 #ff6a2b;
+  --fc-sub: #ff6a2b;
+  --fc-sweep: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  --fc-font-style: normal;
+  --fc-skew: 0deg;
+}

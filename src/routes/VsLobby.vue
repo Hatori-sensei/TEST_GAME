@@ -6,6 +6,8 @@
       <span class="slashes">///</span>
       <span>VS BATTLE</span>
       <span class="vs-host" v-if="hostName">{{ hostName }}</span>
+      <!-- [모드] 이 크레딧에서 몇 판째인지(최대 3판) -->
+      <span class="vs-match" v-if="vsSession">MATCH {{ Math.min(matchCount + (vsDone ? 0 : 1), 3) }}/3</span>
       <div class="vs-hint">
         <template v-if="stage === 'room' && !showResult">
           <span v-if="isLeader"><kbd>&larr;</kbd><kbd>&rarr;</kbd> 곡</span>
@@ -74,8 +76,9 @@
           <span class="vs-res-score">{{ p.final ? p.final.score.toLocaleString() : p.offline ? "OFFLINE" : "PLAYING..." }}</span>
         </div>
         <div class="vs-result-actions">
-          <span v-if="myResultId"><kbd>R</kbd> 내 결과 · 랭킹 등록</span>
-          <span v-if="isLeader && room.phase === 'result'"><kbd>ENTER</kbd> 로비로</span>
+          <span v-if="vsDone" class="vs-done"><kbd>ENTER</kbd> 3판 완료 · 최종 결과로</span>
+          <span v-if="myResultId"><kbd>R</kbd> 내 결과</span>
+          <span v-if="!vsDone && isLeader && room.phase === 'result'"><kbd>ENTER</kbd> 로비로</span>
           <span v-else-if="room.phase === 'result'" class="muted">방장이 로비로 돌아가면 다시 할 수 있어요</span>
           <span v-else class="muted">다른 플레이어가 끝나길 기다리는 중...</span>
         </div>
@@ -91,10 +94,17 @@
             <span class="vs-badge off" v-if="room.players[i - 1].offline">OFFLINE</span>
             <span class="vs-badge ready" v-else-if="room.players[i - 1].ready || room.players[i - 1].pcId === room.leaderId">READY</span>
             <span class="vs-badge wait" v-else>대기</span>
+            <!-- [외부 곡 폴더] PC마다 곡 목록 코드가 다르면 같은 곡이어도 채보가 다를 수 있음 -->
+            <span
+              class="vs-badge off"
+              v-if="room.players[i - 1].catalogHash && room.players[i - 1].catalogHash !== myHash"
+              :title="'곡 목록 코드 ' + room.players[i - 1].catalogHash"
+            >곡 목록 다름</span>
           </template>
           <span v-else class="vs-slot-empty">빈 자리</span>
         </div>
         <div class="vs-status">{{ statusText }}</div>
+        <p class="vs-error" v-if="hashMismatch">곡 목록 코드가 다른 PC가 있어요(이 PC {{ myHash }}). 모든 PC의 DJON-data를 같게 맞춰 주세요.</p>
         <p class="vs-error" v-if="error">{{ error }}</p>
       </section>
     </div>
@@ -110,6 +120,8 @@ import { localCatalog, getSongById } from "../javascript/localCatalog";
 import { isLanActive, getPcId, subscribeLan, measureClockOffset, pingHost } from "../helpers/lan";
 import { vsJoin, vsLeave, vsPing, vsSelect, vsReady, vsStart, vsReset, vsRoom } from "../helpers/vs";
 import { loadLastPlayer, saveLastPlayer, NAME_MAX, GROUP_MAX } from "../helpers/records";
+import { catalogStatus } from "../javascript/localCatalog";
+import { MODES, MAX_STAGES, clearSession } from "../helpers/session";
 
 const PING_MS = 3000;
 
@@ -131,6 +143,23 @@ export default {
     };
   },
   computed: {
+    // [모드] VS MATCH 세션(최대 3판)
+    vsSession() {
+      const s = this.$store.state.session;
+      return s && s.mode === MODES.vs ? s : null;
+    },
+    matchCount() {
+      return this.vsSession ? this.vsSession.stages.length : 0;
+    },
+    vsDone() {
+      return !!this.vsSession && this.matchCount >= MAX_STAGES;
+    },
+    myHash() {
+      return catalogStatus.hash;
+    },
+    hashMismatch() {
+      return !!this.room && this.room.players.some((p) => p.catalogHash && p.catalogHash !== this.myHash);
+    },
     charts() {
       return Object.values(localCatalog.charts).map((c) => {
         const song = getSongById(c.songId);
@@ -225,7 +254,11 @@ export default {
           this.myResultId = "";
           if (this.$route.query.result) this.$router.replace({ path: "/vs" });
         }
-        if (data.phase === "loading" && this.me && !this.launching) this.launchGame(data);
+        // [모드] 3판을 다 쳤으면 다음 대전에 끌려가지 않게 시작하지 않음(방에서 나감)
+        if (data.phase === "loading" && this.me && !this.launching) {
+          if (this.vsDone) vsLeave();
+          else this.launchGame(data);
+        }
       }
     },
     onJoinEnter(e) {
@@ -236,7 +269,7 @@ export default {
       const name = this.joinForm.name.trim();
       if (!name) return;
       this.error = "";
-      const r = await vsJoin(name, this.joinForm.group.trim());
+      const r = await vsJoin(name, this.joinForm.group.trim(), catalogStatus.hash);
       if (!r.ok) {
         this.error = r.error || "입장 실패";
         return;
@@ -283,7 +316,13 @@ export default {
     },
     async leaveAndExit() {
       if (this.stage === "room") await vsLeave();
-      this.$router.push("/menu");
+      // [모드] 한 판이라도 쳤으면 최종 결과, 아니면 모드 선택으로
+      if (this.vsSession && this.matchCount > 0) {
+        this.$router.push("/final");
+        return;
+      }
+      clearSession();
+      this.$router.push("/mode");
     },
     async onKey(e) {
       if (e.key === "Escape") {
@@ -297,6 +336,11 @@ export default {
       }
       if (this.stage !== "room" || !this.room) return;
       if (this.showResult) {
+        if (this.vsDone && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          this.leaveAndExit();
+          return;
+        }
         if ((e.key === "r" || e.key === "R") && this.myResultId) {
           this.$router.push("/result/" + this.myResultId);
         } else if (e.key === "Enter" && this.isLeader && this.room.phase === "result") {
@@ -306,6 +350,7 @@ export default {
         return;
       }
       if (this.room.phase !== "lobby") return;
+      if (this.vsDone) return; // [모드] 3판 완료: 준비/시작 불가
       if (this.isLeader && (e.key === "ArrowRight" || e.key === "ArrowDown")) {
         e.preventDefault();
         this.moveSong(1);
@@ -449,6 +494,15 @@ kbd {
   font-weight: 700;
   letter-spacing: 0.3em;
   color: var(--dm-cyan);
+}
+.vs-match {
+  margin-left: 14px;
+  padding: 0 12px;
+  color: var(--dm-bg);
+  background: var(--dm-cyan);
+}
+.vs-done {
+  color: var(--dm-amber);
 }
 .vs-song {
   display: flex;

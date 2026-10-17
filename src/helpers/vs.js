@@ -7,7 +7,8 @@ import { lanRequest, getPcId, subscribeLan } from "./lan";
 
 const post = (action, body = {}, timeoutMs = 2500) => lanRequest("POST", `/room/${action}`, { pcId: getPcId(), ...body }, timeoutMs);
 
-export const vsJoin = (name, group) => post("join", { name, group });
+// catalogHash: 이 PC의 곡 목록 코드(localCatalog catalogStatus.hash). 다른 PC와 다르면 로비에서 경고
+export const vsJoin = (name, group, catalogHash = "") => post("join", { name, group, catalogHash });
 export const vsLeave = () => post("leave");
 export const vsPing = () => post("ping", {}, 1500);
 export const vsSelect = (sheetId) => post("select", { sheetId });

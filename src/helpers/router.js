@@ -10,6 +10,9 @@ import SpeedSetup from "../routes/SpeedSetup.vue";
 import MyStudio from "../routes/MyStudio.vue";
 import SheetEditor from "../routes/SheetEditor.vue";
 import GameOverScreen from "../routes/GameOverScreen.vue";
+import ModeSelect from "../routes/ModeSelect.vue";
+import ArcadeEntry from "../routes/ArcadeEntry.vue";
+import FinalResult from "../routes/FinalResult.vue";
 import { sendPageview } from "./analytics";
 
 const router = new VueRouter({
@@ -25,6 +28,25 @@ const router = new VueRouter({
         showNav: false,
         backgroundOnly: false,
       },
+    },
+    // [모드] 타이틀 → 모드 선택 → (Arcade는 이름 입력) → 곡 선택 … → 최종 결과
+    {
+      name: "mode",
+      path: "/mode",
+      component: ModeSelect,
+      meta: { requireBg: true, showNav: false, backgroundOnly: true, title: "Mode Select" },
+    },
+    {
+      name: "arcade-entry",
+      path: "/arcade-entry",
+      component: ArcadeEntry,
+      meta: { requireBg: true, showNav: false, backgroundOnly: true, title: "Arcade" },
+    },
+    {
+      name: "final",
+      path: "/final",
+      component: FinalResult,
+      meta: { requireBg: true, showNav: false, backgroundOnly: true, title: "Final Result" },
     },
     {
       name: "menu",

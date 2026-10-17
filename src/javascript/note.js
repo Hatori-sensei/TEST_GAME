@@ -260,6 +260,9 @@ export default class Note {
       this.vm.$refs.judgeDisplay.markJudge = this.initialJudgeString;
       this.vm.$refs.judgeDisplay.showAll = true;
       this.vm.$refs.judgeDisplay.display = true;
+      if (typeof this.vm.$refs.judgeDisplay.syncFever === "function") {
+        this.vm.$refs.judgeDisplay.syncFever(); // [피버] 롱노트 틱으로 오른 게이지 반영
+      }
       clearTimeout(this.vm.$refs.judgeDisplay.timeout);
     }
 
@@ -308,6 +311,24 @@ export default class Note {
     const w = this.width - NOTE_INSET_PX * 2;
     const y = yTop;
     const h = this.singleNoteHeight;
+    // [테마 3] 브래킷 노트: 같은 사각형 안에 검은 테두리 + 흰 속 + 흰 모서리 꺾쇠(위치/크기 동일)
+    if (this.game.theme && this.game.theme.noteStyle === "bracket") {
+      const c = Math.min(12, Math.floor(w / 5));
+      ctx.fillStyle = pal.dark;
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = pal.main;
+      ctx.fillRect(x + 5, y + 6, w - 10, h - 12);
+      ctx.fillStyle = pal.light;
+      ctx.fillRect(x, y, c, 2);
+      ctx.fillRect(x, y, 2, c);
+      ctx.fillRect(x + w - c, y, c, 2);
+      ctx.fillRect(x + w - 2, y, 2, c);
+      ctx.fillRect(x, y + h - 2, c, 2);
+      ctx.fillRect(x, y + h - c, 2, c);
+      ctx.fillRect(x + w - c, y + h - 2, c, 2);
+      ctx.fillRect(x + w - 2, y + h - c, 2, c);
+      return;
+    }
     ctx.fillStyle = pal.main;
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = pal.light;

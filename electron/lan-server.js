@@ -34,26 +34,52 @@ function clampText(v, max) {
 }
 
 // 렌더러(records.js)와 같은 형식만 받음. 잘못된 항목은 버림
+// kind: "song"(곡 기록, 예전 기록 포함) | "final"(Arcade 3곡 최종 점수, 100만점 초과 가능)
 function sanitizeRecord(raw) {
   if (!raw || typeof raw !== "object") return null;
   const name = clampText(raw.name, 8);
-  const sheetId = clampText(raw.sheetId, 80);
+  const kind = raw.kind === "final" ? "final" : "song";
+  const sheetId = kind === "final" ? "final" : clampText(raw.sheetId, 80);
   const score = Number(raw.score);
   if (!name || !sheetId || !Number.isFinite(score)) return null;
   const ts = Number(raw.ts);
-  return {
+  const common = {
     id: clampText(raw.id, 64) || `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    kind,
     name,
     group: clampText(raw.group, 10) || "GUEST",
     sheetId,
+    pc: clampText(raw.pc, 20),
+    ts: Number.isFinite(ts) && ts > 0 ? ts : Date.now(),
+  };
+  if (kind === "final") {
+    const songs = Array.isArray(raw.songs) ? raw.songs.slice(0, 3) : [];
+    return {
+      ...common,
+      title: "FINAL",
+      score: Math.max(0, Math.min(5000000, Math.floor(score))),
+      base: Math.max(0, Math.min(3000000, Math.floor(Number(raw.base) || 0))),
+      bonus: Math.max(0, Math.min(5000000, Math.floor(Number(raw.bonus) || 0))),
+      songs: songs.map((s) => ({
+        sheetId: clampText(s && s.sheetId, 80),
+        title: clampText(s && s.title, 80),
+        level: Math.max(0, Math.min(99, Math.floor(Number(s && s.level) || 0))),
+        score: Math.max(0, Math.min(1000000, Math.floor(Number(s && s.score) || 0))),
+      })),
+      accuracy: 0,
+      maxCombo: 0,
+      isFullCombo: false,
+      missions: [],
+    };
+  }
+  return {
+    ...common,
     title: clampText(raw.title, 80),
     score: Math.max(0, Math.min(1000000, Math.floor(score))),
     accuracy: Math.max(0, Math.min(100, Number(raw.accuracy) || 0)),
     maxCombo: Math.max(0, Math.floor(Number(raw.maxCombo) || 0)),
     isFullCombo: raw.isFullCombo === true,
     missions: Array.isArray(raw.missions) ? raw.missions.slice(0, 20).map((m) => clampText(m, 40)).filter(Boolean) : [],
-    pc: clampText(raw.pc, 20),
-    ts: Number.isFinite(ts) && ts > 0 ? ts : Date.now(),
   };
 }
 
@@ -154,6 +180,7 @@ function createFestivalServer({ dataDir, port = DEFAULT_PORT, name = "DJ@ON HOST
         pcId: p.pcId,
         name: p.name,
         group: p.group,
+        catalogHash: p.catalogHash || "",
         ready: p.ready,
         loaded: p.loaded,
         offline: now - p.lastSeen > OFFLINE_MS,
@@ -228,6 +255,7 @@ function createFestivalServer({ dataDir, port = DEFAULT_PORT, name = "DJ@ON HOST
         pcId,
         name: clampText(body.name, 8) || pcId.slice(0, 8),
         group: clampText(body.group, 10),
+        catalogHash: clampText(body.catalogHash, 12), // [외부 곡 폴더] PC별 곡 목록 코드(다르면 로비에서 경고)
         ready: exists ? exists.ready : false,
         loaded: exists ? exists.loaded : false,
         joinedAt: exists ? exists.joinedAt : Date.now(),

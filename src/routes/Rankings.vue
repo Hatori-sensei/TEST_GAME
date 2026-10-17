@@ -1,5 +1,5 @@
 <template>
-  <!-- 축제 랭킹 보드: 곡별 TOP10 / 소속 대항전 / 미션 도장. 큰 화면에 띄워두면 곡이 자동으로 넘어감 -->
+  <!-- 축제 랭킹 보드: [모드] Arcade 최종 점수 TOP10 / 곡별 TOP10 / 미션 도장. 큰 화면에 띄워두면 곡이 자동으로 넘어감 -->
   <div class="rank-page" @mousedown="stopAuto">
     <div class="rk-lines"></div>
     <header class="rk-top">
@@ -15,59 +15,59 @@
     </header>
 
     <div class="rk-layout">
-      <!-- 왼쪽: 곡 선택 + TOP10 -->
+      <!-- 왼쪽: Arcade 최종 점수 TOP10 -->
       <section class="rk-main">
-        <div class="rk-songs">
-          <div
-            v-for="(c, i) in charts"
-            :key="c.id"
-            class="rk-song"
-            :class="{ active: i === songIndex }"
-            @click="selectSong(i)"
-          >
-            {{ c.title }}
-          </div>
-        </div>
-
-        <div class="rk-board" v-if="currentChart">
+        <div class="rk-board">
           <div class="rk-board-head">
-            <span class="rk-board-title">{{ currentChart.title }}</span>
+            <span class="rk-board-title">ARCADE FINAL</span>
             <span class="rk-board-sub">TOP 10 · {{ todayOnly ? "TODAY" : "ALL TIME" }}</span>
           </div>
-          <div v-if="topList.length === 0" class="rk-empty">아직 기록이 없어요. 첫 번째 주인공이 되어보세요!</div>
-          <div v-for="(e, i) in topList" :key="e.id" class="rk-row" :class="'rank-' + (i + 1)">
+          <div v-if="finalList.length === 0" class="rk-empty">아직 기록이 없어요. ARCADE 3곡에 도전해 보세요!</div>
+          <div v-for="(e, i) in finalList" :key="e.id" class="rk-row" :class="'rank-' + (i + 1)">
             <span class="rk-pos">{{ i + 1 }}</span>
             <span class="rk-name">{{ e.name }}</span>
             <span class="rk-group">{{ e.group }}</span>
-            <span class="rk-acc">{{ Number(e.accuracy).toFixed(2) }}%</span>
-            <span class="rk-fc" v-if="e.isFullCombo">FC</span>
+            <span class="rk-final-songs">{{ songsText(e) }}</span>
             <span class="rk-score">{{ e.score.toLocaleString() }}</span>
           </div>
+          <div class="rk-rule">최종 점수 = 3곡의 (곡 점수 × (1 + 레벨 × {{ bonusPct }}%)) 합계</div>
         </div>
       </section>
 
-      <!-- 오른쪽: 소속 대항전 / 미션 도장 -->
+      <!-- 오른쪽: 곡별 TOP10 / 미션 도장 -->
       <section class="rk-side">
         <div class="rk-tabs">
-          <div class="rk-tab" :class="{ active: sideTab === 'group' }" @click="sideTab = 'group'">소속 대항전</div>
+          <div class="rk-tab" :class="{ active: sideTab === 'song' }" @click="sideTab = 'song'">곡별 TOP 10</div>
           <div class="rk-tab" :class="{ active: sideTab === 'stamp' }" @click="sideTab = 'stamp'">미션 도장</div>
         </div>
 
-        <div v-if="sideTab === 'group'" class="rk-groups">
-          <div v-if="groups.length === 0" class="rk-empty">소속을 입력해 기록을 등록하면 대항전에 반영돼요.</div>
-          <div v-for="(g, i) in groups.slice(0, 10)" :key="g.group" class="rk-group-row">
-            <span class="rk-pos">{{ i + 1 }}</span>
-            <div class="rk-group-body">
-              <div class="rk-group-line">
-                <span class="rk-group-name">{{ g.group }}</span>
-                <span class="rk-group-pts">{{ g.points.toFixed(1) }} pt</span>
-              </div>
-              <div class="rk-bar"><div class="rk-bar-fill" :style="{ width: barWidth(g.points) }"></div></div>
-              <div class="rk-group-meta">{{ g.members }}명 · {{ g.plays }}곡 기록</div>
+        <template v-if="sideTab === 'song'">
+          <div class="rk-songs">
+            <div
+              v-for="(c, i) in charts"
+              :key="c.id"
+              class="rk-song"
+              :class="{ active: i === songIndex }"
+              @click="selectSong(i)"
+            >
+              {{ c.title }}
             </div>
           </div>
-          <div class="rk-rule">점수 = 사람별·곡별 최고점(100만점 → 100pt) 합계</div>
-        </div>
+          <div class="rk-board" v-if="currentChart">
+            <div class="rk-board-head">
+              <span class="rk-board-title small">{{ currentChart.title }}</span>
+            </div>
+            <div v-if="topList.length === 0" class="rk-empty">아직 기록이 없어요.</div>
+            <div v-for="(e, i) in topList" :key="e.id" class="rk-row small" :class="'rank-' + (i + 1)">
+              <span class="rk-pos">{{ i + 1 }}</span>
+              <span class="rk-name">{{ e.name }}</span>
+              <span class="rk-group">{{ e.group }}</span>
+              <span class="rk-acc">{{ Number(e.accuracy).toFixed(2) }}%</span>
+              <span class="rk-fc" v-if="e.isFullCombo">FC</span>
+              <span class="rk-score">{{ e.score.toLocaleString() }}</span>
+            </div>
+          </div>
+        </template>
 
         <div v-else class="rk-groups">
           <div v-if="stamps.length === 0" class="rk-empty">아직 달성한 미션이 없어요.</div>
@@ -84,8 +84,9 @@
 </template>
 
 <script>
-import { localCatalog, getSongById } from "../javascript/localCatalog";
-import { loadRecords, topBySheet, groupStandings, missionStamps, clearRecords } from "../helpers/records";
+import { localCatalog, getSongById, HIDDEN_CHARTS } from "../javascript/localCatalog";
+import { loadRecords, topBySheet, topFinals, missionStamps, clearRecords } from "../helpers/records";
+import { BONUS_PER_LEVEL } from "../helpers/finalScore";
 import { fetchSharedRecords, clearSharedRecords } from "../helpers/lan";
 
 const AUTO_ROTATE_MS = 8000; // 입력이 없으면 곡을 자동으로 넘김(큰 화면 전시용)
@@ -98,14 +99,18 @@ export default {
       entries: [],
       songIndex: 0,
       todayOnly: true,
-      sideTab: "group",
+      sideTab: "song",
       autoRotate: true,
       source: "",
     };
   },
   computed: {
+    // 곡 탭: 일반 곡 + 기록이 있는 히든곡
     charts() {
-      return Object.values(localCatalog.charts).map((c) => {
+      const hiddenPlayed = Object.values(HIDDEN_CHARTS).filter((c) =>
+        this.entries.some((e) => e.kind !== "final" && e.sheetId === c.id)
+      );
+      return [...Object.values(localCatalog.charts), ...hiddenPlayed].map((c) => {
         const song = getSongById(c.songId);
         return { id: c.id, title: (song && song.title) || c.title };
       });
@@ -116,8 +121,12 @@ export default {
     topList() {
       return this.currentChart ? topBySheet(this.entries, this.currentChart.id, 10, { todayOnly: this.todayOnly }) : [];
     },
-    groups() {
-      return groupStandings(this.entries, { todayOnly: this.todayOnly });
+    // [모드] Arcade 최종 점수 TOP10(사람별 최고 1개)
+    finalList() {
+      return topFinals(this.entries, 10, { todayOnly: this.todayOnly });
+    },
+    bonusPct() {
+      return Math.round(BONUS_PER_LEVEL * 100);
     },
     stamps() {
       return missionStamps(this.entries);
@@ -162,14 +171,13 @@ export default {
       this.songIndex = i;
       this.stopAuto();
     },
-    barWidth(points) {
-      const max = this.groups.length ? this.groups[0].points : 0;
-      return max > 0 ? `${Math.max(3, (points / max) * 100)}%` : "0%";
+    songsText(e) {
+      return (e.songs || []).map((s) => `${s.title} LV${s.level}`).join(" · ");
     },
     async onKey(e) {
       if (e.key === "Escape") {
         e.preventDefault();
-        this.$router.push("/menu");
+        this.$router.push("/mode");
         return;
       }
       // 관리자 초기화: Ctrl+Shift+Delete
@@ -194,7 +202,7 @@ export default {
       else if (e.key === "t" || e.key === "T") this.todayOnly = !this.todayOnly;
       else if (e.key === "Tab") {
         e.preventDefault();
-        this.sideTab = this.sideTab === "group" ? "stamp" : "group";
+        this.sideTab = this.sideTab === "song" ? "stamp" : "song";
       }
     },
   },
@@ -405,39 +413,20 @@ export default {
   color: var(--dm-text);
   border-bottom-color: var(--dm-cyan);
 }
-.rk-group-row {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-.rk-group-body {
-  flex: 1;
-  min-width: 0;
-}
-.rk-group-line {
-  display: flex;
-  justify-content: space-between;
-  font-size: 20px;
-  font-weight: 600;
-}
-.rk-group-pts {
-  font-family: var(--dm-font-display);
-  font-weight: 800;
-  color: var(--dm-cyan);
-}
-.rk-bar {
-  height: 10px;
-  margin: 6px 0 4px;
-  background: rgba(255, 255, 255, 0.06);
-}
-.rk-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, rgba(var(--dm-cyan-rgb), 0.4), var(--dm-cyan));
-  transition: width 0.4s ease;
-}
-.rk-group-meta,
 .rk-rule {
   font-size: 13px;
+  color: var(--dm-muted);
+}
+.rk-board-title.small {
+  font-size: 30px;
+}
+.rk-final-songs {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
   color: var(--dm-muted);
 }
 .rk-rule {
