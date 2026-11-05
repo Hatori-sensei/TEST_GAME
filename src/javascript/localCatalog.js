@@ -1,4 +1,5 @@
 import { resolveMediaUrl } from "../utils/pathResolver";
+import { isPaletteId } from "../helpers/palette";
 
 function createDateStub() {
   return {
@@ -85,8 +86,10 @@ export async function fetchChartFile(sheetFile) {
 //   곡:   id, title, audioPath 필수. 나머지는 createSongTemplate 필드와 같다.
 //         영상·표지가 없으면 bgaPath / customCoverUrl을 null로(빼면 템플릿 기본 경로가 들어감)
 //         "hidden": true 이면 히든곡(일반 목록에서 빠지고 Arcade 히든 규칙으로만 등장)
+//         "palette": "blue" 이면 그 곡을 칠 때 강조색(orange/red/blue/green/purple, 메인 테마 3에서만)
 //   차트: id, songId, sheetFile 필수. 나머지는 createChartTemplate 필드와 같다.
-//   hiddenRules: [{ id, picks: [1번째 차트 id, 2번째 차트 id], minAccuracy, hiddenChartId }]
+//   hiddenRules: [{ id, picks: [1번째 차트 id, 2번째 차트 id], hiddenChartId }]
+//                (Arcade에서 1·2번째 곡을 이 순서로 고르면 3번째 칸이 "???" = hiddenChartId)
 // 곡 id는 영문자를 하나 이상 포함해야 함(숫자로만 된 id는 객체 키 정렬 때문에 목록 맨 앞으로 감).
 // main.js가 앱을 띄우기 전에 loadCatalog()를 한 번 부른다. 형식은 차트매니저와 공유하므로
 // 바꿀 때는 매니저 쪽(src/core/game/catalogFormat.js)도 맞춰야 한다.
@@ -161,7 +164,13 @@ export function applyCatalog(data) {
       warn(`곡 id "${entry.id}"에 영문자가 없어 건너뜁니다(예: song-17).`, entry);
       continue;
     }
-    const song = createSongTemplate({ ...entry, bgaPath: entry.bgaPath ?? null });
+    // [팔레트] 곡별 강조색. 모르는 값은 경고 후 무시(기본 색으로 플레이)
+    let palette = entry.palette;
+    if (palette !== undefined && palette !== null && !isPaletteId(palette)) {
+      warn(`곡 "${entry.id}"의 palette "${palette}"를 모릅니다(orange/red/blue/green/purple). 무시합니다.`, entry);
+      palette = undefined;
+    }
+    const song = createSongTemplate({ ...entry, bgaPath: entry.bgaPath ?? null, palette });
     if (entry.hidden === true) {
       delete localCatalog.songs[entry.id];
       HIDDEN_SONGS[entry.id] = song;
@@ -285,7 +294,7 @@ async function computeCatalogHash() {
   let hash = fnv1a(
     Object.keys(songs)
       .sort()
-      .map((id) => `${id}|${songs[id].audioPath}|${HIDDEN_SONGS[id] ? 1 : 0}`)
+      .map((id) => `${id}|${songs[id].audioPath}|${HIDDEN_SONGS[id] ? 1 : 0}|${songs[id].palette || ""}`)
       .join(";")
   );
   const chartIds = Object.keys(charts).sort();

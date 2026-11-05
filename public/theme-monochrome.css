@@ -15,14 +15,19 @@ html[data-theme="3"] {
   --dm-cyan-rgb: 17, 17, 17;
   --dm-cyan-dim: rgba(17, 17, 17, 0.26);
   --dm-cyan-faint: rgba(17, 17, 17, 0.07);
-  --dm-amber: #ff5a1f; /* 포인트: 주황 */
+  /* [팔레트] 강조색. 기본 주황, html[data-palette]로 교체(src/helpers/palette.js와 값이 같아야 함) */
+  --accent: #ff5a1f;
+  --accent-rgb: 255, 90, 31;
+  --accent-light: #ffc2a6;
+  --accent-soft: #ffe2d4;
+  --dm-amber: var(--accent); /* 포인트 = 강조색 */
   --dm-red: #e0243a;
   --dm-text: #111111;
   --dm-muted: #6e6e6c;
   --t3-ink: #111111;
   --t3-paper-color: #ecece9;
   --t3-white: #fafaf8;
-  --t3-orange: #ff5a1f;
+  --t3-orange: var(--accent); /* 예전 이름 유지(이 파일 곳곳에서 씀). 실제 값은 --accent */
   /* 도면 격자(큰 칸 88px + 작은 칸 22px) + 큰 칸 교차점마다 십자 표시 */
   --t3-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='264' height='264'%3E%3Cpath d='M176 167v18M167 176h18' stroke='%23222' stroke-width='1.6'/%3E%3C/svg%3E") 0 0 / 264px 264px,
     linear-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px) 0 0 / 88px 88px,
@@ -36,6 +41,40 @@ html[data-theme="3"] {
   --t3-hazard: repeating-linear-gradient(135deg, #111 0 12px, transparent 12px 24px);
 }
 
+/* ---------- [팔레트] 강조색 교체(테마 3에서만). 값은 src/helpers/palette.js PALETTES와 같게 ---------- */
+html[data-theme="3"][data-palette="red"] {
+  --accent: #e8334a;
+  --accent-rgb: 232, 51, 74;
+  --accent-light: #ffc4cb;
+  --accent-soft: #ffe3e6;
+}
+html[data-theme="3"][data-palette="blue"] {
+  --accent: #3b82ff;
+  --accent-rgb: 59, 130, 255;
+  --accent-light: #bcd3ff;
+  --accent-soft: #dfe9ff;
+}
+html[data-theme="3"][data-palette="green"] {
+  --accent: #19b86b;
+  --accent-rgb: 25, 184, 107;
+  --accent-light: #bff0d6;
+  --accent-soft: #e1f8ec;
+}
+html[data-theme="3"][data-palette="purple"] {
+  --accent: #8a4dff;
+  --accent-rgb: 138, 77, 255;
+  --accent-light: #dccbff;
+  --accent-soft: #efe6ff;
+}
+/* 빨강 팔레트: MAX 100%가 빨강이 되므로 BREAK는 자홍으로 바꿔 구분 */
+html[data-theme="3"][data-palette="red"] .judge {
+  --j-break-text: #e040fb;
+  --j-break-shadow: #4a0060;
+}
+html[data-theme="3"][data-palette="red"] .rs-row {
+  --dm-red: #e040fb;
+}
+
 /* ---------- 판정 글자/콤보/피버/FAST·SLOW (MarkComboJudge 변수) ---------- */
 html[data-theme="3"] .judge {
   --judge-font-style: normal;
@@ -44,27 +83,28 @@ html[data-theme="3"] .judge {
   /* 검은 외곽선 + 오른쪽 아래 그림자(도장 찍은 듯한 단단한 숫자) */
   --combo-num-shadow: -3px 0 0 #111, 3px 0 0 #111, 0 -3px 0 #111, 0 3px 0 #111, 7px 7px 0 rgba(0, 0, 0, 0.45);
   --combo-glow-rgb: 255, 255, 255;
-  --combo-mega-rgb: 255, 106, 43;
-  --j-max-text: #ffffff;
-  --j-max-shadow: #ffffff;
-  --j-high-text: #d6dade;
+  --combo-mega-rgb: var(--accent-rgb);
+  /* MAX 100% = 주황(흰색은 흰 판정선/이펙트에 묻혀서 안 보였음), 이하 = 흰색 → 은회색 → 진회색 */
+  --j-max-text: var(--accent);
+  --j-max-shadow: var(--accent);
+  --j-high-text: #ffffff;
   --j-high-shadow: #8a9096;
-  --j-mid-text: #ff6a2b;
-  --j-mid-shadow: #ff6a2b;
-  --j-low-text: #ff9a7a;
-  --j-low-shadow: #b8461f;
+  --j-mid-text: #c9cdd1;
+  --j-mid-shadow: #5a5f64;
+  --j-low-text: #8a9096;
+  --j-low-shadow: #3a3d40;
   --j-break-text: #ff3347;
   --j-break-shadow: #6b0010;
   --fs-fast-color: #ffffff;
   --fs-fast-shadow: -2px 0 0 #111, 2px 0 0 #111, 0 -2px 0 #111, 0 2px 0 #111;
-  --fs-slow-color: #ff6a2b;
+  --fs-slow-color: var(--accent);
   --fs-slow-shadow: -2px 0 0 #111, 2px 0 0 #111, 0 -2px 0 #111, 0 2px 0 #111;
   --fever-label-color: #ffffff;
-  --fever-mult-color: #ff6a2b;
+  --fever-mult-color: var(--accent);
   --fever-bar-bg: rgba(255, 255, 255, 0.1);
   --fever-bar-border: #ffffff;
   --fever-fill: #ffffff;
-  --fever-fill-on: repeating-linear-gradient(135deg, #ff6a2b 0 6px, #ffffff 6px 12px);
+  --fever-fill-on: repeating-linear-gradient(135deg, var(--accent) 0 6px, #ffffff 6px 12px);
   letter-spacing: 0.04em;
 }
 /* 팝 애니메이션(0.5초)이 끝난 뒤에도 판정 색 유지(안 그러면 본문색 = 검정으로 돌아감) */
@@ -106,7 +146,7 @@ html[data-theme="3"] .judge .fever-bar {
 /* 결과 판정 행: 무채색 테두리(MAX 100% 흰색, 1~90% 은회색, 1% 주황, BREAK 빨강) */
 html[data-theme="3"] .rs-row {
   --dm-cyan: #aab2ba;
-  --dm-amber: #ff6a2b;
+  --dm-amber: var(--accent);
   --dm-red: #ff3347;
   --dm-text: #ffffff;
   --dm-muted: #a8a8a6;
@@ -115,7 +155,7 @@ html[data-theme="3"] .rs-row-label.fs-fast {
   color: #ffffff;
 }
 html[data-theme="3"] .rs-row-label.fs-slow {
-  color: #ff6a2b;
+  color: var(--accent);
 }
 
 /* ---------- 공통: 이탤릭/사선 제거 ---------- */
@@ -713,19 +753,6 @@ html[data-theme="3"] .arcade-buttons::before {
   background: repeating-linear-gradient(135deg, #111 0 12px, transparent 12px 24px);
   border: 2px solid var(--t3-ink);
 }
-html[data-theme="3"] .arcade-buttons::after {
-  content: "DJ@ON  ·  4 BUTTON  ·  MONOCHROME";
-  order: 3;
-  margin: 12px 12px 0;
-  padding: 6px 0;
-  font-family: var(--dm-font-display);
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: 0.3em;
-  text-align: center;
-  color: #ffffff;
-  background: var(--t3-ink);
-}
 html[data-theme="3"] .buttons-container {
   order: 1;
   gap: 2px;
@@ -952,7 +979,7 @@ html[data-theme="3"] .vs-slot.empty {
 }
 html[data-theme="3"] .rk-row.rank-1,
 html[data-theme="3"] .vs-res-row.win {
-  background: linear-gradient(90deg, rgba(255, 90, 31, 0.18), transparent 70%), var(--t3-white);
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.18), transparent 70%), var(--t3-white);
   border-left-color: var(--t3-orange);
 }
 html[data-theme="3"] .rk-row.rank-2 {
@@ -1030,9 +1057,302 @@ html[data-theme="3"] .fc {
   --fc-edge: repeating-linear-gradient(135deg, #fafaf8 0 14px, #111 14px 28px);
   --fc-edge-height: 14px;
   --fc-text: #ffffff;
-  --fc-text-shadow: 6px 6px 0 #ff6a2b;
-  --fc-sub: #ff6a2b;
+  --fc-text-shadow: 6px 6px 0 var(--accent);
+  --fc-sub: var(--accent);
   --fc-sweep: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
   --fc-font-style: normal;
   --fc-skew: 0deg;
+}
+
+/* =====================================================================
+   [모드] 모드 선택 / Arcade 이름 입력 / 최종 결과 / 곡 담기 (메인 테마 전용 다듬기)
+   ===================================================================== */
+html[data-theme="3"] .mode-page,
+html[data-theme="3"] .entry-page,
+html[data-theme="3"] .final-page {
+  color: var(--t3-ink);
+  background: var(--t3-paper);
+}
+html[data-theme="3"] .ms-top,
+html[data-theme="3"] .ae-top,
+html[data-theme="3"] .fr-top {
+  color: var(--t3-ink);
+  background: linear-gradient(var(--t3-orange), var(--t3-orange)) 0 0 / 100% 4px no-repeat, var(--t3-white);
+  border-bottom: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .ms-top .slashes,
+html[data-theme="3"] .ae-top .slashes,
+html[data-theme="3"] .fr-top .slashes {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .ms-hint {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .ms-hint kbd,
+html[data-theme="3"] .fr-actions kbd {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-color: var(--t3-ink);
+}
+
+/* 모드 카드: 흰 도면 카드 → 고르면 흑백 반전 + 아래 주황 "PRESS ENTER" 띠 */
+html[data-theme="3"] .ms-card {
+  padding-bottom: 72px;
+  color: var(--t3-ink);
+  background: var(--t3-hatch), var(--t3-white);
+  border: 2px solid var(--t3-ink);
+  border-top: 2px solid var(--t3-ink);
+  box-shadow: 8px 8px 0 rgba(17, 17, 17, 0.14);
+}
+html[data-theme="3"] .ms-card.active {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-color: var(--t3-ink);
+  box-shadow: 12px 12px 0 var(--t3-orange);
+}
+html[data-theme="3"] .ms-card.active::after {
+  content: "PRESS ENTER";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 0;
+  text-align: center;
+  font-family: var(--dm-font-display);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.4em;
+  color: #ffffff;
+  background: var(--t3-orange);
+}
+/* 번호: 검은 사각 라벨(반전 카드에선 흰 라벨) */
+html[data-theme="3"] .ms-no {
+  display: inline-block;
+  min-width: 64px;
+  padding: 4px 10px 2px;
+  text-align: center;
+  font-size: 54px;
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .ms-card.active .ms-no {
+  color: var(--t3-ink);
+  background: #ffffff;
+}
+html[data-theme="3"] .ms-title {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+html[data-theme="3"] .ms-desc {
+  color: #5a5a58;
+}
+html[data-theme="3"] .ms-card.active .ms-desc {
+  color: #bdbdbb;
+}
+html[data-theme="3"] .ms-rules li {
+  border-top: 1px solid rgba(17, 17, 17, 0.25);
+}
+html[data-theme="3"] .ms-card.active .ms-rules li {
+  border-top-color: rgba(255, 255, 255, 0.22);
+}
+html[data-theme="3"] .ms-rules li::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 10px;
+  vertical-align: 2px;
+  background: var(--t3-orange);
+}
+html[data-theme="3"] .ms-note {
+  color: #ffffff;
+  background: var(--t3-orange);
+}
+/* 아래쪽 곡 폴더 상태: 검은 띠 */
+html[data-theme="3"] .ms-foot {
+  color: #d6d6d2;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .ms-foot b {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .ms-warn {
+  color: #ff6b7d;
+}
+
+/* Arcade 이름 입력 */
+html[data-theme="3"] .ae-card {
+  color: var(--t3-ink);
+  background: var(--t3-hatch), var(--t3-white);
+  border: 2px solid var(--t3-ink);
+  border-top: 8px solid var(--t3-ink);
+  box-shadow: 12px 12px 0 rgba(17, 17, 17, 0.18);
+}
+html[data-theme="3"] .ae-card h2 {
+  display: inline-block;
+  padding: 2px 16px;
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .ae-sub,
+html[data-theme="3"] .ae-hint {
+  color: #5a5a58;
+}
+html[data-theme="3"] .ae-form input {
+  color: var(--t3-ink);
+  background: #ffffff;
+  border: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .ae-form input:focus {
+  border-color: var(--t3-orange);
+  box-shadow: 4px 4px 0 var(--t3-orange);
+}
+
+/* 최종 결과: 검은 머리줄 표 + 검은 합계 상자 */
+html[data-theme="3"] .fr-player small {
+  color: #5a5a58;
+}
+html[data-theme="3"] .fr-table {
+  background: var(--t3-white);
+  border: 2px solid var(--t3-ink);
+  box-shadow: 10px 10px 0 rgba(17, 17, 17, 0.14);
+}
+html[data-theme="3"] .fr-table th {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-bottom: none;
+}
+html[data-theme="3"] .fr-table td {
+  border-bottom: 1px solid rgba(17, 17, 17, 0.2);
+}
+html[data-theme="3"] .fr-table tbody tr:nth-child(even) td {
+  background: rgba(17, 17, 17, 0.035);
+}
+html[data-theme="3"] .fr-table .strong {
+  color: var(--t3-ink);
+}
+html[data-theme="3"] .fr-table tr.failed td {
+  color: #8a8a88;
+}
+html[data-theme="3"] .fr-tag {
+  color: #ffffff;
+  background: var(--t3-orange);
+}
+html[data-theme="3"] .fr-tag.fail {
+  background: var(--dm-red);
+}
+html[data-theme="3"] .fr-total {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-left: 10px solid var(--t3-orange);
+  box-shadow: 12px 12px 0 rgba(17, 17, 17, 0.18);
+}
+html[data-theme="3"] .fr-line {
+  color: #bdbdbb;
+}
+html[data-theme="3"] .fr-line b {
+  color: #ffffff;
+}
+html[data-theme="3"] .fr-line.big {
+  color: #ffffff;
+  border-top-color: rgba(255, 255, 255, 0.25);
+}
+html[data-theme="3"] .fr-line.big b {
+  color: #ffffff;
+  text-shadow: 5px 5px 0 var(--t3-orange);
+}
+html[data-theme="3"] .fr-rank b {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .fr-note {
+  color: #bdbdbb;
+}
+html[data-theme="3"] .fr-actions {
+  color: #5a5a58;
+}
+
+/* 곡 선택: 모드 배지 / Arcade 곡 담기 슬롯 */
+html[data-theme="3"] .mode-badge {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-left: 6px solid var(--t3-orange);
+}
+/* Arcade 곡 확인 팝업: 흰 도면 카드 + 검은 스테이지 라벨, 확인하면 주황 SELECTED 도장 */
+html[data-theme="3"] .pick-overlay {
+  background: rgba(236, 236, 233, 0.78);
+}
+html[data-theme="3"] .pick-card {
+  color: var(--t3-ink);
+  background: var(--t3-hatch), var(--t3-white);
+  border: 2px solid var(--t3-ink);
+  border-top: 8px solid var(--t3-ink);
+  box-shadow: 14px 14px 0 var(--t3-orange);
+}
+html[data-theme="3"] .pick-card.secret {
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .pick-stage {
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .pick-card.secret .pick-stage {
+  background: var(--t3-orange);
+}
+html[data-theme="3"] .pick-cover {
+  border: 3px solid var(--t3-ink);
+}
+html[data-theme="3"] .pick-cover.secret {
+  color: var(--t3-orange);
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 12px, transparent 12px 24px), #1c1c1d;
+  border-color: #ffffff;
+}
+html[data-theme="3"] .pick-lv {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .pick-keys {
+  color: #5a5a58;
+}
+html[data-theme="3"] .pick-card.secret .pick-keys {
+  color: #bdbdbb;
+}
+html[data-theme="3"] .pick-keys kbd {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-color: var(--t3-ink);
+}
+html[data-theme="3"] .pick-card.secret .pick-keys kbd {
+  color: var(--t3-ink);
+  background: #ffffff;
+}
+html[data-theme="3"] .pick-stamp {
+  color: #ffffff;
+  background: var(--t3-orange);
+  box-shadow: 6px 6px 0 var(--t3-ink);
+}
+/* 상단 바: 고른 곡 칩 */
+html[data-theme="3"] .pick-chip {
+  color: var(--t3-ink);
+  background: var(--t3-white);
+  border: 2px solid var(--t3-ink);
+}
+html[data-theme="3"] .pick-chip b {
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .pick-chip.secret {
+  color: var(--t3-orange);
+}
+html[data-theme="3"] .pick-chip.secret b {
+  background: var(--t3-orange);
+}
+html[data-theme="3"] .rs-stage {
+  padding: 0 12px;
+  color: #ffffff;
+  background: var(--t3-ink);
+}
+html[data-theme="3"] .vs-match {
+  color: #ffffff;
+  background: var(--t3-ink);
+  border-left: 6px solid var(--t3-orange);
 }

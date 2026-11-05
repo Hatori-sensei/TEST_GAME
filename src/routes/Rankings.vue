@@ -22,7 +22,7 @@
             <span class="rk-board-title">ARCADE FINAL</span>
             <span class="rk-board-sub">TOP 10 · {{ todayOnly ? "TODAY" : "ALL TIME" }}</span>
           </div>
-          <div v-if="finalList.length === 0" class="rk-empty">아직 기록이 없어요. ARCADE 3곡에 도전해 보세요!</div>
+          <div v-if="finalList.length === 0" class="rk-empty">NO RECORD</div>
           <div v-for="(e, i) in finalList" :key="e.id" class="rk-row" :class="'rank-' + (i + 1)">
             <span class="rk-pos">{{ i + 1 }}</span>
             <span class="rk-name">{{ e.name }}</span>
@@ -57,7 +57,7 @@
             <div class="rk-board-head">
               <span class="rk-board-title small">{{ currentChart.title }}</span>
             </div>
-            <div v-if="topList.length === 0" class="rk-empty">아직 기록이 없어요.</div>
+            <div v-if="topList.length === 0" class="rk-empty">NO RECORD</div>
             <div v-for="(e, i) in topList" :key="e.id" class="rk-row small" :class="'rank-' + (i + 1)">
               <span class="rk-pos">{{ i + 1 }}</span>
               <span class="rk-name">{{ e.name }}</span>
@@ -70,7 +70,7 @@
         </template>
 
         <div v-else class="rk-groups">
-          <div v-if="stamps.length === 0" class="rk-empty">아직 달성한 미션이 없어요.</div>
+          <div v-if="stamps.length === 0" class="rk-empty">NO STAMP</div>
           <div v-for="(p, i) in stamps.slice(0, 12)" :key="p.name + p.group" class="rk-row small">
             <span class="rk-pos">{{ i + 1 }}</span>
             <span class="rk-name">{{ p.name }}</span>

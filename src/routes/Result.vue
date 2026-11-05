@@ -33,15 +33,8 @@
 
         <!-- [모드] Arcade는 곡 기록이 자동 등록됨 / 히든곡이 열리면 안내 -->
         <div class="rs-register" v-if="session && hiddenNotice">
-          <div class="rs-register-head">HIDDEN STAGE UNLOCKED</div>
-          <div class="rs-register-done">조건 달성! 3번째 곡이 <strong>히든곡</strong>으로 바뀌었어요</div>
-        </div>
-        <div class="rs-register" v-if="session && session.mode === 'arcade'">
-          <div class="rs-register-head">RANKING</div>
-          <div class="rs-register-hint" v-if="isAutoPlay">AUTO PLAY 결과는 랭킹에 등록되지 않습니다</div>
-          <div class="rs-register-done" v-else>
-            <strong>{{ session.player && session.player.name }}</strong> 기록 자동 등록 · 최종 점수는 3곡 후 계산
-          </div>
+          <div class="rs-register-head">NEXT STAGE</div>
+          <div class="rs-register-done"><strong>???</strong></div>
         </div>
         <!-- [축제 랭킹] 기록 등록: 이름/소속 입력 → 랭킹에 반영 (모드 진행 중엔 표시 안 함) -->
         <div class="rs-register" v-if="!session && isAutoPlay">

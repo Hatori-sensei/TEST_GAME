@@ -1,12 +1,14 @@
 // [모드] 한 사람(한 크레딧)의 플레이 세션: Free Play / Arcade / VS Match, 최대 3곡(판).
 // - store.state.session에 메모리로만 둔다(Electron은 새로고침을 막음). 타이틀로 가면 지운다.
 // - 곡마다의 점수(100만점)는 그대로 쓰고, Arcade 최종 점수만 finalScore.js에서 난이도 배율을 곱한다.
-// - 히든곡: Arcade 1·2번째 곡이 규칙(picks)과 같고, 두 곡 모두 정확도가 minAccuracy 이상이며
-//   게임오버가 아니면 3번째 곡이 hiddenChartId로 바뀐다. 규칙은 localCatalog getHiddenRules()
-//   (DJON-data/catalog.json의 hiddenRules, 없으면 코드의 HIDDEN_RULES).
+// - 히든곡: Arcade 곡 고르기에서 1·2번째 곡을 규칙(picks)의 조합·순서대로 고르면 3번째 칸이
+//   "???"로 바뀌고 그 칸은 hiddenChartId로 정해진다(성적 조건 없음). 규칙은 localCatalog
+//   getHiddenRules() (DJON-data/catalog.json의 hiddenRules, 없으면 코드의 HIDDEN_RULES).
 
 import { store } from "./store";
 import { getChartById, getSongById, getHiddenRules } from "../javascript/localCatalog";
+import { applyPalette, isPaletteId } from "./palette";
+import { loadSettings } from "./settings";
 
 export const MAX_STAGES = 3;
 export const MODES = { free: "free", arcade: "arcade", vs: "vs" };
@@ -30,6 +32,8 @@ export function startSession(mode, player = null) {
     mode,
     maxStages: MAX_STAGES,
     player: player ? { name: player.name, group: player.group } : null,
+    // [팔레트] Arcade 입장 때 손님이 고른 색(이 크레딧 동안만). 없으면 운영자 기본색
+    palette: player && isPaletteId(player.palette) ? player.palette : "",
     queue: [], // arcade: 미리 고른 3곡(차트 id)
     stages: [], // 끝난 곡/판
     hiddenRuleId: "", // 열린 히든 규칙
@@ -40,13 +44,27 @@ export function startSession(mode, player = null) {
 
 export function clearSession() {
   if (store.state.session) store.commit("setSession", null);
+  restoreBasePalette();
 }
 
-// Arcade 3곡 확정(시작 전)
+// [팔레트] 화면 기본 강조색: 크레딧 색(있으면) → 운영자 기본색. 게임 화면을 떠날 때·크레딧 끝날 때 부른다
+export function basePaletteId() {
+  const s = store.state.session;
+  return (s && isPaletteId(s.palette) && s.palette) || loadSettings().palette;
+}
+
+export function restoreBasePalette() {
+  return applyPalette(basePaletteId());
+}
+
+// Arcade 3곡 확정(시작 전). 1·2번째 곡이 히든 규칙과 맞으면 3번째 곡은 히든곡으로 정해진다.
 export function setArcadeQueue(sheetIds) {
   const s = store.state.session;
   if (!s) return;
-  store.commit("setSession", { ...s, queue: sheetIds.slice(0, MAX_STAGES) });
+  const queue = sheetIds.slice(0, MAX_STAGES);
+  const rule = matchHiddenRule(queue);
+  if (rule) queue[2] = rule.hiddenChartId;
+  store.commit("setSession", { ...s, queue, hiddenRuleId: rule ? rule.id : "" });
 }
 
 export function currentStageNo() {
@@ -91,31 +109,18 @@ export function recordStage(stage) {
     autoPlay: !!stage.autoPlay,
     resultId: stage.resultId || "",
   };
-  const stages = [...s.stages, entry];
-  let next = { ...s, stages };
-  // Arcade 2곡이 끝나면 히든 규칙 검사 → 3번째 곡 교체
-  if (s.mode === MODES.arcade && stages.length === 2) {
-    const rule = matchHiddenRule(s.queue, stages);
-    if (rule) {
-      const queue = [...s.queue];
-      queue[2] = rule.hiddenChartId;
-      next = { ...next, queue, hiddenRuleId: rule.id };
-    }
-  }
-  store.commit("setSession", next);
+  store.commit("setSession", { ...s, stages: [...s.stages, entry] });
   return entry;
 }
 
-// 조합(1·2번째 곡 순서 포함) + 성적(두 곡 모두 정확도 이상, 게임오버 없음)
-export function matchHiddenRule(queue, stages) {
+// 1·2번째 곡(차트 id)이 규칙의 조합·순서와 같으면 그 규칙. 성적은 보지 않는다.
+export function matchHiddenRule(picks) {
   const rules = getHiddenRules() || [];
   return (
     rules.find((r) => {
       if (!r || !Array.isArray(r.picks) || r.picks.length !== 2) return false;
       if (!getChartById(r.hiddenChartId)) return false;
-      if (queue[0] !== r.picks[0] || queue[1] !== r.picks[1]) return false;
-      const min = Number(r.minAccuracy) || 0;
-      return stages.slice(0, 2).every((st) => !st.failed && st.accuracy >= min);
+      return picks[0] === r.picks[0] && picks[1] === r.picks[1];
     }) || null
   );
 }

@@ -59,12 +59,15 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - 미해결 질문/수치 불일치(배속 8.0 상한, 체력 회복량 문서 불일치)는 보고서 [C] 참고.
 
 ## 테마 (2026-10)
-- 설정(곡 선택 ESC) → 화면 테마: 1 = 기존 DJMAX 스타일(기본), 2 = AFTERGLOW(해 질 녘 시티팝, Claude가 자유 디자인), 3 = MONOCHROME(화이트/블랙, MUSYNX RETURN 스크린샷 참고). localStorage `djon.settings.theme`.
+- 테마 3 판정: MAX 100% = 주황(글자·풀 마름모 이펙트), 70~99 흰색 / 40~69 은회색 / 1~39 진회색, 이하 판정은 간소 이펙트(hitFx.simpleBelowMax: 얇은 마름모 테두리 1개, 0.2초, track.js FX_SIMPLE_*). 테마 1/2는 그대로.
+- **컬러 팔레트(테마 3 전용, 2026-10-25)**: `src/helpers/palette.js`(orange 기본/red/blue/green/purple). 화면은 `<html data-palette>` → theme-monochrome.css `--accent`(`--t3-orange`·`--dm-amber`는 별칭), 캔버스는 `getCanvasTheme()`가 `withPalette()`로 롱노트·누르는 중·MAX 100% 이펙트에 반영(곡 시작 때 고정). 빨강 팔레트는 BREAK를 자홍 `#e040fb`로. 우선순위: VS 자동 색 > 곡 지정(catalog.json 곡 `"palette"`) > Arcade 입장 때 고른 색(session.palette, 크레딧 동안) > 운영자 기본색(설정 ESC, settings `palette`) > 주황. Game.vue가 `loadSong` 직전에 `resolveGamePalette`로 적용하고, 게임 화면을 떠나면 `restoreBasePalette()`(크레딧 색 또는 기본색). 색 칩 UI `components/ui/PaletteChips.vue`(설정·ArcadeEntry ↑/↓). VS: lan-server가 입장 때 빈 색을 `player.color`로 배정(`pickFreeColor`, 나가도 남은 사람 색 유지) → 로비 슬롯·HUD 색, 내 게임 강조색. 곡 목록 코드(hash)에 palette 포함.
+(2026-10-21, 기본값: settings.js `theme: 3`, theme.js `DEFAULT_THEME_ID`, index.html 첫 적용값. 저장된 테마가 있으면 그 값 유지). 모드 화면(ModeSelect/ArcadeEntry/FinalResult/곡 담기 슬롯)은 테마 3 CSS 끝 "[모드]" 블록에서 다듬음. 테마 1/2는 나중에 삭제 예정(지금은 설정에서 고를 수 있음).
+- 설정(곡 선택 ESC) → 화면 테마: 1 = 기존 DJMAX 스타일, 2 = AFTERGLOW(해 질 녘 시티팝, Claude가 자유 디자인), 3 = MONOCHROME(화이트/블랙, MUSYNX RETURN 스크린샷 참고). localStorage `djon.settings.theme`.
 - 테마 3: `public/theme-monochrome.css`(흰 도면 격자+십자, 검은 라벨 상자, 경고 줄무늬, 포인트 주황 #ff5a1f, 정자체·사선 없음). 화면 배치는 테마 1과 같고 색/선/장식만 다름. 노트는 CANVAS_THEMES[3].noteStyle "bracket"(note.js `_drawNoteHead`, 같은 30px 사각형 안에 검은 테두리+흰 모서리 꺾쇠). BGA는 흑백 55%, 배경 어둡게 막은 CSS invert로 흰 막(설정값 그대로). 고정 판정 색(밝은 색)은 결과 화면에서 검은 상자/검은 행 안에 둠.
 - 구조: `<html data-theme="N">`. CSS는 `public/theme-afterglow.css`(테마 2 전용, 변수 덮어쓰기+장식+화면 구성 변경), 캔버스 색은 `src/helpers/theme.js` CANVAS_THEMES(곡 시작 시 고정).
 - 화면 CSS의 청록은 `var(--dm-cyan)` / `rgba(var(--dm-cyan-rgb), a)`로 씀. 새 색을 넣을 때도 이 변수 사용.
 - 판정 표시도 테마별(사용자 요청으로 2026-10 변경, 예전엔 고정): MarkComboJudge는 CSS 변수(--j-*, --combo-*, --fs-*, --fever-*, 기본값 = 테마 1 원래 값)를 테마 CSS의 `html[data-theme] .judge`에서 덮어씀. 타격 이펙트는 CANVAS_THEMES[n].hitFx(색 + shape circle/diamond, 테마 3 = 마름모), 결과 랭크 색은 theme.js RANK_COLORS, 결과 판정 행은 테마 변수.
-- 피버 표시: 콤보 아래 "FEVER xN + 게이지"(MarkComboJudge, result.feverMultiplier/feverGauge를 judge 때 복사. 반응형 아님). 옛 fever(gameMixin fever.percent, FeverEffect.js)는 게이지가 안 오르는 죽은 코드라 손대지 않음.
+- 피버 표시: 콤보 아래 "FEVER xN + 게이지"(MarkComboJudge, result.feverMultiplier/feverGauge를 judge 때 복사. 반응형 아님). **2026-10-21 버그수정**: result 초기값에 feverMultiplier/feverGauge가 없어 `undefined++` = NaN → 첫 미스 전까지 x1 고정이었음(gameMixin data·clearResult에 초기값, 증가는 `(x||1)+1`). 피버가 동작하면 콤보가 노트당 x2~x5로 오름(원래 설계). 옛 fever(gameMixin fever.percent, FeverEffect.js)는 죽은 코드라 손대지 않음.
 - 풀콤보 연출: `components/game/FullComboBanner.vue`(섬광 → 띠 열림 → FULL COMBO 글자, 2초, 테마 변수 --fc-*). 예전 ZoomText "Full Combo" + confetti + wow 효과음은 제거(소리 없음).
 - 테마 2는 화면 배치도 다름(곡 선택 좌우 반전, 점수 카드 기어 오른쪽 위, 일시정지 오른쪽 패널, 결과 2단). 단 판정선/기어 기하는 테마 1과 동일해야 함.
 - 모바일은 지원 안 함(사용 중 화면의 모바일 CSS 삭제).
@@ -79,18 +82,19 @@ DemoGame.vue와 옛 엔진(src/gameInstance.js, track.js, note.js), 미사용 �
 - 확인: Node 단독 서버 테스트, 실제 Electron 25(Linux, Xvfb) 호스트 + 브라우저 참가 PC로 통합 랭킹/2인 대전/끊김 처리. **Windows exe·실제 여러 PC·방화벽은 미확인**(가이드의 체크리스트).
 - 대기 화면: `src/helpers/attract.js`(IDLE_TO_TITLE_SEC 60 / TITLE_TO_DEMO_SEC 10). 메뉴·배속·결과·게임오버·일시정지 방치 → 타이틀 → SAMPLE PLAY(`/game/<채보>?demo=1`, 오토+No Fail, 기본 곡 끝까지, 아무 키나 클릭 시 타이틀, 결과/기록 없음) → 끝나면 타이틀 → 10초 뒤 다음 곡. 화면이 바뀌면 대기 시간 리셋. 재생 목록은 localCatalog `DEMO_PLAYLIST`({chartId, from?, lengthSec?}, 차례로 반복). 랭킹·대전·플레이 중엔 동작 안 함. 설정 attractMode(기본 켜짐).
 - 샘플 채보 `public/charts/Doit.sample.json`(Doit.json과 별개, BPM 129/첫 박 0.028s 분석값). localCatalog `DEMO_CHARTS`에만 있어 목록엔 안 나옴.
-- 타격 이펙트: `track.js` `HitEffect`(코어 3겹 후광+이중 선 메인 링+서브 링+스파크, 최대 지름 = 레인 폭 x `FX_SCALE`, 풀 재사용, shadowBlur 없음). 판정선(DOM 흰 띠, z-index 4 안)에 가려지지 않게 `#effectCanvas`(Game.vue z-index 5)에 그림. 롱노트 누르는 동안 `HOLD_FX_INTERVAL_SEC`(0.1초)마다 반복. 크기/시간/개수는 track.js FX_* 상수에서 조정. 판정별 색은 테마와 무관하게 고정. **실제 모양/동작은 코드 검토만 했고 직접 확인하지 못함(사용자 확인 예정).**
+- 타격 이펙트: `track.js` `HitEffect`(코어 3겹 후광+이중 선 메인 링+서브 링+스파크, 최대 지름 = 레인 폭 x `FX_SCALE`, 풀 재사용, shadowBlur 없음). 판정선(DOM 흰 띠, z-index 4 안)에 가려지지 않게 `#effectCanvas`(Game.vue z-index 5)에 그림. 롱노트 누르는 동안 `HOLD_FX_INTERVAL_SEC`(0.1초)마다 반복. 크기/시간/개수는 track.js FX_* 상수에서 조정. 판정별 색·모양은 테마별(CANVAS_THEMES[n].hitFx). **실제 모양/동작은 코드 검토만 했고 직접 확인하지 못함(사용자 확인 예정).**
 - 곡 선택 화면은 keep-alive라 키 리스너는 activated/deactivated에서 붙이고 뗌(예전엔 결과 화면 Enter가 곡 시작으로 새던 버그).
 
 ## 축제 모드 (2026-10)
 - 타이틀 → `/mode`(ModeSelect.vue) → Free Play / Arcade / VS Match. 어느 모드든 한 크레딧 최대 3곡(판). 세션은 `src/helpers/session.js` + store `session`(메모리만), 타이틀(Home mounted)·모드 선택 진입 시 삭제. 세션 없이 `/menu`에 오면 `/mode`로.
 - Free Play: 곡 선택 → … → 결과 NEXT → 3곡 후 `/final`(FinalResult.vue) 요약. 랭킹 등록 없음.
-- Arcade: `/arcade-entry`(이름/소속) → 곡 선택에서 3곡 담기(ENTER 담기, BACKSPACE 빼기, 중복 불가) → START → 곡마다 배속 설정(ENTER 시작, Cancel 없음) → 결과 NEXT STAGE. 곡 기록은 자동 등록(kind song, 오토플레이 제외). 게임오버·일시정지 "End Song"은 그 시점 점수로 곡 마감(failed)하고 다음 곡. 3곡 후 `/final`에서 최종 점수 자동 등록 + 오늘 순위.
+- Arcade: `/arcade-entry`(이름/소속) → 곡 선택: 곡마다 ENTER → 확인 팝업(STAGE n, ESC 취소) → SELECTED 도장 애니메이션 → 상단 칩, 고른 곡은 다음 목록에서 빠짐(`refreshPickList`), BACKSPACE = 마지막 곡 취소. 3곡째 확인하면 시작 → 곡마다 배속 설정(ENTER 시작, Cancel 없음) → 결과 NEXT STAGE. 곡 기록은 자동 등록(kind song, 오토플레이 제외). 게임오버·일시정지 "End Song"은 그 시점 점수로 곡 마감(failed)하고 다음 곡. 3곡 후 `/final`에서 최종 점수 자동 등록 + 오늘 순위.
 - 최종 점수 = Σ 곡 점수 × (1 + 레벨 × 0.02), 레벨 1~30으로 자름(`src/helpers/finalScore.js` BONUS_PER_LEVEL/LEVEL_MAX). 곡별 점수 계산은 그대로.
-- 히든곡: Arcade 1·2번째 곡이 규칙 `picks`(순서 포함)와 같고 두 곡 모두 `minAccuracy` 이상·게임오버 없음이면 3번째 곡이 `hiddenChartId`로 바뀜(결과 화면에 HIDDEN STAGE UNLOCKED). 규칙/히든곡은 DJON-data `catalog.json`(`hiddenRules`, `"hidden": true`) 또는 localCatalog `HIDDEN_RULES`. 지금은 히든곡 없음(사용자가 나중에 추가).
-- VS Match: 기존 `/vs` 로비, 판 수 표시(MATCH n/3), 3판 후 ENTER → 방 나가기 → `/final`. 다음 대전에 끌려가지 않게 3판 완료면 시작 안 함. LAN 꺼짐이면 모드 카드 비활성. 로비 슬롯에 PC별 곡 목록 코드가 다르면 "곡 목록 다름"(join에 catalogHash, 서버가 중계).
+- 히든곡: Arcade 곡 고르기에서 1·2번째 곡을 규칙 `picks`의 조합·순서대로 확인하면 HIDDEN STAGE `???` 팝업(ENTER 시작, ESC = 2번째 곡 취소), 3번째 곡 = `hiddenChartId`(2026-10-21 변경: 성적 조건 삭제, 고르는 단계에서 결정). 2번째 곡 결과 화면에 "NEXT · HIDDEN STAGE ???". 규칙/히든곡은 DJON-data `catalog.json`(`hiddenRules`, `"hidden": true`) 또는 localCatalog `HIDDEN_RULES`. 지금은 히든곡 없음(사용자가 나중에 추가).
+- VS Match: LAN이 꺼져 있어도 카드 선택 가능 → `/vs`에서 바로 LAN 설정(`components/ui/LanSetupPanel.vue`, 곡 선택 ESC 설정의 LAN 칸도 같은 부품) → 적용하면 로비 연결. 기존 `/vs` 로비, 판 수 표시(MATCH n/3), 3판 후 ENTER → 방 나가기 → `/final`. 다음 대전에 끌려가지 않게 3판 완료면 시작 안 함. LAN 꺼짐이면 모드 카드 비활성. 로비 슬롯에 PC별 곡 목록 코드가 다르면 "곡 목록 다름"(join에 catalogHash, 서버가 중계).
 - 모드 진행 중: 일시정지 Restart·결과/게임오버 Replay 숨김, 곡 선택 R/V 막음(R은 모드 선택 화면에서). attract는 `/mode`, `/arcade-entry`, `/final`도 방치 시 타이틀로.
-- 새 화면 3개는 테마가 아직 하나로 정해지지 않아 색을 `--dm-*` 변수로만 씀(테마별 CSS 없음). 테마 확정 후 그 테마만 다듬고 나머지 테마 삭제 예정.
+- 화면 문구는 짧은 영문 라벨 위주(2026-10-21, "AI 느낌" 문장 정리: 기어 아래 장식 글씨 삭제, NO RECORD/NOT RANKED/HIDDEN STAGE 등). 운영자용 설정·오류 문구는 한국어 유지.
+- 새 화면 3개는 색을 `--dm-*` 변수로 쓰고, 메인 테마 3에서만 `theme-monochrome.css`로 다듬음(테마 1/2는 변수 색만 적용된 기본 모양).
 - 확인: `RP_PROD=1 electron . --data-dir=…` + CDP로 Free 3곡, Arcade(중복 막힘·히든 열림·LV99→30·게임오버 곡 진행·합계 손계산 일치·랭킹 표시), End Song, 테마 1/2/3 화면. **VS 3판 제한은 실제 LAN 대전으로 확인 못 함(코드만).**
 
 ## 외부 곡 폴더 DJON-data (2026-10, 외부 제안 패치를 우리 코드에 직접 옮김)

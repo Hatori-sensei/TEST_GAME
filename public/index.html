@@ -42,10 +42,15 @@
       // [테마] 앱이 뜨기 전에 저장된 테마를 먼저 적용(첫 화면 깜빡임 방지)
       try {
         var djonSt = JSON.parse(localStorage.getItem("djon.settings") || "null");
-        var djonTh = djonSt ? Number(djonSt.theme) : 1;
-        document.documentElement.setAttribute("data-theme", djonTh === 2 || djonTh === 3 ? String(djonTh) : "1");
+        // 저장값이 없으면 메인 테마 3(MONOCHROME). theme.js DEFAULT_THEME_ID와 같아야 함
+        var djonTh = djonSt ? Number(djonSt.theme) : 3;
+        document.documentElement.setAttribute("data-theme", djonTh === 1 || djonTh === 2 || djonTh === 3 ? String(djonTh) : "3");
+        // [팔레트] 운영자 기본색(palette.js PALETTE_IDS와 같아야 함)
+        var djonPal = djonSt && djonSt.palette;
+        document.documentElement.setAttribute("data-palette", ["orange", "red", "blue", "green", "purple"].indexOf(djonPal) >= 0 ? djonPal : "orange");
       } catch (e) {
-        document.documentElement.setAttribute("data-theme", "1");
+        document.documentElement.setAttribute("data-theme", "3");
+        document.documentElement.setAttribute("data-palette", "orange");
       }
     </script>
     <script src="/js/logger.min.js"></script>

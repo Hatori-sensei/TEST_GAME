@@ -3,10 +3,12 @@
 // 판정 표시(판정 글자/콤보/피버/FAST·SLOW)는 테마 CSS, 타격 이펙트는 아래 hitFx, 결과 랭크 글자는 RANK_COLORS.
 // 테마 1의 값은 모두 변경 전 고정값과 같음.
 
+import { withPalette, getPalette } from "./palette";
+
 export const THEMES = [
   { id: 1, name: "DJMAX 스타일" },
   { id: 2, name: "AFTERGLOW (해 질 녘 시티팝)" },
-  { id: 3, name: "MONOCHROME (화이트/블랙)" },
+  { id: 3, name: "MONOCHROME (화이트/블랙) · 기본" },
 ];
 
 const MISSED = {
@@ -89,13 +91,15 @@ export const CANVAS_THEMES = {
     coverFill: "#1c1c1d",
     coverEdge: "#ffffff",
     noteStyle: "bracket", // note.js _drawNoteHead: 검은 테두리 + 흰 모서리 브래킷(그림만, 크기 동일)
-    // 무채색 마름모 이펙트: 100% 흰색 → 은회색 → 주황 → 빨강
+    // 마름모 이펙트: 100% 주황(풀 이펙트) → 흰색 → 은회색 → 진회색(간소화)
     hitFx: {
       shape: "diamond",
-      max: { color: "#ffffff", accent: "#ffffff" },
-      high: { color: "#aab2ba", accent: "#ffffff" },
-      mid: { color: "#ff6a2b", accent: "#ffe2d4" },
-      low: { color: "#e0243a", accent: "#ffc9cf" },
+      // MAX 100%만 주황 풀 이펙트, 나머지(99%~1%)는 얇은 마름모 테두리 1개(간소화)
+      simpleBelowMax: true,
+      max: { color: "#ff6a2b", accent: "#ffc2a6" },
+      high: { color: "#ffffff", accent: "#ffffff" },
+      mid: { color: "#aab2ba", accent: "#aab2ba" },
+      low: { color: "#6f767d", accent: "#6f767d" },
     },
     notes: {
       outer: { main: "#ffffff", light: "#ffffff", dark: "#111111" },
@@ -118,18 +122,23 @@ export const RANK_COLORS = {
 };
 
 export function getRankColor(rank) {
-  let id = 1;
+  let id = DEFAULT_THEME_ID;
   try {
     id = normalizeThemeId(document.documentElement.getAttribute("data-theme"));
   } catch (e) {
-    id = 1;
+    id = DEFAULT_THEME_ID;
   }
+  // [팔레트] 테마 3의 D 랭크(강조색)는 현재 팔레트 색
+  if (id === 3 && rank === "D") return getPalette().accent;
   return RANK_COLORS[id][rank] || "#ffffff";
 }
 
+// [테마] 메인 테마(저장값이 없거나 잘못됐을 때). settings.js 기본값, index.html과 같아야 함
+export const DEFAULT_THEME_ID = 3;
+
 export function normalizeThemeId(id) {
   const n = Number(id);
-  return CANVAS_THEMES[n] ? n : 1;
+  return CANVAS_THEMES[n] ? n : DEFAULT_THEME_ID;
 }
 
 // <html data-theme="N"> 적용(CSS 테마 전환)
@@ -144,12 +153,13 @@ export function applyTheme(id) {
 }
 
 // 현재 적용된 테마의 캔버스 색(곡 시작 시 1번 읽어서 고정)
+// [팔레트] 테마 3이면 현재 팔레트(data-palette)의 강조색을 롱노트/MAX 100% 이펙트에 반영한 복사본
 export function getCanvasTheme() {
-  let id = 1;
+  let id = DEFAULT_THEME_ID;
   try {
     id = normalizeThemeId(document.documentElement.getAttribute("data-theme"));
   } catch (e) {
-    id = 1;
+    id = DEFAULT_THEME_ID;
   }
-  return CANVAS_THEMES[id];
+  return id === 3 ? withPalette(CANVAS_THEMES[3]) : CANVAS_THEMES[id];
 }

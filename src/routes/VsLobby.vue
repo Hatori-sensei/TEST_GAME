@@ -18,12 +18,12 @@
       </div>
     </header>
 
-    <!-- LAN 미설정 -->
+    <!-- LAN 미설정: 여기서 바로 설정(호스트/참가) → 적용하면 로비 연결 -->
     <div class="vs-center" v-if="stage === 'off'">
-      <div class="vs-card">
-        <h2>LAN 연결이 필요해요</h2>
-        <p>곡 선택 화면에서 <b>ESC → LAN</b> 설정의 역할을 "호스트" 또는 "참가"로 바꾸고 Apply를 누르세요.</p>
-        <p class="muted">대전은 같은 공유기(같은 네트워크)에 연결된 PC끼리, 최대 4명까지 할 수 있어요.</p>
+      <div class="vs-card vs-setup">
+        <h2>LAN SETUP</h2>
+        <p class="muted">같은 공유기에 연결된 PC끼리 최대 4명. 호스트 1대 + 나머지는 참가.</p>
+        <LanSetupPanel v-model="lanForm" standalone @applied="onLanApplied"></LanSetupPanel>
       </div>
     </div>
 
@@ -86,8 +86,16 @@
 
       <section class="vs-players">
         <div class="vs-section-head">PLAYERS {{ room.players.length }}/4</div>
-        <div v-for="i in 4" :key="i" class="vs-slot" :class="slotClass(room.players[i - 1])">
+        <div
+          v-for="i in 4"
+          :key="i"
+          class="vs-slot"
+          :class="slotClass(room.players[i - 1])"
+          :style="room.players[i - 1] && room.players[i - 1].color ? { borderLeftColor: accentOf(room.players[i - 1].color), borderLeftWidth: '8px' } : null"
+        >
           <template v-if="room.players[i - 1]">
+            <!-- [팔레트] 이 사람의 색(대전 중 내 화면 강조색 + 상대 점수판 색) -->
+            <i class="vs-color" v-if="room.players[i - 1].color" :style="{ background: accentOf(room.players[i - 1].color) }"></i>
             <span class="vs-slot-name">{{ room.players[i - 1].name }}</span>
             <span class="vs-slot-group">{{ room.players[i - 1].group }}</span>
             <span class="vs-badge leader" v-if="room.players[i - 1].pcId === room.leaderId">방장</span>
@@ -117,18 +125,22 @@
 
 <script>
 import { localCatalog, getSongById } from "../javascript/localCatalog";
-import { isLanActive, getPcId, subscribeLan, measureClockOffset, pingHost } from "../helpers/lan";
+import { isLanActive, getPcId, subscribeLan, measureClockOffset, pingHost, getLanConfig } from "../helpers/lan";
+import LanSetupPanel from "../components/ui/LanSetupPanel.vue";
 import { vsJoin, vsLeave, vsPing, vsSelect, vsReady, vsStart, vsReset, vsRoom } from "../helpers/vs";
 import { loadLastPlayer, saveLastPlayer, NAME_MAX, GROUP_MAX } from "../helpers/records";
 import { catalogStatus } from "../javascript/localCatalog";
+import { accentOf } from "../helpers/palette";
 import { MODES, MAX_STAGES, clearSession } from "../helpers/session";
 
 const PING_MS = 3000;
 
 export default {
   name: "VsLobby",
+  components: { LanSetupPanel },
   data() {
     return {
+      lanForm: { ...getLanConfig() }, // [LAN] 이 화면에서 바로 설정할 때 쓰는 값
       stage: "off",
       room: null,
       pcId: getPcId(),
@@ -214,29 +226,7 @@ export default {
     // 게임 화면에서 돌아왔으면 대전 컨텍스트 해제(평소 플레이에 영향 없도록)
     this.$store.commit("setVs", null);
     window.addEventListener("keydown", this.onKey);
-    if (!isLanActive()) {
-      this.stage = "off";
-      return;
-    }
-    const info = await pingHost();
-    if (info.ok) this.hostName = info.name;
-    this.off = subscribeLan(this.onEvent);
-    const room = await vsRoom();
-    if (!info.ok && this.myResultId) {
-      this.stage = "lost";
-      return;
-    }
-    if (room && room.players.some((p) => p.pcId === this.pcId)) {
-      this.room = room;
-      this.stage = "room";
-    } else {
-      const last = loadLastPlayer();
-      this.joinForm = { name: last.name, group: last.group };
-      this.stage = "join";
-      this.error = info.ok ? "" : `호스트에 연결할 수 없어요: ${info.error}`;
-      this.$nextTick(() => this.$refs.joinName && this.$refs.joinName.focus());
-    }
-    this.pingTimer = setInterval(() => this.stage === "room" && vsPing(), PING_MS);
+    await this.init();
   },
   beforeDestroy() {
     window.removeEventListener("keydown", this.onKey);
@@ -245,6 +235,39 @@ export default {
     if (this.off) this.off();
   },
   methods: {
+    // 호스트 연결 → 방 상태에 따라 입장/로비. LAN 설정을 이 화면에서 적용한 뒤에도 다시 부름
+    async init() {
+      if (!isLanActive()) {
+        this.stage = "off";
+        return;
+      }
+      const info = await pingHost();
+      if (info.ok) this.hostName = info.name;
+      if (this.off) this.off();
+      this.off = subscribeLan(this.onEvent);
+      const room = await vsRoom();
+      if (!info.ok && this.myResultId) {
+        this.stage = "lost";
+        return;
+      }
+      if (room && room.players.some((p) => p.pcId === this.pcId)) {
+        this.room = room;
+        this.stage = "room";
+      } else {
+        const last = loadLastPlayer();
+        this.joinForm = { name: last.name, group: last.group };
+        this.stage = "join";
+        this.error = info.ok ? "" : `호스트에 연결할 수 없어요: ${info.error}`;
+        this.$nextTick(() => this.$refs.joinName && this.$refs.joinName.focus());
+      }
+      clearInterval(this.pingTimer);
+      this.pingTimer = setInterval(() => this.stage === "room" && vsPing(), PING_MS);
+    },
+    async onLanApplied() {
+      this.lanForm = { ...getLanConfig() };
+      this.error = "";
+      await this.init();
+    },
     onEvent(event, data) {
       if (event === "room" && data) {
         this.room = data;
@@ -305,11 +328,13 @@ export default {
         sheetId: room.sheetId,
         offsetMs: clock ? clock.offsetMs : 0,
         rttMs: clock ? clock.rttMs : -1,
+        color: (this.me && this.me.color) || "", // [팔레트] 대전 중 내 화면 강조색
       });
       this.$store.commit("setAutoPlay", false); // 대전은 오토플레이 불가
       this.$store.commit("setPendingGameOptions", { randomGimmickMode: "off" }); // 모두 같은 채보
       this.$router.push("/game/" + room.sheetId);
     },
+    accentOf,
     slotClass(p) {
       if (!p) return "empty";
       return { me: p.pcId === this.pcId, offline: p.offline };
@@ -503,6 +528,15 @@ kbd {
 }
 .vs-done {
   color: var(--dm-amber);
+}
+.vs-color {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+}
+.vs-setup {
+  width: min(760px, 92vw);
 }
 .vs-song {
   display: flex;

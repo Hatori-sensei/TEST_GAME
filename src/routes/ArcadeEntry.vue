@@ -7,8 +7,8 @@
     </header>
     <div class="ae-center">
       <div class="ae-card">
-        <h2>이름을 입력하세요</h2>
-        <p class="ae-sub">3곡을 다 치면 최종 점수가 이 이름으로 랭킹에 올라가요.</p>
+        <h2>PLAYER ENTRY</h2>
+        <p class="ae-sub">NAME · GROUP</p>
         <div class="ae-form">
           <input
             ref="name"
@@ -17,6 +17,8 @@
             placeholder="이름"
             @keydown.enter.prevent="onEnter"
             @keydown.esc.prevent="back"
+            @keydown.up.prevent="cyclePalette(-1)"
+            @keydown.down.prevent="cyclePalette(1)"
           />
           <input
             v-model="group"
@@ -24,9 +26,16 @@
             placeholder="소속 (예: 2-3, 컴공)"
             @keydown.enter.prevent="onEnter"
             @keydown.esc.prevent="back"
+            @keydown.up.prevent="cyclePalette(-1)"
+            @keydown.down.prevent="cyclePalette(1)"
           />
         </div>
-        <p class="ae-hint">ENTER 시작 · ESC 뒤로 · 소속을 비우면 {{ guest }}</p>
+        <!-- [팔레트] 이 크레딧 동안 쓸 강조색(↑/↓ 또는 클릭). 곡에 지정된 색이 있으면 그 곡은 곡 색 -->
+        <div class="ae-color">
+          <span class="ae-color-label">COLOR</span>
+          <PaletteChips :value="palette" @input="setPalette"></PaletteChips>
+        </div>
+        <p class="ae-hint">ENTER START · ↑↓ COLOR · ESC BACK · 소속 비우면 {{ guest }}</p>
         <p class="ae-error" v-if="error">{{ error }}</p>
       </div>
     </div>
@@ -36,12 +45,17 @@
 <script>
 import { NAME_MAX, GROUP_MAX, GUEST_GROUP, loadLastPlayer, saveLastPlayer } from "../helpers/records";
 import { startSession, MODES } from "../helpers/session";
+import { PALETTE_IDS, applyPalette, normalizePaletteId } from "../helpers/palette";
+import { loadSettings } from "../helpers/settings";
+import PaletteChips from "../components/ui/PaletteChips.vue";
 
 export default {
   name: "ArcadeEntry",
+  components: { PaletteChips },
   data() {
     const last = loadLastPlayer();
-    return { name: last.name, group: last.group, nameMax: NAME_MAX, groupMax: GROUP_MAX, guest: GUEST_GROUP, error: "" };
+    // 손님마다 다르므로 매번 운영자 기본색에서 시작
+    return { palette: normalizePaletteId(loadSettings().palette), name: last.name, group: last.group, nameMax: NAME_MAX, groupMax: GROUP_MAX, guest: GUEST_GROUP, error: "" };
   },
   mounted() {
     this.$nextTick(() => this.$refs.name && this.$refs.name.focus());
@@ -52,15 +66,23 @@ export default {
       if (e.isComposing || e.keyCode === 229) return;
       const name = this.name.trim();
       if (!name) {
-        this.error = "이름을 입력해 주세요";
+        this.error = "NAME REQUIRED";
         this.$refs.name && this.$refs.name.focus();
         return;
       }
       const group = this.group.trim() || GUEST_GROUP;
       saveLastPlayer(name, group === GUEST_GROUP ? "" : group);
-      startSession(MODES.arcade, { name, group });
+      startSession(MODES.arcade, { name, group, palette: this.palette });
       this.$store.state.audio.playEffect("ui/slide2");
       this.$router.push("/menu");
+    },
+    setPalette(id) {
+      this.palette = applyPalette(id); // 고르는 즉시 화면 강조색 미리보기
+      this.$store.state.audio.playHoverEffect("ui/ta");
+    },
+    cyclePalette(step) {
+      const i = PALETTE_IDS.indexOf(this.palette);
+      this.setPalette(PALETTE_IDS[(i + step + PALETTE_IDS.length) % PALETTE_IDS.length]);
     },
     back() {
       this.$router.push("/mode");
@@ -137,6 +159,19 @@ export default {
 }
 .ae-form input:focus {
   border-color: var(--dm-cyan);
+}
+.ae-color {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 16px 0 6px;
+}
+.ae-color-label {
+  font-family: var(--dm-font-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.2em;
+  color: var(--dm-muted);
 }
 .ae-error {
   color: var(--dm-red);

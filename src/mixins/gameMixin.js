@@ -48,6 +48,8 @@ export default {
         totalHitNotes: 0,
         combo: 0,
         maxCombo: 0,
+        feverMultiplier: 1, // [버그수정] 피버 초기값(clearResult와 같게)
+        feverGauge: 0,
         marks: { perfect: 0, good: 0, offbeat: 0, miss: 0 },
         judgeSummary: createJudgeSummary(),
         judgeDetails: createJudgeDetails(),
@@ -264,6 +266,9 @@ export default {
         totalHitNotes: 0,
         combo: 0,
         maxCombo: 0,
+        // [버그수정] 피버 초기값. 예전엔 없어서 첫 미스 전까지 배율이 NaN(화면엔 x1)으로 고정됐음
+        feverMultiplier: 1,
+        feverGauge: 0,
         marks: { perfect: 0, good: 0, offbeat: 0, miss: 0 },
         judgeSummary: createJudgeSummary(),
         judgeDetails: createJudgeDetails(),

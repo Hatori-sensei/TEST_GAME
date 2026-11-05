@@ -21,6 +21,14 @@ const DEFAULT_PORT = 41235;
 const MAX_BODY = 256 * 1024;
 const MAX_RECORDS = 20000;
 const MAX_PLAYERS = 4;
+// [팔레트] 대전 플레이어 색. 입장할 때 쓰지 않는 첫 색을 배정하고 저장(한 명이 나가도 다른 사람 색은 그대로).
+// 렌더러 src/helpers/palette.js VS_COLORS와 같아야 함
+const VS_COLORS = ["red", "blue", "green", "purple"];
+
+function pickFreeColor(usedColors) {
+  const used = new Set(usedColors || []);
+  return VS_COLORS.find((c) => !used.has(c)) || "";
+}
 const OFFLINE_MS = 10000; // 이 시간 동안 소식이 없으면 OFFLINE 표시
 const COUNTDOWN_MS = 3000; // 모두 로딩 완료 → 이만큼 뒤에 동시 시작
 const LOAD_TIMEOUT_MS = 20000; // 로딩이 늦는 PC가 있어도 이 시간 뒤엔 시작
@@ -181,6 +189,7 @@ function createFestivalServer({ dataDir, port = DEFAULT_PORT, name = "DJ@ON HOST
         name: p.name,
         group: p.group,
         catalogHash: p.catalogHash || "",
+        color: p.color || "",
         ready: p.ready,
         loaded: p.loaded,
         offline: now - p.lastSeen > OFFLINE_MS,
@@ -256,6 +265,11 @@ function createFestivalServer({ dataDir, port = DEFAULT_PORT, name = "DJ@ON HOST
         name: clampText(body.name, 8) || pcId.slice(0, 8),
         group: clampText(body.group, 10),
         catalogHash: clampText(body.catalogHash, 12), // [외부 곡 폴더] PC별 곡 목록 코드(다르면 로비에서 경고)
+        // [팔레트] 다시 입장(이름 변경 등)하면 원래 색 유지
+        color:
+          exists && exists.color
+            ? exists.color
+            : pickFreeColor(Object.values(room.players).filter((p) => p.pcId !== pcId).map((p) => p.color)),
         ready: exists ? exists.ready : false,
         loaded: exists ? exists.loaded : false,
         joinedAt: exists ? exists.joinedAt : Date.now(),
@@ -546,4 +560,4 @@ function createFestivalServer({ dataDir, port = DEFAULT_PORT, name = "DJ@ON HOST
   };
 }
 
-module.exports = { createFestivalServer, sanitizeRecord, DEFAULT_PORT };
+module.exports = { createFestivalServer, sanitizeRecord, pickFreeColor, VS_COLORS, DEFAULT_PORT };

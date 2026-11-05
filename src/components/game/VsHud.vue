@@ -10,10 +10,12 @@
       :key="p.pcId"
       class="vs-row"
       :class="{ me: p.pcId === vs.pcId, offline: p.offline }"
+      :style="p.color ? { borderLeftColor: accentOf(p.color), borderLeftWidth: '6px' } : null"
     >
       <span class="vs-pos">{{ i + 1 }}</span>
       <div class="vs-body">
         <div class="vs-line">
+          <i class="vs-color" v-if="p.color" :style="{ background: accentOf(p.color) }"></i>
           <span class="vs-name">{{ p.name }}</span>
           <span class="vs-off" v-if="p.offline">OFFLINE</span>
           <span class="vs-score">{{ p.score.toLocaleString() }}</span>
@@ -30,6 +32,7 @@
 <script>
 import { subscribeLan } from "../../helpers/lan";
 import { vsProgress, vsRoom } from "../../helpers/vs";
+import { accentOf } from "../../helpers/palette";
 
 const REPORT_MS = 250; // 점수 보고 간격
 
@@ -75,6 +78,7 @@ export default {
     clearInterval(this.clockTimer);
   },
   methods: {
+    accentOf,
     applyRoom(room) {
       const next = {};
       (room.players || []).forEach((p) => {
@@ -82,6 +86,7 @@ export default {
         next[p.pcId] = {
           pcId: p.pcId,
           name: p.name,
+          color: p.color || "", // [팔레트] 서버가 배정한 플레이어 색
           offline: p.offline,
           score: (p.live && p.live.score) || (prev && prev.score) || 0,
         };
@@ -168,6 +173,12 @@ export default {
 .vs-row.me {
   border-left-color: var(--dm-cyan);
   background: rgba(var(--dm-cyan-rgb), 0.16);
+}
+/* [팔레트] 플레이어 색 점(서버가 입장 순서로 배정) */
+.vs-color {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
 }
 .vs-row.offline {
   opacity: 0.5;

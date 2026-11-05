@@ -118,7 +118,7 @@ export default class DropTrack {
           (this.vm.result.feverGauge || 0) + gaugeCharge;
         if (this.vm.result.feverGauge >= 100) {
           if ((this.vm.result.feverMultiplier || 1) < 5) {
-            this.vm.result.feverMultiplier++;
+            this.vm.result.feverMultiplier = (this.vm.result.feverMultiplier || 1) + 1; // [버그수정] 초기값이 없으면 undefined++ = NaN → x1 고정이었음
           }
           this.vm.result.feverGauge -= 100;
         }
@@ -200,7 +200,7 @@ export default class DropTrack {
         (this.vm.result.feverGauge || 0) + gaugeCharge;
       if (this.vm.result.feverGauge >= 100) {
         if ((this.vm.result.feverMultiplier || 1) < 5) {
-          this.vm.result.feverMultiplier++;
+          this.vm.result.feverMultiplier = (this.vm.result.feverMultiplier || 1) + 1; // [버그수정] 초기값이 없으면 undefined++ = NaN → x1 고정이었음
         }
         this.vm.result.feverGauge -= 100;
       }
@@ -348,6 +348,10 @@ const FX_CENTER_OFFSET_Y = 9; // 판정선(높이 18px) 중앙. 정타 시 노�
 const FX_RING_MAX_WIDTH = 16; // 메인 링 시작 굵기(px)
 const FX_HOLD_UNTIL = 0.4; // 진행도가 이 값에 도달할 때까지는 최대 밝기 유지, 이후 사라짐
 const HOLD_FX_INTERVAL_SEC = 0.1; // 롱노트 누르는 동안 이펙트 반복 간격(노트 틱 간격과 동일)
+// [테마] hitFx.simpleBelowMax 테마(3)에서 MAX 100%가 아닌 판정의 간소 이펙트: 얇은 테두리 1개
+const FX_SIMPLE_DURATION_MS = 200;
+const FX_SIMPLE_SCALE = 0.7; // 최대 크기(풀 이펙트 대비)
+const FX_SIMPLE_LINE = 2; // 선 굵기(px)
 
 const easeOutCubic = (p) => 1 - Math.pow(1 - p, 3);
 
@@ -382,6 +386,8 @@ export class HitEffect {
     const c = this.getColors(judge);
     e.color = c.color;
     e.accent = c.accent;
+    const fx = this.game.theme && this.game.theme.hitFx;
+    e.simple = !!(fx && fx.simpleBelowMax) && judge !== "MAX 100%";
     e.t0 = performance.now();
     e.spin = (this.next * 0.37) % (Math.PI / FX_SPARK_COUNT); // 연속으로 터질 때 스파크 각도가 매번 조금씩 달라지게
   }
@@ -428,10 +434,19 @@ export class HitEffect {
       const e = this.pool[i];
       if (!e.active) continue;
       // 경과 시간 기준 진행도(프레임 수와 무관 → 저FPS에서도 같은 시간에 끝남)
-      const p = (now - e.t0) / FX_DURATION_MS;
+      const p = (now - e.t0) / (e.simple ? FX_SIMPLE_DURATION_MS : FX_DURATION_MS);
       if (p >= 1) {
         e.active = false;
         this.count -= 1;
+        continue;
+      }
+      if (e.simple) {
+        // 간소 이펙트: 테두리 1개가 퍼지며 사라짐(코어/후광/서브 링/스파크 없음)
+        ctx.strokeStyle = e.color;
+        ctx.globalAlpha = 1 - p;
+        ctx.lineWidth = FX_SIMPLE_LINE;
+        this._shape(ctx, e.x, e.y, e.r * FX_SIMPLE_SCALE * (0.4 + 0.6 * easeOutCubic(p)), diamond);
+        ctx.stroke();
         continue;
       }
       const R = e.r;

@@ -269,7 +269,7 @@ export default class Note {
     this.vm.result.feverGauge = (this.vm.result.feverGauge || 0) + 1;
     if (this.vm.result.feverGauge >= 100) {
       if ((this.vm.result.feverMultiplier || 1) < 5) {
-        this.vm.result.feverMultiplier++;
+        this.vm.result.feverMultiplier = (this.vm.result.feverMultiplier || 1) + 1; // [버그수정] 초기값이 없으면 undefined++ = NaN → x1 고정이었음
       }
       this.vm.result.feverGauge -= 100;
     }

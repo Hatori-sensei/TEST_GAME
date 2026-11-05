@@ -23,7 +23,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   mirror: false, // 좌우 반전
   noFail: false, // 체력 0이어도 게임오버 안 됨
   showFastSlow: false, // FAST/SLOW 표시(기존엔 없던 표시라 기본은 끔)
-  theme: 1, // 화면 테마(1 = 기존 디자인, 2 = AFTERGLOW, 3 = MONOCHROME)
+  palette: "orange", // [팔레트] 메인 테마 3의 강조색(orange/red/blue/green/purple). 운영자 기본색
+  theme: 3, // 화면 테마(1 = 기존 DJMAX 디자인, 2 = AFTERGLOW, 3 = MONOCHROME = 메인 테마/기본값)
   fxEnabled: true, // 채보 연출 효과(섬광/암전 등). 기존 채보엔 연출이 없어서 켜져 있어도 동작 동일
   attractMode: true, // [대기 화면] 입력이 없으면 타이틀 → SAMPLE PLAY 자동 진행
   // [LAN] 여러 PC 연결(기본 = 사용 안 함 → 기존 동작과 동일)
@@ -51,6 +52,7 @@ const STRING_RULES = {
   lanRole: { enum: ["off", "host", "client"] },
   lanHost: { max: 64 },
   pcName: { max: 12 },
+  palette: { enum: ["orange", "red", "blue", "green", "purple"] },
 };
 
 function sanitize(raw) {

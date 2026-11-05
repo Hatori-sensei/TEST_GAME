@@ -286,7 +286,8 @@ import HealthBar from "../components/game/HealthBar.vue";
 import VsHud from "../components/game/VsHud.vue";
 import { vsLoaded, vsFinish, waitForStartAt } from "../helpers/vs";
 import { setGameIdleCheck } from "../helpers/attract";
-import { MODES, recordStage, nextRoute } from "../helpers/session";
+import { MODES, recordStage, nextRoute, basePaletteId, restoreBasePalette } from "../helpers/session";
+import { applyPalette, resolveGamePalette } from "../helpers/palette";
 import { addRecord } from "../helpers/records";
 import { evaluateMissions } from "../helpers/missions";
 import { postSharedRecord, getLanConfig } from "../helpers/lan";
@@ -467,6 +468,7 @@ export default {
     window.removeEventListener("keydown", this.handleUIKeyDown);
     window.removeEventListener("keyup", this.handleUIKeyUp);
     setGameIdleCheck(null);
+    restoreBasePalette(); // [팔레트] 곡/VS 색은 게임 화면에서만. 나가면 크레딧 색 또는 기본색으로
     window.removeEventListener("keydown", this.onDemoKey, true);
     window.removeEventListener("pointerdown", this.blockDemoPointer, true);
     window.removeEventListener("click", this.onDemoKey, true);
@@ -491,6 +493,15 @@ export default {
           : {
               randomGimmickMode: this.$store.state.randomGimmickMode || "off",
             };
+        // [팔레트] 캔버스 색은 loadSong에서 고정되므로 그 전에 적용.
+        // 우선순위: VS 자동 색 > 곡 지정(catalog.json palette) > 크레딧 색/운영자 기본색
+        applyPalette(
+          resolveGamePalette({
+            vsColor: this.vs && this.vs.color,
+            songPalette: song && song.song && song.song.palette,
+            defaultPalette: basePaletteId(),
+          })
+        );
         this.instance.loadSong(song, gameOptions);
         this.$store.commit("setPendingGameOptions", null);
         document.title = song.title + " - Rhythm+ Music Game";

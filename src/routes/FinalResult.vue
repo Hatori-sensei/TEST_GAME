@@ -43,17 +43,17 @@
         <div class="fr-line"><span>난이도 가산점 (레벨 × {{ bonusPct }}%)</span><b>+{{ final.bonus.toLocaleString() }}</b></div>
         <div class="fr-line big"><span>FINAL SCORE</span><b>{{ final.total.toLocaleString() }}</b></div>
         <div class="fr-rank" v-if="saveState === 'saved'">
-          오늘 순위 <b>{{ rank > 0 ? rank + "위" : "-" }}</b>
+          TODAY RANK <b>{{ rank > 0 ? "#" + rank : "-" }}</b>
         </div>
-        <div class="fr-note" v-else-if="saveState === 'auto'">오토플레이로 친 곡이 있어 랭킹에 등록되지 않습니다</div>
-        <div class="fr-note" v-else-if="saveState === 'empty'">친 곡이 없어 등록하지 않았습니다</div>
+        <div class="fr-note" v-else-if="saveState === 'auto'">AUTO PLAY · NOT RANKED</div>
+        <div class="fr-note" v-else-if="saveState === 'empty'">NO STAGE · NOT RANKED</div>
       </div>
       <div class="fr-total" v-else>
-        <div class="fr-note">{{ isVs ? "VS MATCH" : "FREE PLAY" }}는 랭킹에 등록되지 않습니다</div>
+        <div class="fr-note">{{ isVs ? "VS MATCH" : "FREE PLAY" }} · NOT RANKED</div>
       </div>
 
       <div class="fr-actions">
-        <span><kbd>ENTER</kbd> 끝내기 (타이틀로)</span>
+        <span><kbd>ENTER</kbd> EXIT</span>
       </div>
     </div>
   </div>

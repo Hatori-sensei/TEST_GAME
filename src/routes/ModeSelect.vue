@@ -18,7 +18,7 @@
         v-for="(m, i) in modes"
         :key="m.id"
         class="ms-card"
-        :class="{ active: i === index, disabled: m.disabled }"
+        :class="{ active: i === index }"
         @click="choose(i)"
         @mouseenter="index = i"
       >
@@ -28,7 +28,7 @@
         <ul class="ms-rules">
           <li v-for="r in m.rules" :key="r">{{ r }}</li>
         </ul>
-        <div class="ms-off" v-if="m.disabled">{{ m.disabledText }}</div>
+        <div class="ms-note" v-if="m.note">{{ m.note }}</div>
       </div>
     </div>
 
@@ -58,22 +58,22 @@ export default {
         {
           id: MODES.free,
           title: "FREE PLAY",
-          desc: "원하는 곡을 골라서 자유롭게",
+          desc: "FREE SELECT",
           rules: ["최대 3곡", "랭킹 등록 없음"],
         },
         {
           id: MODES.arcade,
           title: "ARCADE",
-          desc: "이름을 적고 3곡을 미리 골라 도전",
-          rules: ["3곡 순서대로", "난이도 가산점으로 최종 점수", "랭킹 등록", "조건을 만족하면 히든곡"],
+          desc: "3 STAGES · RANKING",
+          rules: ["3곡 순서대로", "난이도 가산점으로 최종 점수", "랭킹 등록", "HIDDEN STAGE ???"],
         },
         {
           id: MODES.vs,
           title: "VS MATCH",
-          desc: "다른 PC와 같은 곡으로 대결",
+          desc: "LAN BATTLE",
           rules: ["최대 3판", "LAN 연결 필요"],
-          disabled: !this.lan,
-          disabledText: "LAN이 꺼져 있어요 (곡 선택 ESC → LAN 설정)",
+          // [VS] LAN이 꺼져 있어도 선택 가능. 들어가면 LAN 설정 화면이 먼저 나옴
+          note: this.lan ? "" : "LAN SETUP",
         },
       ];
     },
@@ -97,10 +97,6 @@ export default {
       const m = this.modes[i];
       if (!m) return;
       this.index = i;
-      if (m.disabled) {
-        this.$store.state.audio.playEffect("error");
-        return;
-      }
       this.$store.state.audio.playEffect("ui/slide2");
       if (m.id === MODES.arcade) {
         this.$router.push("/arcade-entry"); // 세션은 이름 입력 후 시작
@@ -203,9 +199,6 @@ export default {
   border-color: var(--dm-cyan);
   border-top-color: var(--dm-cyan);
 }
-.ms-card.disabled {
-  opacity: 0.45;
-}
 .ms-no {
   font-family: var(--dm-font-display);
   font-weight: 800;
@@ -239,10 +232,16 @@ export default {
   content: "· ";
   color: var(--dm-cyan);
 }
-.ms-off {
+.ms-note {
+  display: inline-block;
   margin-top: 18px;
+  padding: 2px 12px;
+  font-family: var(--dm-font-display);
+  font-weight: 700;
   font-size: 15px;
-  color: var(--dm-red);
+  letter-spacing: 0.2em;
+  color: var(--dm-bg);
+  background: var(--dm-amber);
 }
 .ms-foot {
   display: flex;
