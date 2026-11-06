@@ -6,10 +6,14 @@ const CopyPlugin = require("copy-webpack-plugin");
 const packageJson = require("./package.json");
 const version = packageJson.version || 0; //TODO change to ?? once netlify resolves their issue
 const versionPrefix = "alpha";
-const commitHash = require("child_process")
-  .execSync("git rev-parse --short HEAD")
-  .toString()
-  .trim();
+// git이 없거나 저장소가 아니어도 빌드되게 폴백
+let commitHash = "nogit";
+try {
+  commitHash = require("child_process")
+    .execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+    .toString()
+    .trim();
+} catch (e) {}
 
 const isProduction = () => process.env.NODE_ENV === "production";
 

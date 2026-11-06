@@ -3,6 +3,7 @@
   <div class="vs-page">
     <div class="vs-lines"></div>
     <header class="vs-top">
+      <button class="dm-back-btn" type="button" @click="leaveAndExit">&larr; BACK</button>
       <span class="slashes">///</span>
       <span>VS BATTLE</span>
       <span class="vs-host" v-if="hostName">{{ hostName }}</span>
@@ -226,7 +227,10 @@ export default {
     // 게임 화면에서 돌아왔으면 대전 컨텍스트 해제(평소 플레이에 영향 없도록)
     this.$store.commit("setVs", null);
     window.addEventListener("keydown", this.onKey);
-    await this.init();
+    // 게임을 마치고 돌아온 게 아니면 항상 호스트/참가 선택(LAN SETUP)부터 다시 시작.
+    // APPLY를 눌러야 연결(onLanApplied → init)
+    if (this.myResultId) await this.init();
+    else this.stage = "off";
   },
   beforeDestroy() {
     window.removeEventListener("keydown", this.onKey);
@@ -245,10 +249,15 @@ export default {
       if (info.ok) this.hostName = info.name;
       if (this.off) this.off();
       this.off = subscribeLan(this.onEvent);
-      const room = await vsRoom();
+      let room = await vsRoom();
       if (!info.ok && this.myResultId) {
         this.stage = "lost";
         return;
+      }
+      // 게임을 마치고 돌아온 게 아닌데(결과 없음) 이전에 들어갔던 방이 남아 있으면 정리 → 입장 화면부터
+      if (info.ok && !this.myResultId && room && room.players.some((p) => p.pcId === this.pcId)) {
+        await vsLeave();
+        room = await vsRoom();
       }
       if (room && room.players.some((p) => p.pcId === this.pcId)) {
         this.room = room;
@@ -428,6 +437,23 @@ export default {
 }
 .vs-top .slashes {
   color: var(--dm-cyan);
+}
+.vs-back {
+  margin-right: 8px;
+  padding: 4px 14px;
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  color: var(--dm-cyan);
+  background: transparent;
+  border: 1px solid var(--dm-cyan-dim);
+  cursor: pointer;
+}
+.vs-back:hover {
+  color: var(--dm-bg);
+  background: var(--dm-cyan);
 }
 .vs-host {
   font-size: 14px;

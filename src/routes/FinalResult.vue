@@ -3,6 +3,7 @@
        Free Play / VS: 친 곡(판) 목록만. ENTER/ESC → 타이틀. 색은 --dm-* 변수만 사용 -->
   <div class="final-page">
     <header class="fr-top">
+      <button class="dm-back-btn" type="button" @click="finish">&larr; BACK</button>
       <span class="slashes">///</span>
       <span>{{ modeLabel }} · FINAL</span>
       <span class="fr-player" v-if="session && session.player">{{ session.player.name }} <small>{{ session.player.group }}</small></span>

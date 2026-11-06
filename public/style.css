@@ -571,3 +571,23 @@ input::placeholder {
     opacity: 1;
   }
 }
+
+/* 모든 화면 공통 뒤로가기 버튼 */
+.dm-back-btn {
+  margin-right: 8px;
+  padding: 4px 14px;
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  color: var(--dm-cyan);
+  background: transparent;
+  border: 1px solid var(--dm-cyan-dim);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.dm-back-btn:hover {
+  color: var(--dm-bg);
+  background: var(--dm-cyan);
+}

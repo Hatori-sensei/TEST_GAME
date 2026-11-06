@@ -3,6 +3,7 @@
        테마가 아직 정해지지 않아서 색은 --dm-* 변수만 쓴다(테마별 CSS 없음). -->
   <div class="mode-page">
     <header class="ms-top">
+      <button class="dm-back-btn" type="button" @click="$router.push('/')">&larr; BACK</button>
       <span class="slashes">///</span>
       <span>MODE SELECT</span>
       <div class="ms-hint">

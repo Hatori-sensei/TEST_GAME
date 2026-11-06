@@ -6,6 +6,7 @@
 
     <header class="top-bar">
       <div class="top-title">
+        <button class="dm-back-btn" type="button" @click="$router.push('/mode')">&larr; BACK</button>
         <span class="slashes">///</span>
         <span>MUSIC SELECT</span>
         <!-- [모드] 진행 중인 모드/스테이지 -->

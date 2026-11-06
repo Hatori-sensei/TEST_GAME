@@ -2,6 +2,7 @@
   <!-- [모드] Arcade 시작 전 이름/소속 입력. 끝나면 곡 고르기(/menu)로. 색은 --dm-* 변수만 사용 -->
   <div class="entry-page">
     <header class="ae-top">
+      <button class="dm-back-btn" type="button" @click="back">&larr; BACK</button>
       <span class="slashes">///</span>
       <span>ARCADE · ENTRY</span>
     </header>

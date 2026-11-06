@@ -3,6 +3,7 @@
   <div class="rank-page" @mousedown="stopAuto">
     <div class="rk-lines"></div>
     <header class="rk-top">
+      <button class="dm-back-btn" type="button" @click.stop="$router.push('/mode')">&larr; BACK</button>
       <span class="slashes">///</span>
       <span>FESTIVAL RANKING</span>
       <span class="rk-source" v-if="source">{{ source }}</span>
